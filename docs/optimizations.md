@@ -1,246 +1,246 @@
-# 优化记录
+# Optimization log
 
-每一条优化都写清楚做了什么、为什么这样做、怎么验证、还有哪些边界没覆盖. 硬件细节见 [xe3.md](xe3.md),
-验证结果的总表见 [verification.md](verification.md).
+Each optimization states what was done, why it was done this way, how it was verified, and which edge cases are not covered. Hardware details in [xe3.md](xe3.md),
+the summary table of verification results in [verification.md](verification.md).
 
-总原则: **做不到逐位精确就拒**. 着色器只接受在 EU 上能算出 IEEE f32 精确结果的操作. 近似指令 (inv / rsq /
-sqrt) 不直接当结果用, 先修正到正确舍入. 修正不了的情况一律拒编译, 不静默降级. 2D 合成的「对」也按这个标准:
-GPU 结果要和一个逐层量化的精确模型逐通道对上, 允许的偏差只有可解释的舍入分界点.
+General principle: **if it cannot be bit-exact, reject it**. Shaders only accept operations whose IEEE f32 exact result can be computed on the EU. Approximate instructions (inv / rsq /
+sqrt) are not used directly as results; they are first corrected to correct rounding. Cases that cannot be corrected are rejected at compile time, never silently degraded. "Correct" for 2D compositing follows the same standard:
+the GPU result must match a per-layer quantized exact model channel by channel, and the only allowed deviations are explainable rounding boundaries.
 
-## 1. 着色器数值: 每个操作怎么做到精确
+## 1. Shader numerics: how each operation is made exact
 
-下降在 `crates/intel/codegen/src/shader.rs`, 精确性由 `math` 示例在真机上逐位对照 Rust 的 f32.
+The lowering is in `crates/intel/codegen/src/shader.rs`; exactness is checked by the `math` example on real hardware, bit by bit against Rust's f32.
 
-| MLIR 操作 | EU 指令 | 为什么精确 |
+| MLIR op | EU instruction | Why it is exact |
 | --- | --- | --- |
-| `arith.addf` / `subf` / `mulf` / `negf` | `add` / `add -src1` / `mul` / `mov -x` | 单次 IEEE 运算, 取反只改符号位 |
-| `math.fma` | `mad` (src0 + src1 * src2) | 真机实测是融合乘加: 只舍入一次, 和 `f32::mul_add` 逐位一致 |
-| `math.absf` | `mov (abs)x` | 只改符号位 |
-| `math.floor` | `rndd` | 取整本身精确 |
-| `arith.minnumf` / `maxnumf` | `sel.l` / `sel.ge` | 选择, 不做运算. 一边是 NaN 时取另一边 (同 Rust `f32::min` / `max`). `-0` 和 `+0` 取哪个不确定 (MLIR 和 Rust 都允许两种) |
-| `arith.cmpf` (oeq ogt oge olt ole une) | `cmp.<cond>` 写进寄存器 | i1 当作一个 f32 寄存器: 真是全 1 (一个 NaN), 假是 +0. 有序谓词碰到 NaN 为假, `une` 为真, 和 cmp 的条件码语义一致 |
-| `arith.select` | `csel.z`, 以条件为 src2 | 条件是 +0 (假) 时选第二个值, 其他 (全 1 的 NaN 不等于 0) 选第一个值. 不用 flag 寄存器, 不需要 SWSB 跟踪 flag 依赖 |
-| `arith.divf` | inv + 4 次 mad + 缩放 / 兜底 | 见 1.2 |
-| `math.sqrt` | rsq + 5 次 mad + 缩放 / 兜底 | 见 1.3 |
+| `arith.addf` / `subf` / `mulf` / `negf` | `add` / `add -src1` / `mul` / `mov -x` | A single IEEE operation; negation only changes the sign bit |
+| `math.fma` | `mad` (src0 + src1 * src2) | Measured on real hardware to be fused multiply-add: rounds only once, bit-identical to `f32::mul_add` |
+| `math.absf` | `mov (abs)x` | Only changes the sign bit |
+| `math.floor` | `rndd` | Rounding to an integer is itself exact |
+| `arith.minnumf` / `maxnumf` | `sel.l` / `sel.ge` | A selection, no arithmetic. When one side is NaN, takes the other side (same as Rust `f32::min` / `max`). Which of `-0` and `+0` is taken is unspecified (both MLIR and Rust allow either) |
+| `arith.cmpf` (oeq ogt oge olt ole une) | `cmp.<cond>` written to a register | i1 is held as an f32 register: true is all ones (a NaN), false is +0. Ordered predicates are false on NaN, `une` is true, matching cmp's condition code semantics |
+| `arith.select` | `csel.z`, with the condition as src2 | When the condition is +0 (false) it picks the second value, otherwise (the all-ones NaN is not equal to 0) the first. No flag register, so no SWSB tracking of flag dependencies is needed |
+| `arith.divf` | inv + 4 mad + scaling / fallback | See 1.2 |
+| `math.sqrt` | rsq + 5 mad + scaling / fallback | See 1.3 |
 
-其他 (`minimumf`、`cmpf one/ord/uno/ueq...`、超越函数) 下降失败, 编译报错.
+Others (`minimumf`, `cmpf one/ord/uno/ueq...`, transcendental functions) fail to lower and are a compile error.
 
-### 1.1 保留 f32 非规格化数 (kernel 序言)
+### 1.1 Preserving f32 denormals (kernel prologue)
 
-- 现象: 线程启动时 cr0 的 f32 denorm 位是 0, 即**冲零**. 这时 add / mul / mad 碰到非规格化输入或结果都会变成 0, 不是 IEEE.
-  实测: 商落在非规格化范围时 (例如 2.4e-16 / 2.1e23 = 1.15e-39) GPU 返回 0.
-- 做法: 每个 kernel 的第一条指令是 `or(1) cr0.0 cr0.0 0x80 {NoMask}`, 置上 bit 7 (`BRW_CR0_FP32_DENORM_PRESERVE`),
-  接一条 `sync.nop A@1` 等它完成, 因为 EU 不跟踪 cr0 的依赖. 写法照 Mesa: brw `generate_float_controls_mode`,
-  jay `set_cr0`. 代码在 `shader.rs` `ieee_prologue`, 由 `place_arguments` 插在每个 kernel 的最前面, 在片段着色器插值的 mad 之前,
-  所以插值本身也保留非规格化数.
-- `xe3-swsb` 会保留手写的 SWSB (序言里 sync 的 `A@1`), 前提是它自己没算出依赖.
-- ⚠ **采样器会冲零**: 采样返回的 rgba32float 纹素里的非规格化数都变成 0, 跟 cr0 无关. 常量 (`mov` 立即数) 写进
-  rgba32float 渲染目标能保留非规格化数, 所以问题出在采样器, 不在写回路径. 要用采样器传进非规格化数, 只能拆成
-  「规格化数 × 2^-100」, 在着色器里乘回来 (`math` 示例就是这么做的).
+- Symptom: at thread start the f32 denorm bit of cr0 is 0, i.e. **flush to zero**. Then add / mul / mad turn denormal inputs or results into 0, which is not IEEE.
+  Measured: when the quotient falls in the denormal range (e.g. 2.4e-16 / 2.1e23 = 1.15e-39) the GPU returns 0.
+- Approach: the first instruction of every kernel is `or(1) cr0.0 cr0.0 0x80 {NoMask}`, setting bit 7 (`BRW_CR0_FP32_DENORM_PRESERVE`),
+  followed by a `sync.nop A@1` to wait for it to complete, because the EU does not track cr0 dependencies. Written after Mesa: brw `generate_float_controls_mode`,
+  jay `set_cr0`. The code is `ieee_prologue` in `shader.rs`, inserted by `place_arguments` at the very start of every kernel, before the fragment shader's interpolation mad,
+  so interpolation itself also preserves denormals.
+- `xe3-swsb` keeps hand-written SWSB (the `A@1` of the sync in the prologue), provided it has not computed a dependency itself.
+- ⚠ **The sampler flushes to zero**: denormals in sampled rgba32float texels all become 0, regardless of cr0. Constants (`mov` immediates) written to an
+  rgba32float render target do keep denormals, so the problem is in the sampler, not the write path. To pass denormals in through the sampler, they must be split into
+  "normal number × 2^-100" and multiplied back in the shader (this is what the `math` example does).
 
-### 1.2 精确除法 `a / b`
+### 1.2 Exact division `a / b`
 
-EU 从 Xe-HPG 起没有 f32 FDIV, 只有近似的 `math.inv` (误差几个 ulp). 用 IA-64 的 Markstein 序列修正
-(Cornea, Harrison, Tang, *Scientific Computing on Itanium-based Systems*). 所有 mad 都是融合的, 只舍入一次:
+From Xe-HPG on the EU has no f32 FDIV, only the approximate `math.inv` (error of a few ulp). It is corrected with the IA-64 Markstein sequence
+(Cornea, Harrison, Tang, *Scientific Computing on Itanium-based Systems*). All mads are fused and round only once:
 
 ```text
-y0 = inv(b)                 近似倒数
-e  = 1 - b * y0             mad: 倒数的残差
-y1 = y0 + e * y0            mad: 一步牛顿, 倒数到 ~0.5 ulp
-q0 = a * y1                 近似商
-r  = a - b * q0             mad: 商的残差, 精确可表示 (不下溢时)
-q1 = q0 + r * y1            mad: 正确舍入的商
+y0 = inv(b)                 approximate reciprocal
+e  = 1 - b * y0             mad: residual of the reciprocal
+y1 = y0 + e * y0            mad: one Newton step, reciprocal to ~0.5 ulp
+q0 = a * y1                 approximate quotient
+r  = a - b * q0             mad: residual of the quotient, exactly representable (when no underflow)
+q1 = q0 + r * y1            mad: correctly rounded quotient
 ```
 
-三处边界 (全部用 `csel` 处理, 不分支):
+Three edge cases (all handled with `csel`, no branches):
 
-1. **溢出成 NaN**: b 是 0 或 ∞, 或输入有 NaN 时, 序列算出 NaN (例如 `1 - 0 * ∞`). 这时改取 EU 自己的 `a * inv(b)`,
-   这些情况下它是精确的 (±∞、±0、NaN). 判断方法: `q1 - q1` 是 +0 说明 q1 有限, 否则是 NaN (`finite_or`).
-2. **零被除数丢符号**: a = -0 时 `q1 = -0 + (+0) = +0`. 所以 a 等于 0 时直接取 `a * inv(b)`, 它保留了符号.
-3. **残差或倒数离开规格化范围**: a < 2^-100 时残差 `a - b*q0` (量级约 a * 2^-24) 低于非规格化数的精度,
-   修正会丢位. b 是非规格化数时 `inv(b)` 溢出成 ∞. 做法: |a| 或 |b| 小于 2^-100 时, **两个操作数同乘 2^64**.
-   这是精确的 (乘 2 的幂), 商不变, 所以不用再缩放回来, 也没有二次舍入. 缩放可能让一个操作数溢出 (a 小 b 大、
-   或 b 小 a 大), 但这时真正的商本来就超出范围 (分别是 0 或 ∞), 序列 / 兜底给的正是这个值.
-   「|x| < 界」用 `add (abs)x, -界` 的符号判断: 减法结果的符号是精确的.
+1. **Overflow to NaN**: when b is 0 or ∞, or an input is NaN, the sequence yields NaN (e.g. `1 - 0 * ∞`). Then the EU's own `a * inv(b)` is taken instead,
+   which is exact in these cases (±∞, ±0, NaN). How it is detected: `q1 - q1` is +0 means q1 is finite, otherwise it is NaN (`finite_or`).
+2. **Zero dividend loses its sign**: when a = -0, `q1 = -0 + (+0) = +0`. So when a equals 0, `a * inv(b)` is taken directly; it keeps the sign.
+3. **Residual or reciprocal leaves the normal range**: when a < 2^-100 the residual `a - b*q0` (magnitude about a * 2^-24) is below denormal precision,
+   and the correction loses bits. When b is denormal, `inv(b)` overflows to ∞. Approach: when |a| or |b| is less than 2^-100, **multiply both operands by 2^64**.
+   This is exact (multiplying by a power of 2) and the quotient is unchanged, so there is no scaling back and no double rounding. Scaling may make one operand overflow (a small and b large,
+   or b small and a large), but then the true quotient is already out of range (0 or ∞ respectively), and the sequence / fallback gives exactly that value.
+   "|x| < bound" is decided by the sign of `add (abs)x, -bound`: the sign of a subtraction result is exact.
 
-### 1.3 精确平方根 `sqrt(a)`
+### 1.3 Exact square root `sqrt(a)`
 
-EU 的 `math.sqrt` / `math.rsq` 都是近似值. 做法同样照 IA-64 的序列:
+The EU's `math.sqrt` / `math.rsq` are both approximations. The approach likewise follows the IA-64 sequence:
 
 ```text
 y0 = rsq(a)
 g0 = a * y0,  h0 = 0.5 * y0            g ≈ √a, h ≈ 1/(2√a)
 d  = 0.5 - g0 * h0                     mad
-g1 = g0 + g0 * d,  h1 = h0 + h0 * d    mad ×2: 一步牛顿
-r  = a - g1 * g1                       mad: 残差
-g2 = g1 + r * h1                       mad: 正确舍入的根
+g1 = g0 + g0 * d,  h1 = h0 + h0 * d    mad ×2: one Newton step
+r  = a - g1 * g1                       mad: residual
+g2 = g1 + r * h1                       mad: correctly rounded root
 ```
 
-边界:
+Edge cases:
 
-- a 是 0、∞ 或负数时序列得 NaN (`0 * ∞`), 改取 EU 的 `math.sqrt`. 它在这些点上精确: ±0、∞、NaN.
-- a < 2^-100 时残差下溢. 先乘 2^64, 算出根后乘 2^-32 (都是 2 的幂, 精确). 结果至少 2^-75, 是规格化数, 乘回去不会二次舍入.
+- When a is 0, ∞ or negative the sequence yields NaN (`0 * ∞`), and the EU's `math.sqrt` is taken instead. It is exact at these points: ±0, ∞, NaN.
+- When a < 2^-100 the residual underflows. Multiply by 2^64 first, and after computing the root multiply by 2^-32 (both powers of 2, exact). The result is at least 2^-75, a normal number, so multiplying back does not double-round.
 
-### 1.4 验证: `math` 示例
+### 1.4 Verification: the `math` example
 
-- 65536 组操作数 (a, b, c, d), 每组一个像素. 两个 rgba32float 纹理的纹素相乘得到操作数, 以避开采样器冲零.
-  每条管线每个像素写四个结果到 rgba32float 目标, 和 Rust f32 **逐位比较**. 任何 NaN 都算相等;
-  min / max 的 ±0 两种结果都接受.
-- 操作数的构成: 全指数范围 (±126) 的随机规格化数, 非规格化数 (单独出现在 a、b、c 位置), 相等的数对,
-  只差 1 ulp 的数对, 整数和半整数 (测 floor), 指数在 ±2 内的数 (商和根接近 1), 再加两行特殊值的全组合:
-  0、-0、±1、±∞、NaN、0.5、3、1e-30、1e30.
-- 结果: 6 个随机种子, 每个 65536 组, a/b、sqrt、fma、floor、min、max、两种 select 全部 **0 错**.
-- 修正前后的对比 (都在真机上测):
+- 65536 operand groups (a, b, c, d), one pixel per group. The operands are the product of texels from two rgba32float textures, to avoid the sampler's flush to zero.
+  Each pipeline writes four results per pixel to an rgba32float target, compared **bit by bit** against Rust f32. Any NaN counts as equal;
+  both ±0 results of min / max are accepted.
+- How the operands are built: random normal numbers over the full exponent range (±126), denormals (appearing alone in the a, b, c positions), equal pairs,
+  pairs differing by 1 ulp, integers and half-integers (to test floor), numbers with exponents within ±2 (quotients and roots near 1), plus two rows of all combinations of special values:
+  0, -0, ±1, ±∞, NaN, 0.5, 3, 1e-30, 1e30.
+- Result: 6 random seeds, 65536 groups each; a/b, sqrt, fma, floor, min, max and both selects all have **0 errors**.
+- Comparison before and after the fixes (all measured on real hardware):
 
-  | 版本 | 指数 ±60 | 指数 ±126 | 有非规格化操作数 |
+  | Version | Exponent ±60 | Exponent ±126 | With denormal operands |
   | --- | --- | --- | --- |
-  | 只用序列 | 除法只错 -0 的符号 (21 个) | 除法错约 3%, sqrt 错约 1% (残差下溢、denorm 冲零) | 全错成 0 |
-  | + 零被除数兜底 + cr0 保留 denorm | 0 错 | 除法约 50 个、sqrt 约 50 个 (操作数 < 2^-100) | 除以 denorm 得 ∞ (约 400 个) |
-  | + 2^64 缩放 (被除数、根) | 0 错 | 0 错 | 除以 denorm 仍是 ∞ |
-  | + 除数小于 2^-100 也缩放 (最终) | 0 错 | 0 错 | 0 错 |
+  | Sequence only | Division only gets the sign of -0 wrong (21 cases) | Division wrong ~3%, sqrt wrong ~1% (residual underflow, denorm flushed to zero) | All wrongly 0 |
+  | + zero-dividend fallback + cr0 denorm preserve | 0 errors | Division ~50, sqrt ~50 (operands < 2^-100) | Dividing by a denorm gives ∞ (~400 cases) |
+  | + 2^64 scaling (dividend, root) | 0 errors | 0 errors | Dividing by a denorm still gives ∞ |
+  | + scaling when the divisor is below 2^-100 too (final) | 0 errors | 0 errors | 0 errors |
 
-### 1.5 整数和 compute (R1)
+### 1.5 Integers and compute (R1)
 
-compute 内核的整数运算由 `compute` 示例逐位对照 Rust: 65536 次调用 (4096 个工作组), 操作数是随机字、小数、相等的数对、
-0 / ±1 / i32::MIN / MAX 的全组合; 20 种结果全部 0 错.
+Integer arithmetic in compute kernels is checked bit by bit against Rust by the `compute` example: 65536 invocations (4096 workgroups), operands are random words, small numbers, equal pairs,
+and all combinations of 0 / ±1 / i32::MIN / MAX; all 20 kinds of results have 0 errors.
 
-| MLIR 操作 | EU 指令 | 说明 |
+| MLIR op | EU instruction | Notes |
 | --- | --- | --- |
-| `arith.addi` / `subi` | `add` / `add -src1` | 补码, 回绕 |
-| `arith.muli` | 两次 `mul` (32 × 16) + `shl` + `add` | ⚠ Xe-HP 起 EU 没有 32 × 32 整数乘 (Mesa `has_integer_dword_mul = false`). 直接写 `mul :d :d :d` 时奇数通道的结果是错的, 算出的地址越界, 引擎报 CAT error 后挂起. 照 Mesa `brw_lower_integer_multiplication`: `a * b.lo16 + (a * b.hi16) << 16`, 半字用区域 `r.0<16;8,2>:uw` / `r.2<16;8,2>:uw` 取 (写成 `<2;1,0>` 也不对) |
+| `arith.addi` / `subi` | `add` / `add -src1` | Two's complement, wrapping |
+| `arith.muli` | two `mul` (32 × 16) + `shl` + `add` | ⚠ From Xe-HP on the EU has no 32 × 32 integer multiply (Mesa `has_integer_dword_mul = false`). Writing `mul :d :d :d` directly gives wrong results in odd channels; the computed address goes out of bounds, the engine reports a CAT error and then hangs. After Mesa `brw_lower_integer_multiplication`: `a * b.lo16 + (a * b.hi16) << 16`, with the half-words taken through the regions `r.0<16;8,2>:uw` / `r.2<16;8,2>:uw` (writing `<2;1,0>` is also wrong) |
 | `shli` / `shrui` / `shrsi` | `shl` / `shr` (:ud) / `asr` | |
 | `andi` / `ori` / `xori` | `and` / `or` / `xor` (:ud) | |
 | `minsi` / `maxsi` / `minui` / `maxui` | `sel.l` / `sel.ge` (:d / :ud) | |
-| `cmpi` | `cmp`, 目的操作数和源同类型 | ⚠ `cmp` 不能混用整数源和浮点目的操作数: 写成 `:f` 时目的寄存器根本没被写. i1 仍用 f32 寄存器存, 只是 cmp 按 :d / :ud 写进去 (全 1 或 0) |
-| `select` (i32) | `(x & c) \| (y & !c)` | 按位选, 不经过浮点 csel, 任何位模式 (包括像 NaN 的) 都原样保留 |
-| `extui` / `extsi` (i1) | `and 1` / `mov` | 掩码是全 1: extsi 就是 -1 |
-| `sitofp` / `uitofp` / `fptosi` / `fptoui` | `mov` 带类型转换 | 实测和 Rust `as` 在范围内逐位一致 (舍入到最近偶数、截断) |
-| `bitcast` | `mov`, 两边都按 :ud | |
+| `cmpi` | `cmp`, destination of the same type as the sources | ⚠ `cmp` cannot mix integer sources with a float destination: written as `:f`, the destination register is not written at all. i1 is still stored in an f32 register; cmp just writes it as :d / :ud (all ones or 0) |
+| `select` (i32) | `(x & c) \| (y & !c)` | Bitwise select, not through the float csel, so any bit pattern (including NaN-like ones) is preserved as is |
+| `extui` / `extsi` (i1) | `and 1` / `mov` | The mask is all ones: extsi is just -1 |
+| `sitofp` / `uitofp` / `fptosi` / `fptoui` | `mov` with type conversion | Measured bit-identical to Rust `as` within range (round to nearest even, truncation) |
+| `bitcast` | `mov`, both sides as :ud | |
 
-- 寄存器的读法由指令的属性决定, 不改值的类型 (`regalloc.rs` `Retype`): `unsigned` 把 i32 读成 :ud, `as = "ud"` 把
-  所有操作数按同一类型读, `dst_as` 只改目的操作数, `half1` 取源 1 每个 dword 的一个半字.
-- **派发** (`render.rs` `compute`, 照 iris `iris_emit_compute_walker`): Xe2 起不用 PIPELINE_SELECT, 渲染批次里直接发
-  CFE_STATE + COMPUTE_WALKER. 一个工作组是一个 SIMD16 线程 (16 次调用), 局部 id x 由硬件生成到 r1 (16 个 uw),
-  inline 数据 (8 个 dword, 内核的参数) 在 r2, 工作组号在 r0.1. 线程用发给消息网关 (message gateway) 的 EOT 结束
-  (Mesa `emit_cs_terminate`, Xe-HPG 起). walker 之后一条带 untyped dataport / HDC flush 和 CS stall 的 PIPE_CONTROL,
-  所以下一条命令能看到它写的东西.
-- **访存**: LSC untyped global memory, flat 表面, **32 位地址** (A32). 本机 GPU 虚拟地址只有 30 位 (`xe-info` 的
-  va_bits), 所有缓冲都在 4 GB 以下, 所以不需要 A64 和 surface state, 地址就是一个 i32. 每次调用一个地址, 一次读写
-  1 到 4 个连续 dword, 或者 1 / 2 字节 (零扩展).
-- CFE_STATE 的线程数取 320: 本机 4 个 DSS × 8 个 EU × 10 个线程 (iris 用 max_cs_threads × subslice_total).
+- How a register is read is decided by the instruction's attributes, without changing the value's type (`regalloc.rs` `Retype`): `unsigned` reads i32 as :ud, `as = "ud"` reads
+  all operands as the same type, `dst_as` changes only the destination, `half1` takes one half-word of each dword of source 1.
+- **Dispatch** (`render.rs` `compute`, after iris `iris_emit_compute_walker`): from Xe2 on PIPELINE_SELECT is not used; the render batch directly emits
+  CFE_STATE + COMPUTE_WALKER. One workgroup is one SIMD16 thread (16 invocations); local id x is generated by the hardware into r1 (16 uw),
+  inline data (8 dwords, the kernel's arguments) is in r2, the workgroup id is in r0.1. A thread ends with an EOT sent to the message gateway
+  (Mesa `emit_cs_terminate`, from Xe-HPG on). After the walker comes a PIPE_CONTROL with untyped dataport / HDC flush and CS stall,
+  so the next command sees what it wrote.
+- **Memory access**: LSC untyped global memory, flat surface, **32-bit addresses** (A32). This machine's GPU virtual addresses are only 30 bits (`xe-info`'s
+  va_bits), all buffers are below 4 GB, so neither A64 nor surface state is needed; an address is just an i32. One address per invocation; each read or write covers
+  1 to 4 consecutive dwords, or 1 / 2 bytes (zero-extended).
+- CFE_STATE's thread count is 320: this machine has 4 DSS × 8 EUs × 10 threads (iris uses max_cs_threads × subslice_total).
 
-## 2. 调度和寄存器: 软件记分板 (`xe3-swsb`) 和消息寄存器 (`xe3-regalloc`)
+## 2. Scheduling and registers: software scoreboard (`xe3-swsb`) and message registers (`xe3-regalloc`)
 
-- **多个 SBID 的等待**: 一条指令同时依赖两个乱序 send 的结果 (例如两次采样的结果相乘), 而一条指令的 SWSB 字段只能写一个
-  SBID; send 自己要设新的 SBID, 也不能再等别的. 照 Mesa `brw_lower_scoreboard`: 指令自己保留一个等待, 其余的 (以及 send
-  需要的所有等待) 放到它前面的 `sync.nop $n.dst` / `$n.src` 上, 每个 token 一条.
-- **消息寄存器复用** (毛玻璃引出, 2026-10-29): 以前非 EOT send 的 payload 从 r112 往下分配、永不复用, 一个 kernel 有
-  32 次以上读写就 out of registers. 现在单寄存器的 payload (地址) 就是它的值本身, 多寄存器的拷进一段连续寄存器, 都在 send
-  之后释放; 之后写它们的指令等 `$n.src`. ⚠ send 的结果不能和自己的 payload 重叠: 先给结果分配, 再释放 payload.
-- 复用寄存器后暴露的三个记分板漏洞 (现象都是随机的少量像素错, 常见奇数通道错或整片 0 / 255; 单独跑某个 kernel 也会错):
-  1. 等过 `$n.src` 就把 token 从 pending 里删掉了, 之后读这个 send 结果的指令不再等 `$n.dst`. 现在 `.src` 只清掉它的读集合,
-     `.dst` 才删.
-  2. 跨管线的写后读 (WAR) 没有跟踪: int 管线的 `mov r48 ← r50` 还没读, float 管线的 `mov r50 ← ...` 就写了. 现在每个寄存器
-     记下每条管线上最后一个读它的指令, 写它时对别的管线的读者加 regdist (同一管线按序, 不用).
-  3. RegDist 和 SBID 写在同一条指令上时编码里不带管线号 (Xe2+: `0b01` / `0b10` 是按源类型推断的管线 + `.dst` / `.src`,
-     `0b11` 是 All + `.dst`, Mesa `gen_swsb_encode`). 只有 RegDist 的管线就是推断出来的那条 (float / int), 或是 All 且等
-     `.dst` 时才合并 (Mesa `baked_ordered_dependency_mode`), 否则 token 的等待放进 sync.nop. 设 token 的 send 的 RegDist 只能
-     在 float / int / All 上, 别的管线改成 All.
-- SBID 有 32 个, 轮流用: 再次设一个还在途中的 token 前先等它 (`sync.nop $t.dst`).
-- 代价: 每个多出来的 token 一条 sync.nop, 只在真有多个依赖时才插.
+- **Waiting on several SBIDs**: an instruction depends on the results of two out-of-order sends at once (e.g. multiplying the results of two samples), but an instruction's SWSB field can hold only one
+  SBID; a send sets its own new SBID and cannot wait on another either. After Mesa `brw_lower_scoreboard`: the instruction keeps one wait, and the rest (plus all waits a send
+  needs) go on `sync.nop $n.dst` / `$n.src` before it, one per token.
+- **Message register reuse** (prompted by frosted glass, 2026-10-29): previously the payloads of non-EOT sends were allocated downward from r112 and never reused, so a kernel with
+  32 or more reads/writes ran out of registers. Now a single-register payload (an address) is the value itself, and a multi-register one is copied into a contiguous block; both are freed after the send;
+  later instructions that write them wait on `$n.src`. ⚠ A send's result must not overlap its own payload: allocate the result first, then free the payload.
+- Three scoreboard bugs exposed by register reuse (all showed up as a few random wrong pixels, often wrong odd channels or whole patches of 0 / 255; running a kernel alone was also wrong):
+  1. Waiting on `$n.src` removed the token from pending, so later instructions reading this send's result no longer waited on `$n.dst`. Now `.src` only clears its read set,
+     and only `.dst` removes it.
+  2. Write-after-read (WAR) across pipes was not tracked: the int pipe's `mov r48 ← r50` had not read yet when the float pipe's `mov r50 ← ...` wrote. Now each register
+     records the last instruction on each pipe that read it, and writing it adds a regdist for readers on other pipes (the same pipe is in order, so not needed).
+  3. When RegDist and SBID are on the same instruction, the encoding carries no pipe number (Xe2+: `0b01` / `0b10` are the pipe inferred from the source type + `.dst` / `.src`,
+     `0b11` is All + `.dst`, Mesa `gen_swsb_encode`). They are only combined when the RegDist's pipe is the inferred one (float / int), or it is All and waits on
+     `.dst` (Mesa `baked_ordered_dependency_mode`); otherwise the token wait goes into a sync.nop. The RegDist of a send that sets a token can only
+     be on float / int / All; other pipes are changed to All.
+- There are 32 SBIDs, used in rotation: before setting a token that is still in flight, wait on it first (`sync.nop $t.dst`).
+- Cost: one sync.nop per extra token, inserted only when there really are several dependencies.
 
-## 3. VS 的 URB 条目大小
+## 3. VS URB entry size
 
-- 问题: VF 先把取到的顶点写进 VS 的 URB 条目 (每个输入一个 vec4), VS 再往同一个条目里写 VUE (头、位置、varying).
-  条目大小 (`3DSTATE_URB_ALLOC_VS`, 以 64 字节为单位, 减 1) 默认是 0, 只装得下 4 个 vec4. 条带加上 paint 属性后有
-  5 个输入, 每个顶点溢出到相邻条目, 别的顶点 / 实例读到的属性是错的. 硬件不报任何错, 只是画错 (只有约 6% 的通道对).
-- 做法: 条目单位数 = ceil(max(输入数, 2 + varying 数) / 4). 条目数 = 5888 / 单位数, 向下取 8 的倍数,
-  即同样大的 URB 分成更少、更大的条目. 代码在 `render.rs` `draw`.
-- 排查方法 (以后遇到属性错乱可以照做): 把片段着色器的输出临时换成某个中间量 (例如插值后的坐标), 并关掉混合,
-  逐像素读出来看. 这次的结论是属性在实例之间串了位, 不是着色器算错.
+- Problem: the VF first writes the fetched vertices into the VS's URB entry (one vec4 per input), then the VS writes the VUE (header, position, varyings) into the same entry.
+  The entry size (`3DSTATE_URB_ALLOC_VS`, in units of 64 bytes, minus 1) defaults to 0, which only fits 4 vec4s. With the paint attributes added, strips have
+  5 inputs; each vertex overflows into the adjacent entry, and other vertices / instances read wrong attributes. The hardware reports no error, it just draws wrong (only about 6% of channels correct).
+- Approach: entry units = ceil(max(inputs, 2 + varyings) / 4). Entry count = 5888 / units, rounded down to a multiple of 8,
+  i.e. the same URB split into fewer, larger entries. The code is in `render.rs` `draw`.
+- Debugging method (can be reused when attributes get scrambled): temporarily replace the fragment shader's output with some intermediate value (e.g. the interpolated coordinates), turn off blending,
+  and read it back pixel by pixel. The conclusion this time was that attributes leaked between instances, not that the shader computed wrong.
 
-## 4. 2D 合成: 线性渐变和裁剪 (已提交)
+## 4. 2D compositing: linear gradients and clipping (committed)
 
-- **实例全是浮点**: CPU 把 NDC 矩形、alpha 图集 uv、预乘颜色、paint 坐标都算好, 着色器不解包整数、不读 uniform.
-  实心段从 alpha 图集里一列全 255 的列取覆盖率, 和 alpha 段共用同一个着色器, 不需要分支.
-- **paint 图集**: RGBA8, 每行 4096 个纹素. 第 0 行全白, 纯色实例的颜色在 color 里, paint 取白色. 渐变实例的 color 是 1,
-  paint 取它那一行的 LUT. 所有 paint 共用一条管线、一次 draw.
-- **LUT 用 vello_common 的 f32 LUT**: `dispatch!(Level::new(), simd => g.f32_lut(simd))`, 和 vello_cpu 在同一个 SIMD
-  级别上生成, 所以 mul_add 是否融合两边一致. LUT 舍入到 unorm8 放进图集.
-- **线性渐变的 t 是像素位置的仿射函数**: 在四边形的角上算好 u, 由硬件插值到像素中心. 这和 vello_cpu 用
-  `PIXEL_CENTER_OFFSET 0.5` 取像素中心一致. 着色器里不用做任何渐变运算.
-- **裁剪**: vello_common 的 `ClipContext` 生成条带时已经和裁剪路径求交, GPU 侧不用改.
-- 结果: `strips` 场景里和精确模型 (纹素 × 颜色 × 覆盖率, 每层量化) 对比, 96.6% 的通道相等, 其余都差 1, 而且全部落在
-  舍入分界点或 paint 纹素的边上. 和 vello_cpu f32 管线比最多差 2.
+- **Instances are all floats**: the CPU precomputes the NDC rectangle, alpha atlas uv, premultiplied color and paint coordinates; the shader does not unpack integers or read uniforms.
+  Solid segments take coverage from a column in the alpha atlas that is all 255, sharing one shader with alpha segments, with no branch.
+- **Paint atlas**: RGBA8, 4096 texels per row. Row 0 is all white; a solid-color instance's color is in color and its paint samples white. A gradient instance's color is 1,
+  and its paint samples the LUT in its row. All paints share one pipeline and one draw.
+- **The LUT uses vello_common's f32 LUT**: `dispatch!(Level::new(), simd => g.f32_lut(simd))`, generated at the same SIMD
+  level as vello_cpu, so whether mul_add is fused is the same on both sides. The LUT is rounded to unorm8 and put in the atlas.
+- **A linear gradient's t is an affine function of pixel position**: u is computed at the quad's corners and interpolated by the hardware to pixel centers. This matches vello_cpu's use of
+  `PIXEL_CENTER_OFFSET 0.5` to take pixel centers. The shader does no gradient arithmetic at all.
+- **Clipping**: vello_common's `ClipContext` already intersects with the clip path when generating strips, so nothing changes on the GPU side.
+- Result: in the `strips` scene, compared with the exact model (texel × color × coverage, quantized per layer), 96.6% of channels are equal and the rest all differ by 1, and all of them fall on
+  rounding boundaries or paint texel edges. Compared with the vello_cpu f32 pipeline, the difference is at most 2.
 
-## 5. 径向 / 扫描渐变 (进行中, 尚未提交)
+## 5. Radial / sweep gradients (in progress, not yet committed)
 
-1 到 3 节是为它们准备的. 设计如下:
+Sections 1 to 3 were groundwork for these. The design:
 
-- 径向渐变的 t 不是位置的仿射函数, 不能再靠顶点插值. 改为插值**变换后的位置** (gx, gy) (它仍是仿射的),
-  在片段着色器里照 vello_cpu `fine/common/gradient` 逐像素算 t:
-  - 线性: `t = gx`.
-  - 径向 (同心, `RadialKind::Radial`): `t = sqrt(gx² + gy²) * scale + bias`. 用到精确 sqrt.
-  - 扫描: vello 的 `x_y_to_unit_angle`, 即 atan 的多项式近似, 加上象限选择和清除 NaN:
-    `slope = min(|x|,|y|) / max(|x|,|y|)`, 然后三次 mad, 再用三次 select 选象限, 最后 `(φ·2π − start) · inv_delta`.
-    用到精确除法、abs、min/max、cmpf/select.
-  - 三种类型用逐实例的系数加权求和, 系数是 0 或 1 乘一个有限值, 结果精确, 不需要分支.
-    `RadialKind::Strip` / `Focal` (两点锥形) 有未定义区域 (NaN ⇒ 透明), 先拒.
-- 扩展模式 (extend) 也在着色器里照 vello `apply_extend` 的运算顺序算: pad 是 `clamp(t, 0, 1)`, repeat 是 `t − floor(t)`,
-  reflect 是 `|(t−1) − 2·floor((t−1)·0.5) − 1|` 再 clamp. 都是精确运算, 按逐实例的 0/1 权重相加.
-- **LUT 下标改成逐位对齐 vello**: vello 取第 `trunc(t·(n−1))` 项 (n 是 LUT 长度, 256 到 4096). 新做法是图集一行
-  放 n 项原样 (不再重采样到 4096), 着色器算 `u = (floor(t·(n−1)) + 0.5) / 4096`, 正好落在纹素中心. 采样器的定点坐标
-  不会选错纹素. 旧做法把 n 项重采样到 4096 项, 而 4095 不能被 n−1 整除, 所以在某些 t 上和 vello 差一项.
-- 实例要加 gy 的三个系数、类型系数和扩展权重, 片段着色器的输入会超过现在 2 个 varying 的上限. URB 条目大小已经按
-  varying 数计算 (第 3 节), 上限可以放开, 放开后要在真机上验证插值.
-- 模型的判定也要相应扩展: t 在 f64 里逐像素算, `t·(n−1)` 离整数 0.01 以内算纹素边. 扫描渐变在 |x| ≈ |y| 的对角线上,
-  多项式在两个象限分支之间有约 1e-5 的跳变, 这些像素也算边.
+- A radial gradient's t is not an affine function of position, so vertex interpolation no longer works. Instead interpolate the **transformed position** (gx, gy) (which is still affine),
+  and compute t per pixel in the fragment shader after vello_cpu `fine/common/gradient`:
+  - Linear: `t = gx`.
+  - Radial (concentric, `RadialKind::Radial`): `t = sqrt(gx² + gy²) * scale + bias`. Uses the exact sqrt.
+  - Sweep: vello's `x_y_to_unit_angle`, i.e. a polynomial approximation of atan, plus quadrant selection and NaN clearing:
+    `slope = min(|x|,|y|) / max(|x|,|y|)`, then three mads, then three selects for the quadrant, finally `(φ·2π − start) · inv_delta`.
+    Uses exact division, abs, min/max, cmpf/select.
+  - The three kinds are summed weighted by per-instance coefficients; a coefficient is 0 or 1 times a finite value, so the result is exact and no branch is needed.
+    `RadialKind::Strip` / `Focal` (two-point conical) have undefined regions (NaN ⇒ transparent) and are rejected for now.
+- Extend modes are also computed in the shader, following the operation order of vello `apply_extend`: pad is `clamp(t, 0, 1)`, repeat is `t − floor(t)`,
+  reflect is `|(t−1) − 2·floor((t−1)·0.5) − 1|` then clamp. All are exact operations, summed with per-instance 0/1 weights.
+- **LUT index changed to align bit for bit with vello**: vello takes entry `trunc(t·(n−1))` (n is the LUT length, 256 to 4096). The new approach puts the n entries
+  into one atlas row as is (no longer resampled to 4096), and the shader computes `u = (floor(t·(n−1)) + 0.5) / 4096`, landing exactly on the texel center. The sampler's fixed-point coordinates
+  cannot pick the wrong texel. The old approach resampled the n entries to 4096, and since 4095 is not divisible by n−1, it was one entry off from vello at some t.
+- Instances need three gy coefficients, the kind coefficients and the extend weights, so the fragment shader's inputs exceed the current limit of 2 varyings. The URB entry size is already computed from the
+  varying count (section 3), so the limit can be lifted; after lifting it, interpolation must be verified on real hardware.
+- The model's judgment must be extended accordingly: t is computed per pixel in f64, and `t·(n−1)` within 0.01 of an integer counts as a texel edge. For sweep gradients on the diagonal |x| ≈ |y|,
+  the polynomial jumps by about 1e-5 between the two quadrant branches; those pixels also count as edges.
 
-## 6. 运行时 (M1, 详见 [runtime.md](runtime.md))
+## 6. Runtime (M1, details in [runtime.md](runtime.md))
 
-- pipeline 只编译一次, 状态和命令做成带洞的模板, 录一帧只是填洞和拷贝: 1920x1080 录帧 p50 约 9 µs.
-- 4 个 batch 组成环, 每个槽有自己的 binding table 区. CPU 写下一帧时不必等 GPU 读完上一帧: 约 1180 fps, 延迟约 1.1 ms.
-- 共享状态 (cc / sf / ccs / rss) 每个 render pass 发一次, 不在每个 draw 上重发.
+- A pipeline is compiled only once; state and commands become templates with holes, and recording a frame is just filling holes and copying: 1920x1080 frame recording p50 about 9 µs.
+- 4 batches form a ring, each slot with its own binding table area. The CPU writing the next frame does not have to wait for the GPU to finish reading the previous one: about 1180 fps, latency about 1.1 ms.
+- Shared state (cc / sf / ccs / rss) is emitted once per render pass, not re-emitted on every draw.
 
-## 7. 模糊效果: compute 上的 dual Kawase (`frost.rs`, `frost` 示例)
+## 7. Blur effects: dual Kawase on compute (`frost.rs`, the `frost` example)
 
-- 照 acde 合成器 (acde-base `crates/shell/src/compositor/web.wgsl` + `compose.rs`) 的三种效果: 毛玻璃 (`backdrop-filter:
-  blur() saturate() brightness()`, 包括原生窗口下面那层壁纸 `under`)、CSS `filter` (模糊后乘颜色矩阵)、`drop-shadow`.
-  层数 `clamp(ceil(log2(max(σ,1)/2)), 1, 5)`, down 5 个采样点、up 8 个, 每层 RGBA8 (和合成器的 Rgba8Unorm 一样每趟量化).
-  定义 (逐条运算) 写在 `frost.rs` 的模块文档里; 示例里的参照按定义另写, 不和生成器共用代码.
-- **不用采样器**: 硬件双线性的权重是定点的, 没法和 Rust 逐位一致. 双线性在着色器里用 f32 自己算, 值一律是字节单位的
-  f32 (0..255), lerp 是 `fma(t, b - a, a)` (EU 的 mad 单次舍入, 和 Rust `mul_add` 一致, `math` 示例验过).
-- 着色器由 Rust 生成 MLIR (`Ssa`: 一行一个 SSA 值, `binary!` / `unary!` 生成运算方法), 建 `Frost` 时编译一次 (7 个:
-  down、up、backdrop、filter、shadow, 以及 `under` 的合成和直通 alpha 图层的预乘). 常量用十六进制 f32, 位模式确定.
-  每像素一个调用, 网格 (ceil(w / 16), h), 行尾多出的通道钳到最后一列.
-- 每帧的参数: down / up 走 inline (8 个 dword), 混合的几趟每个效果一块 128 字节的参数块 (每个 ring 槽一份, `Frost::frame`).
-- **性能** (本机 Xe3, 1920x1080 上 1200x700 的面板, 4 层, 每块面板的 GPU 时间, 一帧 11 块对 1 块相减):
-  | 版本 | 每块 | down0 | up0 | backdrop |
+- Follows the three effects of the acde compositor (acde-base `crates/shell/src/compositor/web.wgsl` + `compose.rs`): frosted glass (`backdrop-filter:
+  blur() saturate() brightness()`, including the wallpaper layer `under` beneath native windows), CSS `filter` (blur then multiply by a color matrix), `drop-shadow`.
+  Level count `clamp(ceil(log2(max(σ,1)/2)), 1, 5)`, 5 sample points for down and 8 for up, RGBA8 per level (quantized every pass, like the compositor's Rgba8Unorm).
+  The definition (operation by operation) is in the module docs of `frost.rs`; the reference in the example is written separately from the definition and shares no code with the generator.
+- **No sampler**: hardware bilinear weights are fixed-point and cannot match Rust bit for bit. Bilinear filtering is computed in the shader in f32; all values are f32 in byte units
+  (0..255), and lerp is `fma(t, b - a, a)` (the EU's mad rounds once, matching Rust `mul_add`, verified by the `math` example).
+- Shaders are MLIR generated by Rust (`Ssa`: one SSA value per line, `binary!` / `unary!` generate the operation methods), compiled once when `Frost` is built (7 of them:
+  down, up, backdrop, filter, shadow, plus the compositing for `under` and the premultiply of straight-alpha layers). Constants are hexadecimal f32, so the bit patterns are fixed.
+  One invocation per pixel, grid (ceil(w / 16), h); extra channels at the end of a row are clamped to the last column.
+- Per-frame parameters: down / up go through inline data (8 dwords); the blending passes use one 128-byte parameter block per effect (one per ring slot, `Frost::frame`).
+- **Performance** (this machine's Xe3, a 1200x700 panel on 1920x1080, 4 levels, GPU time per panel, a frame with 11 panels minus one with 1):
+  | Version | Per panel | down0 | up0 | backdrop |
   | --- | --- | --- | --- | --- |
-  | 第一版 (每个采样点 4 次 gather, 逐像素除法) | 1.55 ms | 0.41 ms | 0.77 ms | 0.40 ms |
-  | 采样点共用小数和行地址、相邻两个纹素一次 8 字节读、坐标比例和倒数在 CPU 上算 | 1.39 ms | 0.13 ms | 0.67 ms | 0.31 ms |
-  | 按字节解包 (`detour.unpack4xu8`)、lerp 和加权和用 fma、÷12 改成 ×(1/12) | 1.02 ms | 0.11 ms | 0.46 ms | 0.27 ms |
+  | First version (4 gathers per sample point, per-pixel division) | 1.55 ms | 0.41 ms | 0.77 ms | 0.40 ms |
+  | Sample points share fractions and row addresses, two adjacent texels in one 8-byte read, coordinate ratios and reciprocals computed on the CPU | 1.39 ms | 0.13 ms | 0.67 ms | 0.31 ms |
+  | Unpack by byte (`detour.unpack4xu8`), lerp and weighted sums with fma, ÷12 changed to ×(1/12) | 1.02 ms | 0.11 ms | 0.46 ms | 0.27 ms |
 
-  一帧一块面板从提交到完成约 1.5 ms. up0 每线程约 700 条指令, 时间在 ALU 上 (显存带宽很小).
-  - 相邻两个纹素一次读: 在图像边上把小数换成 0 或 1 (x 方向的值是整数字节, `fma(1, b - a, a)` 就是 b), 和逐个夹紧的结果
-    逐位相同; 1 宽的图像小数恒为 0 (读到的第二个纹素在图像外, scratch 末尾多留 64 字节).
-  - ⚠ 字节解包: `mov :f ← r.k<32;8,4>:ub` 只有 k = 0 合法 (浮点目的操作数要求源区域保持最低通道的位位置, gentool 校验),
-    k = 1..3 先 `mov :d ← :ub` 再转 f.
-  - 测时间要背靠背连跑: 两次之间 CPU 做几秒核对的话 GPU 会降频, 测出来的时间翻倍还多.
-- 还能做: 2 倍上采样时一个通道算相邻两个像素 (共用读和解包, 但奇数尺寸的比例不是 0.5, 要两套着色器); 每层合成一次 dispatch
-  (现在每趟后都有一个带 CS stall 的 PIPE_CONTROL).
+  One frame with one panel takes about 1.5 ms from submit to completion. up0 is about 700 instructions per thread; the time is spent in the ALU (memory bandwidth is small).
+  - Reading two adjacent texels at once: at the image edge the fraction is replaced by 0 or 1 (values in the x direction are integer bytes, `fma(1, b - a, a)` is exactly b), giving results
+    bit-identical to clamping each one; for a 1-wide image the fraction is always 0 (the second texel read lies outside the image; 64 extra bytes are left at the end of scratch).
+  - ⚠ Byte unpacking: `mov :f ← r.k<32;8,4>:ub` is only legal for k = 0 (a float destination requires the source region to keep the bit position of the lowest channel, checked by gentool);
+    for k = 1..3, first `mov :d ← :ub`, then convert to f.
+  - Measure time with back-to-back runs: if the CPU spends a few seconds checking between two runs, the GPU downclocks and the measured time more than doubles.
+- Still possible: for 2x upsampling, one channel computes two adjacent pixels (sharing reads and unpacking, but for odd sizes the ratio is not 0.5, so two sets of shaders are needed); one dispatch per level of compositing
+  (currently every pass is followed by a PIPE_CONTROL with CS stall).
 
-## 8. 编译期: 类型化指令 op 的开销
+## 8. Compile time: the cost of typed instruction ops
 
-只在建 pipeline / 编译时, 不在每帧的路径上. 量法: release, `perf stat -e instructions:u`; 一个模块里放同一个着色器 1 份和 21 份,
-差值 / 20 就是每个着色器的编译开销 (把启动去掉).
+Only when building a pipeline / compiling, not on the per-frame path. How it is measured: release, `perf stat -e instructions:u`; put the same shader 1 time and 21 times in one module,
+and the difference / 20 is the compile cost per shader (startup removed).
 
-- AMD 指令方言改成类型化 op 后 (`1de94ab`): 单个着色器整条流程 1.003 亿条 (改前 1.031 亿, 启动少注册了 1300 个 op); 每个着色器的
-  编译 1140 万条 (改前 980 万, +16%).
-- 先踩过的坑: 编码和分配后的各个 pass 每条指令都 `head::<Valu>()` 一次, 走类型化 op 的 serde 通用形式, 是改前的 1.7 倍;
-  serde 派生的大枚举 (`Opcode`, 1237 个助记符) 反序列化是逐个比较字符串. 改成: 构造用 `Build` 直接写 `OpData`, 读取用
-  `Isa::read` 单遍读成 `Fields`, 助记符用生成的 FNV-1a 哈希表查. 类型化 op 只用来解析和打印模块.
-- 剩下的 +16% 主要在 mlirpass 0.4.1 的 `Body::create` ⇒ `place()`: 每建一个 op, 每个属性都在该 op 的 `inherent` 列表里
-  线性比字符串; 类型化 op 有十几个 inherent 属性 (旧的通用 op 没有). 两个办法, 都要改 mlirpass 发新版 (用户的仓库, 要用户同意):
-  1. `OpInfo.inherent` 排序后二分查找 (或者建 op 时按名字查一次得到位图);
-  2. 给已经按 inherent / discardable 分好的 `OpData` 一条不再 `place()` 的快速路径 (像 `push_op`, 但走 Rewriter / 转换的监听).
+- After the AMD instruction dialect was changed to typed ops (`1de94ab`): the full flow for a single shader is 100.3 million instructions (before: 103.1 million; startup registers 1300 fewer ops); compiling each shader
+  is 11.4 million (before: 9.8 million, +16%).
+- A pitfall hit first: encoding and the passes after allocation each called `head::<Valu>()` once per instruction, going through the typed op's serde generic form, 1.7 times the cost before the change;
+  deserializing the large serde-derived enum (`Opcode`, 1237 mnemonics) compares strings one by one. Changed to: construction uses `Build` to write `OpData` directly, reading uses
+  `Isa::read` to read into `Fields` in a single pass, and mnemonics are looked up in a generated FNV-1a hash table. Typed ops are only used to parse and print modules.
+- The remaining +16% is mostly in mlirpass 0.4.1's `Body::create` ⇒ `place()`: for every op built, each attribute is compared as a string linearly against that op's `inherent` list;
+  typed ops have a dozen or so inherent attributes (the old generic ops had none). Two options, both requiring a change to mlirpass and a new release (the user's repository, needs the user's consent):
+  1. Sort `OpInfo.inherent` and binary search (or look up by name once when building the op to get a bitmap);
+  2. Give `OpData` already split into inherent / discardable a fast path that skips `place()` (like `push_op`, but going through the Rewriter / conversion listeners).

@@ -1,36 +1,36 @@
 ---
 name: detour-runtime
-description: 动 detour 运行时（crates/intel/driver/src/runtime.rs）：Context / Pipeline / Target / Buffer / Recorder 各管什么、堆和地址、模板的洞名约定和谁来填、加一个 draw 参数要改的三处、batch 环、fence 和 sync_file / dma-buf 导出、frames 示例怎么量。改每帧路径、接合成器、加资源类型时读。
+description: "Working on the detour runtime (crates/intel/driver/src/runtime.rs): what Context / Pipeline / Target / Buffer / Recorder each manage, heaps and addresses, the template hole naming convention and who fills them, the three places to change when adding a draw parameter, the batch ring, fences and sync_file / dma-buf export, how to measure with the frames example. Read when changing the per-frame path, hooking up a compositor, or adding a resource type."
 ---
 
-# 运行时
+# Runtime
 
-细节和洞名表在 `docs/runtime.md`.
+Details and the hole name table are in `docs/runtime.md`.
 
-## 规矩
+## Rules
 
-- ⛔ 每帧的路径 (`Context::record`、`Recorder::*`、`Template::emit`、`Context::submit`) 不跑 MLIR、不读属性、不建 BO.
-- 建一次的东西 (pipeline、目标、缓冲) 放进 `Context::pipeline / target / buffer`, 它们可以慢.
-- 漏填的洞会变成地址 0 ⇒ GPU 缺页、队列被封: 新的洞一定要在 `Context::pipeline` 的检查里认得.
+- ⛔ The per-frame path (`Context::record`, `Recorder::*`, `Template::emit`, `Context::submit`) runs no MLIR, reads no attributes, creates no BOs.
+- Things built once (pipelines, targets, buffers) go into `Context::pipeline / target / buffer`; they can be slow.
+- A missed hole becomes address 0 ⇒ GPU page fault, banned queue: every new hole must be recognized by the check in `Context::pipeline`.
 
-## 加一个 draw 时才知道的参数
+## Adding a parameter known only at draw time
 
-1. `crates/intel/codegen/src/render.rs` `Cmds::draw` (或 `DrawArgs`): 对应字段取 `A::sym("名字")`.
-2. `runtime.rs` `Context::pipeline` 的 `fill`: 把这个名字认成一种 `Fill` (没认出的名字按 `Context` 自己的名字解析, 解析不了就报错).
-3. `runtime.rs` `Recorder::draw_at` 的 `value`: 按 `Fill` 返回值.
+1. `crates/intel/codegen/src/render.rs` `Cmds::draw` (or `DrawArgs`): the corresponding field takes `A::sym("name")`.
+2. `fill` in `runtime.rs` `Context::pipeline`: recognize this name as a kind of `Fill` (unrecognized names are resolved against `Context`'s own names; if that fails, it reports an error).
+3. `value` in `runtime.rs` `Recorder::draw_at`: return the value according to the `Fill`.
 
-模块下降那边 (`Render::draw`) 照旧给数.
+The module lowering side (`Render::draw`) still gives numbers.
 
-## 加一种按目标的状态
+## Adding per-target state
 
-在 `Cmds::pass_state` 里加 (返回的名字数组跟着加), `Context::target` 会把它放进堆并记地址; draw 模板里的名字加进 `SHARED`.
+Add it in `Cmds::pass_state` (and add to the returned name array); `Context::target` puts it into the heap and records the address; add the name used in the draw template to `SHARED`.
 
-## 提交、等待、导出
+## Submit, wait, export
 
-`submit(dw)` ⇒ 环里下一个槽 (满了先等), 返回槽号; `wait(n)` 等并查 fault; `export_fence(n)` ⇒ sync_file; `Target::export()` ⇒ dma-buf
-(linear, 一行 `width * 4` 字节). CPU 写完 WC 内存后 `H::fence()` 再提交 (已经做了).
+`submit(dw)` ⇒ the next slot in the ring (waits first if full), returns the slot number; `wait(n)` waits and checks for faults; `export_fence(n)` ⇒ sync_file; `Target::export()` ⇒ dma-buf
+(linear, `width * 4` bytes per row). After the CPU finishes writing WC memory, `H::fence()` before submitting (already done).
 
-## 量
+## Measuring
 
-`cargo run --features xe3 --example frames [N]`: 录制 p50 / p99、背靠背吞吐、逐帧延迟、逐像素、导出. 改了每帧路径就重跑, 结果更新到
+`cargo run --features xe3 --example frames [N]`: recording p50 / p99, back-to-back throughput, per-frame latency, per pixel, export. Rerun after changing the per-frame path, and update the results in
 `docs/verification.md`.

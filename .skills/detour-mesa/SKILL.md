@@ -1,34 +1,34 @@
 ---
 name: detour-mesa
-description: 去 Mesa（~/coding/mesa，只读）里找 Xe2/Xe3 的硬件用法：iris（OpenGL）、anv（Vulkan）的状态和命令怎么发，brw 编译器的 payload / 插值 / 消息，genxml 布局，gentool 汇编器；以及已经读出来、写进 docs/xe3.md 的结论。要实现新硬件功能、不确定某个状态位怎么设时读。
+description: "Finding Xe2/Xe3 hardware usage in Mesa (~/coding/mesa, read-only): how iris (OpenGL) and anv (Vulkan) emit state and commands, the brw compiler's payload / interpolation / messages, genxml layouts, the gentool assembler; plus the conclusions already read out and written into docs/xe3.md. Read when implementing a new hardware feature or unsure how to set some state bit."
 ---
 
-# 照 Mesa 找硬件用法
+# Finding hardware usage in Mesa
 
-Intel 没有公开 Xe3 的 PRM. 寄存器和命令的布局、怎么用, 都从 Mesa 读 (`~/coding/mesa`, 浅克隆, 只读, 不编译, 不往上游提东西).
-Khronos 的规范在 `~/coding/OpenGL-Registry`、`~/coding/Vulkan-Docs`、`~/coding/Vulkan-Headers`.
+Intel has not published a PRM for Xe3. Register and command layouts, and how to use them, are all read from Mesa (`~/coding/mesa`, shallow clone, read-only, not built, nothing sent upstream).
+Khronos specs are in `~/coding/OpenGL-Registry`, `~/coding/Vulkan-Docs`, `~/coding/Vulkan-Headers`.
 
-## 去哪里找
+## Where to look
 
-| 想知道 | 看 |
+| To learn | Look at |
 | --- | --- |
-| 命令 / 状态的字段 | `src/intel/genxml/xe3.xml` (和它导入的 xe2 / gen125 ...); 我们的 `crates/intel/dialect/genxml/xe3.xml` 是展平的 |
-| 某个状态 OpenGL 怎么设 | `src/gallium/drivers/iris/iris_state.c` (`genX(...)`), 首批命令 `iris_init_render_context` |
-| 某个状态 Vulkan 怎么设 | `src/intel/vulkan/genX_gfx_state.c` (draw 时的合并)、`genX_pipeline.c`、`genX_cmd_draw.c`、`genX_cmd_buffer.c`、`genX_state.c` (首批) |
-| 着色器的 payload、插值、消息 | `src/intel/compiler/brw/`: `brw_thread_payload.cpp` (各阶段 payload)、`brw_compile_fs.cpp` (`remap_attr_reg`)、`brw_from_nir.cpp`、`brw_lower_logical_sends.cpp` (URB / 采样 / RT 写怎么变成 send) |
-| NIR 层面先做了什么 | `src/intel/compiler/brw/brw_nir.c`, `src/compiler/nir/nir_lower_*.c` |
-| 指令编码、汇编语法 | `src/intel/compiler/gen/` (gentool: `gentool asm|disasm -p ptl`)、`gen_validate.cpp` (哪些指令 / 操作数在哪代合法) |
-| 清屏、拷贝、blit | `src/intel/blorp/` |
-| 表面格式的值 | `src/intel/isl/isl_format_layout.csv`、`isl.h` |
+| Fields of a command / state | `src/intel/genxml/xe3.xml` (and the xe2 / gen125 ... it imports); our `crates/intel/dialect/genxml/xe3.xml` is flattened |
+| How OpenGL sets some state | `src/gallium/drivers/iris/iris_state.c` (`genX(...)`), first batch of commands `iris_init_render_context` |
+| How Vulkan sets some state | `src/intel/vulkan/genX_gfx_state.c` (merging at draw time), `genX_pipeline.c`, `genX_cmd_draw.c`, `genX_cmd_buffer.c`, `genX_state.c` (first batch) |
+| Shader payload, interpolation, messages | `src/intel/compiler/brw/`: `brw_thread_payload.cpp` (payload per stage), `brw_compile_fs.cpp` (`remap_attr_reg`), `brw_from_nir.cpp`, `brw_lower_logical_sends.cpp` (how URB / sampling / RT writes become sends) |
+| What is done first at the NIR level | `src/intel/compiler/brw/brw_nir.c`, `src/compiler/nir/nir_lower_*.c` |
+| Instruction encoding, assembly syntax | `src/intel/compiler/gen/` (gentool: `gentool asm|disasm -p ptl`), `gen_validate.cpp` (which instructions / operands are legal on which generation) |
+| Clear, copy, blit | `src/intel/blorp/` |
+| Surface format values | `src/intel/isl/isl_format_layout.csv`, `isl.h` |
 
-`src/intel/compiler/jay` (Xe2 / Xe3 的新编译器) 也可以读, 但 Mesa 规定不能改它.
+`src/intel/compiler/jay` (the new Xe2 / Xe3 compiler) can also be read, but Mesa's rules say it must not be modified.
 
-## 已经读出来的 (写在 docs/xe3.md)
+## Already read out (written in docs/xe3.md)
 
-- PS SIMD16 payload (Xe2+): r0、r1, 然后每种开了的重心坐标 2 个寄存器, 再往后是属性的平面参数.
-- 平面参数: 每个标量分量 12 字节 (a0, a1-a0, a2-a0), 5 个分量一个 64 字节寄存器.
-- 插值: 没有 PLN, 两次 MAD: `b.y * (a1-a0) + a0`, 再 `b.x * (a2-a0) + 前一步`.
-- URB 写: LSC 的 URB store, 地址是 URB 句柄.
-- pipeline 状态: anv 建 pipeline 时打包、draw 时按位或合进动态部分 (我们的模板同理).
+- PS SIMD16 payload (Xe2+): r0, r1, then 2 registers for each enabled kind of barycentric, then the attributes' plane parameters.
+- Plane parameters: 12 bytes per scalar component (a0, a1-a0, a2-a0), 5 components per 64-byte register.
+- Interpolation: no PLN, two MADs: `b.y * (a1-a0) + a0`, then `b.x * (a2-a0) + previous step`.
+- URB write: LSC URB store, the address is the URB handle.
+- Pipeline state: anv packs it when building the pipeline and ORs it bitwise into the dynamic part at draw time (our templates do the same).
 
-读出新结论就补进 `docs/xe3.md`, 写清楚出处 (文件、函数).
+When you read out a new conclusion, add it to `docs/xe3.md` with its source (file, function).

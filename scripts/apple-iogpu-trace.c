@@ -1,5 +1,5 @@
 // IOKit calls of a process (DYLD_INSERT_LIBRARIES; scripts/apple-iogpu-trace.sh): what Metal's driver asks the kernel
-// (AGXG16G, IOGPU) for, and at each submission the memory the GPU is about to read. docs/roadmap.md "M3 运行时".
+// (AGXG16G, IOGPU) for, and at each submission the memory the GPU is about to read. docs/roadmap.md "M3 runtime".
 #include <IOKit/IOKitLib.h>
 #include <mach/mach.h>
 #include <mach/mach_vm.h>

@@ -1,35 +1,35 @@
 ---
 name: detour-diag
-description: detour 出事了怎么查：GPU fault / 队列被封（Error::Fault、ban）、作业超时、像素不对、命令被拒（打包报错、洞没人填）；看 journalctl -k 的缺页地址、在 batch 里打点读回、二分关阶段、用 lower 示例看每个 pass 之后的 MLIR、对照已知的坑。
+description: "How to investigate when detour goes wrong: GPU fault / banned queue (Error::Fault, ban), job timeout, wrong pixels, rejected commands (packing errors, unfilled holes); reading the page fault address in journalctl -k, store-and-read-back markers in the batch, bisecting by disabling stages, using the lower example to see the MLIR after each pass, checking against known pitfalls."
 ---
 
-# 出事了
+# When things go wrong
 
-## 队列被封 (`Error::Fault`)、缺页
+## Banned queue (`Error::Fault`), page fault
 
-1. `journalctl -k | grep -i xe | tail` 看缺页地址和引擎. 地址落在哪里: 对照 `lower` 打印的 `xe3-layout` 之后的 `addr` / `offset`,
-   运行时对照 `Context` 的堆 (1 MB 起: 代码堆 1 MB、pool 64 KB、batch 环) 和各 BO 的地址.
-2. 地址 0 或很小: 多半是**没填的洞 / 没解析的符号** (例如 binding table pool 基址、状态指针). 运行时的模板检查会报
-   `nothing fills @x`; 模块路径看 `xe3-layout` 有没有漏掉的 SymbolRef.
-3. 定位卡在哪条命令: 在 batch 里插 `xe3.cmd.mi_store_data_imm {address = [@x, n], immediate_data = ...}` 打点, 读回看到了哪个.
-4. 二分: 关掉一个阶段 (例如 PS) 或删掉一段命令再跑.
+1. `journalctl -k | grep -i xe | tail` to see the faulting address and engine. Where the address falls: compare with the `addr` / `offset` after `xe3-layout` printed by `lower`;
+   for the runtime, compare with `Context`'s heaps (from 1 MB: code heap 1 MB, pool 64 KB, batch ring) and each BO's address.
+2. Address 0 or very small: most likely an **unfilled hole / unresolved symbol** (e.g. the binding table pool base address, a state pointer). The runtime's template check reports
+   `nothing fills @x`; for the module path, check whether `xe3-layout` missed a SymbolRef.
+3. Locating the command it hangs on: insert `xe3.cmd.mi_store_data_imm {address = [@x, n], immediate_data = ...}` markers in the batch, read back to see which ones landed.
+4. Bisect: disable a stage (e.g. PS) or delete a stretch of commands and run again.
 
-## 像素不对
+## Wrong pixels
 
-- 先用 `lower` 示例看每个 pass 之后的 MLIR: `cargo run --features xe3 --example lower -- FILE 'builtin.module(<到某个 pass 为止>)'`.
-- 着色器: 看 `xe3-swsb` 之后的 `xe3.eu` (寄存器、regdist). 依赖少等 (swsb) 会读到旧值, 时好时坏.
-- 读管线统计 (render pass 的 `statistics = @q`): IA / VS / 裁剪 / PS 次数对不对, 判断是没画还是画错.
+- First use the `lower` example to see the MLIR after each pass: `cargo run --features xe3 --example lower -- FILE 'builtin.module(<up to some pass>)'`.
+- Shaders: look at `xe3.eu` after `xe3-swsb` (registers, regdist). Waiting too little on a dependency (swsb) reads stale values, intermittently.
+- Read the pipeline statistics (the render pass's `statistics = @q`): whether the IA / VS / clipping / PS counts are right tells you whether nothing was drawn or it was drawn wrong.
 
-## 已知的坑 (见 docs/xe3.md「踩过的坑」)
+## Known pitfalls (see "Pitfalls" in docs/xe3.md)
 
-- binding table 必须在 pool 里; 每个阶段都要发 binding table 指针 (不绑东西的给 null 表).
-- `STATE_SYSTEM_MEM_FENCE_ADDRESS` 要 4 KB 对齐.
-- EOT 消息的源在 r112 ..= r127.
-- fence 到了不代表跑完: 要查 `Queue::fault()`.
-- 没有 `3DSTATE_PUSH_CONSTANT_ALLOC_PS` (Xe-HP 起).
+- The binding table must be in the pool; every stage must emit a binding table pointer (stages that bind nothing get a null table).
+- `STATE_SYSTEM_MEM_FENCE_ADDRESS` must be 4 KB aligned.
+- The EOT message sources are in r112 ..= r127.
+- A signaled fence does not mean it finished: check `Queue::fault()`.
+- There is no `3DSTATE_PUSH_CONSTANT_ALLOC_PS` (from Xe-HP on).
 
-## 打包 / 编译报错
+## Packing / compile errors
 
-- `no field x`: 属性名不对, 去 `cmd.gen.rs` 查字段名.
-- `does not fit`: 值超出字段宽度, 或地址没对齐 (地址字段的低位必须是 0).
-- `@x is not a number yet`: `pack` 遇到了符号, 应该先定址或用 `template`.
+- `no field x`: wrong attribute name; look up the field name in `cmd.gen.rs`.
+- `does not fit`: the value exceeds the field width, or the address is not aligned (the low bits of an address field must be 0).
+- `@x is not a number yet`: `pack` hit a symbol; assign addresses first or use `template`.
