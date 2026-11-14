@@ -1,7 +1,7 @@
 <a id="top"></a>
 <div align="center">
 
-# 🛣️ detour
+# detour
 
 ### Skip Mesa. Skip Vulkan. Skip OpenGL. Skip libdrm.
 **From MLIR straight to the silicon: a GPU userspace driver written 100% in Rust.**

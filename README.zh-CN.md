@@ -1,7 +1,7 @@
 <a id="top"></a>
 <div align="center">
 
-# 🛣️ detour
+# detour
 
 ### 绕开 Mesa. 绕开 Vulkan. 绕开 OpenGL. 绕开 libdrm.
 **从 MLIR 直达硅片: 100% Rust 写的 GPU 用户态驱动.**
