@@ -1,5 +1,3 @@
-//! Print what the xe device reports: ids, engines, GTs, memory, topology, hwconfig.
-
 use detour::base::Gpu;
 use detour::xe::Xe;
 

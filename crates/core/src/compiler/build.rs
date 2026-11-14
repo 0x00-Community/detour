@@ -1,11 +1,6 @@
-//! Building attributes and register types: values in, `Attribute`s / `Type`s out (every backend builds its ops with
-//! these).
-
 use mlirformat::{Attribute, Error, Extended, NamedAttr, Type};
 use mlirpass::OpData;
 
-/// ⭐ A vendor dialect's register type `!<name><<elem>>` (`!xe3.grf<f32>`), as mlirformat keeps a dialect type (its
-/// text); the dialect wraps it in its own type (`Grf`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RegType<'t> {
     pub name: &'t str,
@@ -29,14 +24,12 @@ impl<'t> TryFrom<&'t Type<'_>> for RegType<'t> {
     }
 }
 
-/// A value of an attribute: `true`, `3`, `0.5`, `@x`, `@m::@x`.
 #[derive(Clone, Debug)]
 pub enum A {
     Bool(bool),
     Int(i128),
     F32(f32),
     Sym(String),
-    /// `@memory::@x`: x's offset in its memory
     In(String, String),
     Str(String),
     Raw(Attribute<'static>),
@@ -101,15 +94,12 @@ impl<'a> From<A> for Attribute<'a> {
 }
 
 impl A {
-    /// A dictionary attribute.
     pub fn dict<'a>(entries: Vec<(&str, A)>) -> Attribute<'a> {
         Attribute::Dict(entries.into_iter().map(|(n, v)| NamedAttr { name: String::from(n).into(), value: Some(v.into()) }).collect())
     }
 }
 
-/// ⭐ [`OpData`] with several attributes at once.
 pub trait WithAttrs {
-    /// `attrs` set (in order).
     fn with_attrs(self, attrs: Vec<(&str, A)>) -> Self;
 }
 
@@ -122,9 +112,6 @@ impl WithAttrs for OpData<'_> {
     }
 }
 
-/// ⭐ A packed field's value in a typed op: a number, or a place, `@x` / `@m::@x` plus `add` (`[@x, n]`), which the
-/// image fills in once laid out (a template's hole). Serialized as the attribute [`Layouts`](crate::base::Layouts)'s
-/// packer reads.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Fill {
     Int(i128),
@@ -132,14 +119,12 @@ pub enum Fill {
     Place { path: Vec<String>, add: i64 },
 }
 
-
 impl From<bool> for Fill {
     fn from(v: bool) -> Self {
         Fill::Bool(v)
     }
 }
 
-/// A number as a field's value.
 macro_rules! fills {
     ($($t:ty),*) => {$(
         impl From<$t> for Fill {
@@ -153,21 +138,17 @@ macro_rules! fills {
 fills!(i32, u32, i64, u64);
 
 impl Fill {
-    /// `@name` plus `add`.
     pub fn at(name: impl Into<String>, add: i64) -> Fill {
         Fill::Place { path: vec![name.into()], add }
     }
 }
 
-/// An attribute value as a field's (`xe3!` and the like take either): a number, a bool or a place; anything else is
-/// a caller's mistake (a string, an f32: a `Real` field takes that).
 impl From<A> for Fill {
     fn from(a: A) -> Self {
         Fill::try_from(&a).unwrap_or_else(|e| panic!("{e}"))
     }
 }
 
-/// An attribute value as a field's: a number or a place.
 impl TryFrom<&A> for Fill {
     type Error = Error;
 
@@ -212,14 +193,10 @@ impl TryFrom<&Attribute<'_>> for Fill {
     }
 }
 
-/// ⭐ A typed field's value as an attribute, however mlirformat hands it to serde: an `Attribute` read off an op, or
-/// the plain values a custom form's parser gives (a number, a bool, an array, a dictionary). Asked for as an `i128`:
-/// an integer comes whole (a 64-bit address does not fit an `i64`), anything else as it is.
 pub fn attribute_of<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Attribute<'static>, D::Error> {
     d.deserialize_i128(AttrVisitor)
 }
 
-/// [`attribute_of`]'s visitor (and seed, for an array's elements and a dictionary's values).
 #[derive(Clone, Copy)]
 struct AttrVisitor;
 
@@ -273,13 +250,11 @@ impl<'de> serde::de::Visitor<'de> for AttrVisitor {
         }
         Ok(Attribute::Dict(d))
     }
-    /// The `Attribute` enum itself, as mlirformat carries one.
     fn visit_enum<A: serde::de::EnumAccess<'de>>(self, e: A) -> Result<Self::Value, A::Error> {
         <Attribute<'static> as serde::Deserialize>::deserialize(serde::de::value::EnumAccessDeserializer::new(e))
     }
 }
 
-/// Through serde as mlirformat carries attributes: `Attribute` itself.
 impl serde::Serialize for Fill {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         serde::Serialize::serialize(&Attribute::from(self), s)
@@ -292,8 +267,6 @@ impl<'de> serde::Deserialize<'de> for Fill {
     }
 }
 
-/// ⭐ A struct as an op's property: a dictionary attribute of its fields (a nested state struct, a group's element).
-/// mlirformat hands a dictionary attribute to serde as `Attribute` itself; this reads it field by field into `T`.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Fields<T>(pub T);
 
@@ -313,13 +286,9 @@ impl<'de, T: serde::de::DeserializeOwned> serde::Deserialize<'de> for Fields<T> 
     }
 }
 
-/// ⭐ A float field's value in a typed op (the tables' floats are 32-bit; the packer reads the literal as an `f64`,
-/// so a fixed-point field keeps what was written), printed as MLIR reads it back: always with a decimal point
-/// (`3.0`, not mlirformat's `3e0` for a serde float), the shortest form that round-trips, `: f32` as `A::F32` prints.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Real(pub f64);
 
-/// As `A::F32` gives it to the packer: the f32's shortest decimal.
 impl From<f32> for Real {
     fn from(v: f32) -> Self {
         Real(format!("{v:?}").parse().unwrap_or(v.into()))
@@ -335,7 +304,6 @@ impl From<f64> for Real {
 impl<'a> From<Real> for Attribute<'a> {
     fn from(r: Real) -> Self {
         let s = format!("{:?}", r.0);
-        // `1e-5` ⇒ `1.0e-5` (a float literal has a decimal point); `inf` / `NaN` stay as they are
         let lit = match s.find(['e', 'E']) {
             Some(at) if !s[..at].contains('.') => format!("{}.0{}", &s[..at], &s[at..]),
             _ => s,

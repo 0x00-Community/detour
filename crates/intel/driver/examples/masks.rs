@@ -1,8 +1,3 @@
-//! Each color target its own state (`GPUColorTargetState`): one draw over the whole of two targets cleared to
-//! (0, 64, 255, 255). Target 0 is opaque with write mask red | alpha: only those channels change, to (255, 64, 255, 255).
-//! Target 1 blends premultiplied; its source (100, 0, 0, 0) has alpha 0, so the blend adds it: (100, 64, 255, 255).
-//! Checked pixel by pixel in both.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

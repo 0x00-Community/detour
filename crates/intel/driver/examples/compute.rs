@@ -1,9 +1,3 @@
-//! Compute shaders and their i32 arithmetic against Rust, bit for bit: 65536 invocations (4096 workgroups of 16), each
-//! reading an operand pair (a, b) from a buffer at its index (`detour.workgroup_id` × 16 + `detour.lane`) and writing
-//! twenty results to another: add, sub, mul (low 32 bits), shifts (by b & 31), bit operations, signed / unsigned min
-//! and max, compare-select, the i1 extensions, i32 ⇄ f32 conversions. The operands: random words, small numbers,
-//! equal pairs, and 0, ±1, i32::MIN / MAX in every combination.
-
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
 use detour::base::{Gpu, Native};
@@ -11,7 +5,6 @@ use detour::base::{Gpu, Native};
 const N: usize = 1 << 16;
 const RESULTS: usize = 20;
 
-/// xorshift64*
 struct Rng(u64);
 
 impl Rng {

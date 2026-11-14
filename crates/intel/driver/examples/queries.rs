@@ -1,9 +1,3 @@
-//! Queries (WebGPU's `occlusion` / `timestamp` / pipeline statistics): two quads (the left half, the bottom of the right
-//! quarter of 1920x1080) and a quad off the target, each draw between occlusion snapshots (`Recorder::depth_count`):
-//! the samples each draw passed, exactly its pixels (0 off the target); pipeline statistics around the three draws
-//! (vertices, primitives, clipping, fragment invocations); timestamps around them, in order, converted by the GT's
-//! reference clock.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe3_codegen::{CL_INVOCATION_COUNT, CL_PRIMITIVES_COUNT, IA_PRIMITIVES_COUNT, IA_VERTICES_COUNT, PS_INVOCATION_COUNT, VS_INVOCATION_COUNT};
@@ -12,7 +6,6 @@ use detour::xe::Xe;
 const W: u32 = 1920;
 const H: u32 = 1080;
 
-/// Three triangle-list quads (x, y in clip space): the left half, the bottom of the right quarter, one off the target.
 #[rustfmt::skip]
 const VERTICES: [f32; 36] = [
     -1.0, -1.0,  0.0, -1.0,  -1.0, 1.0,  -1.0, 1.0,  0.0, -1.0,  0.0, 1.0,
@@ -43,7 +36,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut r = cx.record();
     r.target(&target);
     r.draw(&clear, &[&corners], &[], 3, 1)?;
-    // results: occlusion snapshots at 0, 8, 16, 24; statistics begin at 64, end at 128; timestamps at 256, 264
     r.timestamp((&results, 256))?;
     r.statistics(&STATS.map(|(reg, _)| reg), (&results, 64))?;
     r.depth_count((&results, 0))?;
@@ -66,8 +58,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for ((_, name), v) in STATS.iter().zip(&stats) {
         println!("  {name}: {v}");
     }
-    // 18 vertices, 6 triangles read; clipping saw 6 and passed the 4 on the target; a fragment invocation per covered
-    // pixel at least
     assert_eq!((stats[0], stats[1], stats[3]), (18, 6, 6));
     assert!(stats[2] >= 1 && stats[2] <= 18 && stats[5] >= want[0] + want[1], "statistics {stats:?}");
     let (t0, t1) = (u64_at(256), u64_at(264));

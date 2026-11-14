@@ -1,14 +1,3 @@
-//! The sample mask a fragment shader writes (WGSL `@builtin(sample_mask)` out: the last result of a fragment function
-//! with `detour.sample_mask`; the render target write's oMask) on Xe3: a whole-target quad into a 4x target cleared
-//! blue, its mask (pixel x) & 15, resolved. Pixel (x, y) is the quad's color on popcount(x & 15) of its 4 samples and
-//! the clear color on the rest: their mean, pixel by pixel in 1920x1080 (colors multiples of 8: whole unorm8 means).
-//! Then the input coverage mask (`detour.coverage_mask`, WGSL `@builtin(sample_mask)` in) of one triangle over the
-//! whole target (a quad's diagonal pixels would be two invocations of partial masks), red mask · 16: 15 (240) without
-//! varyings and with one (its planes past the mask: green and blue from the varying (0.25, 0.5019608)); with
-//! `sample_shading` the mask ANDed with 1 << sample_index (the hardware gives the pixel's coverage; Mesa ANDs too),
-//! red resolving to (16 + 32 + 64 + 128) / 4 = 60. Last, the `msaa` example's triangle: its edge pixels' masks worked
-//! out exactly from the 4x positions (bit k: sample k), red mask · 16 on the covered samples and black on the rest.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

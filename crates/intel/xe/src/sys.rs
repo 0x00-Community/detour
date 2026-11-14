@@ -1,14 +1,9 @@
-//! Raw uAPI: the structs and ioctl numbers of include/uapi/drm/xe_drm.h that detour uses, laid out as the
-//! kernel has them (all `repr(C)`, sizes checked by the tests at the end).
-
 #![allow(non_camel_case_types)]
 #![allow(dead_code, reason = "mirrors the uAPI headers, used or not")]
 
 use std::ffi::c_ulong;
 
 use crate::base::Ioctl;
-
-// ---- xe_drm.h ------------------------------------------------------------------------------------------------
 
 const DRM_COMMAND_BASE: c_ulong = Ioctl::COMMAND_BASE;
 
@@ -40,7 +35,6 @@ pub struct drm_xe_engine {
 pub struct drm_xe_query_engines {
     pub num_engines: u32,
     pub pad: u32,
-    // engines: [drm_xe_engine]
 }
 
 pub const DRM_XE_MEM_REGION_CLASS_SYSMEM: u16 = 0;
@@ -64,7 +58,6 @@ pub struct drm_xe_mem_region {
 pub struct drm_xe_query_mem_regions {
     pub num_mem_regions: u32,
     pub pad: u32,
-    // mem_regions: [drm_xe_mem_region]
 }
 
 pub const DRM_XE_QUERY_CONFIG_REV_AND_DEVICE_ID: usize = 0;
@@ -79,7 +72,6 @@ pub const DRM_XE_QUERY_CONFIG_MAX_EXEC_QUEUE_PRIORITY: usize = 4;
 pub struct drm_xe_query_config {
     pub num_params: u32,
     pub pad: u32,
-    // info: [u64]
 }
 
 pub const DRM_XE_QUERY_GT_TYPE_MAIN: u16 = 0;
@@ -107,7 +99,6 @@ pub struct drm_xe_gt {
 pub struct drm_xe_query_gt_list {
     pub num_gt: u32,
     pub pad: u32,
-    // gt_list: [drm_xe_gt]
 }
 
 pub const DRM_XE_TOPO_DSS_GEOMETRY: u16 = 1;
@@ -122,7 +113,6 @@ pub struct drm_xe_query_topology_mask {
     pub gt_id: u16,
     pub type_: u16,
     pub num_bytes: u32,
-    // mask: [u8; num_bytes]
 }
 
 pub const DRM_XE_DEVICE_QUERY_ENGINES: u32 = 0;
@@ -204,7 +194,6 @@ pub struct drm_xe_vm_bind_op {
     pub obj: u32,
     pub pat_index: u16,
     pub pad: u16,
-    /// obj_offset, or userptr for DRM_XE_VM_BIND_OP_MAP_USERPTR
     pub obj_offset: u64,
     pub range: u64,
     pub addr: u64,
@@ -223,7 +212,6 @@ pub struct drm_xe_vm_bind {
     pub exec_queue_id: u32,
     pub pad: u32,
     pub num_binds: u32,
-    /// the one bind (num_binds == 1), else `vector_of_binds` as its first u64
     pub bind: drm_xe_vm_bind_op,
     pub pad2: u32,
     pub num_syncs: u32,
@@ -277,7 +265,6 @@ pub struct drm_xe_sync {
     pub extensions: u64,
     pub type_: u32,
     pub flags: u32,
-    /// handle (syncobj, u32) or addr (user fence)
     pub handle_or_addr: u64,
     pub timeline_value: u64,
     pub reserved: [u64; 2],

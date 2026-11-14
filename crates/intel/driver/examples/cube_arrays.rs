@@ -1,9 +1,3 @@
-//! Cube arrays (`texture_cube_array`: `Context::texture_layers` with 6 layers a cube) on Xe3, pixel by pixel: three
-//! cubes of six 4 x 4 faces, every texel distinct (cube, face, x, y). A 24 x 20 target whose pixel (x, y) samples
-//! (nearest) face x / 4, texel (x % 4, y % 4) by the direction that picks it (as the `cubes` example, scaled by 3) and
-//! the cube y / 4: rows 0 ..= 11 cubes 0, 1, 2; rows 12 ..= 15 cube 1.4 (rounded: 1); rows 16 ..= 19 cube 9 (clamped:
-//! 2). `detour.sample {cube = true}` of a vector<4xf32> (direction, cube): the direction normalized, the cube kept.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -30,7 +24,6 @@ fn texel(cube: u32, face: u32, x: u32, y: u32) -> [u8; 4] {
     [(face * 40 + 10) as u8, (x * 60 + 5) as u8, (y * 60 + 7) as u8, (255 - cube * 70) as u8]
 }
 
-/// The direction sampling face `f`'s texel at (u, v) (s, t = 2u − 1, 2v − 1, the major axis 1).
 fn direction(f: u32, u: f32, v: f32) -> [f32; 3] {
     let (s, t) = (2.0 * u - 1.0, 2.0 * v - 1.0);
     match f {

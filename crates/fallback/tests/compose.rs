@@ -1,5 +1,3 @@
-//! The Vulkan fallback's compositing against the CSS model (moved with the compositor from acde's acde-vello tests).
-
 use std::sync::Arc;
 
 use detour::base::{Backdrop, ColorMatrix, Effect, Shadow};

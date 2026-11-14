@@ -1,8 +1,3 @@
-//! Multi-draw indirect (`multiDrawIndirect`; Vulkan `vkCmdDrawIndirectCount`: `Recorder::multi_draw_indirect`) on Xe3:
-//! eight eighth-wide quads of one vertex buffer, draw k's arguments (32 bytes apart) picking quad k (first vertex, or
-//! base vertex when indexed). Into 1920x1080 cleared blue, each case its own target, pixel by pixel: no count (all 8),
-//! a count of 3 (the first three), 0 (none), 20 (all 8: at most `max_count`), and indexed with a count of 5.
-
 use detour::base::{Gpu, IndexFormat, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -43,8 +38,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let vb = cx.floats(&quads)?;
     let index = cx.buffer(&words(&[0, 1, 2, 3, 4, 5]))?;
-    // 32 bytes a draw: drawIndirect's (count, instances, first vertex, first instance), drawIndexedIndirect's (count,
-    // instances, first index, base vertex, first instance)
     let plain = cx.buffer(&words(&(0..8).flat_map(|k| [6, 1, 6 * k, 0, 0, 0, 0, 0]).collect::<Vec<u32>>()))?;
     let indexed = cx.buffer(&words(&(0..8).flat_map(|k| [6, 1, 0, 6 * k, 0, 0, 0, 0]).collect::<Vec<u32>>()))?;
     let counts = cx.buffer(&words(&[3, 0, 20, 5]))?;

@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::Level;
 use crate::vello_cpu::dispatch::multi_threaded::{
     RecordedCommand, RecordedCommandSender, RecordedCommandTask, RenderTask, RenderTaskType,

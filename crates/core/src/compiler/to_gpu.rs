@@ -1,43 +1,18 @@
-//! `convert-detour-to-gpu`: detour's compute shaders as upstream `gpu.func` kernels, which mlirpass's GPU targets
-//! (`convert-gpu-to-xe3` / `-agx` / `-rdna2`) lower. Every compute `func.func` goes into `gpu.module @shaders` (the
-//! module `gpu.container_module`), what only detour spells in upstream ops:
-//!
-//! ```text
-//!   func.func {detour.stage = "compute", detour.workgroup = T, detour.shared = S}
-//!                                   ⇒ gpu.func kernel {known_block_size = array<i32: 16 T, 1, 1>} with a workgroup
-//!                                     attribution memref<S x i8, #gpu.address_space<workgroup>> (unused: the shared
-//!                                     memory is addressed by byte offsets from 0)
-//!   func.return                     ⇒ gpu.return
-//!   detour.workgroup_id {dim} / lane ⇒ gpu.block_id x | y | z / gpu.thread_id x, arith.index_cast to i32
-//!   detour.load / store {size}       ⇒ llvm.inttoptr to !llvm.ptr<1> (global) or <3> (`shared`) + llvm.load / store:
-//!                                     size 1 / 2 an i8 / i16 (arith.extui / trunci beside it), else the type's own
-//!   detour.atomic {op}               ⇒ llvm.atomicrmw (add .. xchg) monotonic
-//!   detour.barrier                   ⇒ gpu.barrier
-//! ```
-//!
-//! The vertex and fragment shaders stay as they are. A load or store of a binding is refused (compute shaders have
-//! none), so is any other detour op in a compute shader.
-
 use mlirformat::llvm_types::LlvmType;
 use mlirformat::{Attribute, Dim, Error, Op, Shaped, ShapedKind, Type};
 use mlirpass::{A, Body, Heads, OpData, OpId, Quiet, Rewriter, ValueId, pass};
 
 use crate::base::{Atomic, AtomicOp, Attrs, Barrier, Lane, Load, Stage, Store, WorkgroupId};
 
-/// The `gpu.module` the kernels go into.
 pub const SHADERS: &str = "shaders";
 
-/// The invocations of a compute thread (a workgroup is `detour.workgroup` threads of them).
 const LANES: i64 = 16;
 
-/// The address spaces of `!llvm.ptr`: global memory, the workgroup's shared memory.
 const GLOBAL: u32 = 1;
 const SHARED: u32 = 3;
 
-/// `llvm.atomicrmw`'s `ordering`: monotonic (LLVM AtomicOrdering).
 const MONOTONIC: i64 = 2;
 
-/// `convert-detour-to-gpu`.
 #[pass("convert-detour-to-gpu", on = "builtin.module")]
 pub fn convert_detour_to_gpu<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     let top = body.top_block(op);
@@ -64,12 +39,9 @@ pub fn convert_detour_to_gpu<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Er
     Ok(())
 }
 
-/// The ops of a compute shader in upstream ops.
 struct ToGpu;
 
 impl ToGpu {
-    /// The `func.func` a `gpu.func` kernel: its workgroup's threads its block size, its shared memory a workgroup
-    /// attribution.
     fn kernel(rw: &mut Rewriter<'_, '_>, f: OpId) -> Result<(), Error> {
         let count = |rw: &Rewriter<'_, '_>, attr: &str| rw.body[f].get(attr).map(Attrs::as_int).transpose().map(|n| n.unwrap_or(0));
         let (threads, shared) = (count(rw, "detour.workgroup")?, count(rw, "detour.shared")?);
@@ -114,7 +86,6 @@ impl ToGpu {
                 let ptr = Self::pointer(rw, rw.body[o].operands[0], load.shared);
                 let ty = rw.body[rw.body[o].results[0]].ty.clone();
                 let v = match Self::narrow(load.size)? {
-                    // the narrow integer, zero-extended
                     Some(n) => {
                         let l = rw.create(OpData::build("llvm.load").operands(&[ptr]).with("alignment", Self::align(n.1)), &[Type::int(n.0)]);
                         let l = rw.body[l].results[0];
@@ -147,7 +118,6 @@ impl ToGpu {
             }
             n if n == Atomic::NAME => {
                 let atomic = rw.body.head::<Atomic>(o)?;
-                // mlirformat's LLVM AtomicBinOp: xchg, add, sub, _and, nand, _or, _xor, max, min, umax, umin
                 let bin_op = match atomic.op {
                     AtomicOp::Exchange => 0,
                     AtomicOp::Add => 1,
@@ -180,7 +150,6 @@ impl ToGpu {
         Ok(())
     }
 
-    /// `gpu.<id> <case>` (an index) cast to the op's result type.
     fn id(rw: &mut Rewriter<'_, '_>, o: OpId, name: &str, case: &str) {
         rw.set_before(o);
         let dim = Attribute::Extended { ext: mlirformat::Extended { name: "gpu".into(), body: Some(format!("<dim {case}>").into()), params: Vec::new() }.into(), ty: None };
@@ -192,14 +161,12 @@ impl ToGpu {
         rw.replace_op(o, &[v]);
     }
 
-    /// The address as a pointer of global memory, or of the shared memory.
     fn pointer(rw: &mut Rewriter<'_, '_>, addr: ValueId, shared: Option<bool>) -> ValueId {
         let space = if shared == Some(true) { SHARED } else { GLOBAL };
         let p = rw.create(OpData::build("llvm.inttoptr").operands(&[addr]), &[LlvmType::Ptr(space).into()]);
         rw.body[p].results[0]
     }
 
-    /// A `size` of 1 or 2 bytes: the narrow integer's width and its bytes; 4 (or none): the type's own.
     fn narrow(size: Option<u32>) -> Result<Option<(u32, u32)>, Error> {
         match size {
             None | Some(4) => Ok(None),
@@ -209,7 +176,6 @@ impl ToGpu {
         }
     }
 
-    /// The bytes of a component of `t` (an f64 / i64's 8, else 4).
     fn bytes(t: &Type<'_>) -> u32 {
         let e = match t {
             Type::Shaped(s) => &*s.elem,
@@ -225,7 +191,6 @@ impl ToGpu {
         Attribute::integer(i128::from(bytes), Type::int(64))
     }
 
-    /// Compute shaders read and write flat addresses, no binding.
     fn unbound(binding: Option<u32>) -> Result<(), Error> {
         match binding {
             None => Ok(()),

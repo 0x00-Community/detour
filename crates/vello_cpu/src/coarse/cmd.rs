@@ -1,8 +1,3 @@
-//! Render commands for a single row of strips.
-
-// Copyright 2026 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::coarse::depth::BucketRange;
 use crate::vello_cpu::peniko::BlendMode;
 use crate::vello_cpu::span::TileAlignedSpan;
@@ -10,24 +5,14 @@ use core::num::NonZeroU32;
 use vello_common::mask::Mask;
 use vello_common::paint::Paint;
 
-// TODO: If we wanted to, we could likely reduce the memory footprint from 16 bytes to 8 bytes
-// by using 4 bits from a span (since tile size is 4, for `x` and `width` we can always store
-// the value divided by 4), and creating a bit-packed representation of all commands.
-
-/// A bucketed render command.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum RenderCmd {
-    /// See [`PaintFill`].
     PaintFill(PaintFill),
-    /// Push a new temporary layer buffer.
     PushBuf(Option<TileAlignedSpan>),
-    /// Pop the last temporary layer buffer.
     PopBuf,
-    /// See [`LayerFill`].
     LayerFill(LayerFill),
 }
 
-/// Fill a span with the given paint and optionally some alpha coverage.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct PaintFill {
     pub(crate) span: TileAlignedSpan,
@@ -49,7 +34,6 @@ impl PaintFill {
     }
 }
 
-/// Fill a whole range of depth buckets with the given paint.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct DepthFill {
     bucket_range: BucketRange,
@@ -73,8 +57,6 @@ impl DepthFill {
     }
 }
 
-/// Composite a span from the current temporary layer buffer into the parent
-/// buffer and optionally apply some alpha coverage.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct LayerFill {
     pub(crate) span: TileAlignedSpan,
@@ -96,7 +78,6 @@ impl LayerFill {
     }
 }
 
-// We use `NonZeroU32` so that `Option<AlphaIdx>` still only needs 4 bytes.
 #[derive(Debug, Clone, Copy)]
 struct AlphaIdx(NonZeroU32);
 
@@ -118,7 +99,6 @@ pub struct PaintFillAttrs {
     pub mask: Option<Mask>,
     pub draw_id: u32,
     pub thread_idx: u8,
-    /// See the comment in `CommandBucketer::bucket_commands`.
     pub origin: (u16, u16),
 }
 
@@ -128,8 +108,6 @@ pub(crate) struct LayerFillAttrs {
     pub(crate) opacity: f32,
     pub(crate) mask: Option<Mask>,
     pub(crate) draw_id: u32,
-    /// In case there is any alpha associated with the layer command, this stores
-    /// the index of the thread that stores the alpha.
     pub(crate) thread_idx: u8,
 }
 

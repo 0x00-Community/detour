@@ -1,9 +1,3 @@
-//! ⭐ vello_cpu's layer filters on Xe3, bit for bit (roadmap R5): the gaussian blur (`filters/blur.mlir`), as its u8
-//! kernel runs it (`filter/gaussian_blur.rs`): `n` decimations ([1, 3, 3, 1] / 8, each axis), the separable
-//! convolution at the coarsest size, `n` upsamplings back ([0.75, 0.25]), each pass one dispatch from one image into
-//! another (vello_cpu runs them in place: every read is inside the current size, so the bytes are the same); the drop
-//! shadow (`filters/shadow.mlir`, `filter/drop_shadow.rs`): the layer offset, blurred, colored, the layer over it.
-
 use crate::base::vello_common::filter::drop_shadow::DropShadow;
 use crate::base::vello_common::filter::gaussian_blur::GaussianBlur;
 use crate::base::vello_common::filter_effects::EdgeMode;
@@ -14,14 +8,12 @@ use crate::xe3::{Codegen, Context, Error, Kernel, Recorder};
 const BLUR: &str = include_str!("filters/blur.mlir");
 const SHADOW: &str = include_str!("filters/shadow.mlir");
 
-/// An image a pass reads or writes: its address, its stride in pixels.
 #[derive(Clone, Copy, Debug)]
 pub struct Plane {
     pub addr: u32,
     pub stride: u32,
 }
 
-/// ⭐ The filters' kernels, compiled once.
 pub struct Filters {
     blur_x: Kernel,
     blur_y: Kernel,
@@ -48,20 +40,16 @@ impl Filters {
         })
     }
 
-    /// The bytes a blur's kernel weights take (`plan.kernel_size` f32s, 64-byte aligned).
     pub fn weights(plan: &GaussianBlur) -> usize {
         (usize::from(plan.kernel_size) * 4).next_multiple_of(64)
     }
 
-    /// `plan`'s weights as the kernel reads them (little-endian f32s).
     pub fn write_weights(plan: &GaussianBlur, dst: &mut [u8]) {
         for (to, k) in dst.as_chunks_mut::<4>().0.iter_mut().zip(&plan.kernel[..usize::from(plan.kernel_size)]) {
             *to = k.to_le_bytes();
         }
     }
 
-    /// ⭐ `src` (`w × h`) blurred by `plan` into `dst`, recorded into `r`: `weights` where [`write_weights`](Self::write_weights)
-    /// put the kernel, `scratch` two images of `w × h` (`dst`'s stride) the passes go through. Edge mode `None` only.
     #[allow(clippy::too_many_arguments, reason = "the images a blur goes through")]
     pub fn blur<'d, G: Gpu<Cmd = u64> + 'd, H: Host>(&self, r: &mut Recorder<'_, 'd, G, H>, src: Plane, dst: Plane, (w, h): (u32, u32), plan: &GaussianBlur, weights: u32, [a, b]: [Plane; 2]) -> Result<(), Error> {
         if plan.edge_mode != EdgeMode::None {
@@ -106,14 +94,10 @@ impl Filters {
         Ok(())
     }
 
-    /// A drop shadow's blur (its plan: the same as [`GaussianBlur::new`]'s).
     pub fn shadow_blur(d: &DropShadow) -> GaussianBlur {
         GaussianBlur { std_deviation: d.std_deviation, n_decimations: d.n_decimations, kernel: d.kernel, kernel_size: d.kernel_size, edge_mode: d.edge_mode }
     }
 
-    /// ⭐ `src`'s (`w × h`) drop shadow `d` into `dst`, recorded into `r`: the layer offset (by `d`'s offsets rounded),
-    /// blurred (`weights` its blur's, [`shadow_blur`](Self::shadow_blur)), colored, the layer over it unless shadow
-    /// only; `scratch` three images of `w × h`, all of `src`'s stride. Edge mode `None` only.
     #[allow(clippy::too_many_arguments, reason = "the images a drop shadow goes through")]
     pub fn drop_shadow<'d, G: Gpu<Cmd = u64> + 'd, H: Host>(&self, r: &mut Recorder<'_, 'd, G, H>, src: Plane, dst: Plane, (w, h): (u32, u32), d: &DropShadow, weights: u32, [s0, a, b]: [Plane; 3]) -> Result<(), Error> {
         if d.edge_mode != EdgeMode::None {
@@ -128,7 +112,6 @@ impl Filters {
             shadow = s0;
         }
         if d.std_deviation > 0.0 {
-            // the blur reads its source only in its first pass and writes its destination in its last: in place in s0
             self.blur(r, shadow, s0, (w, h), &Self::shadow_blur(d), weights, [a, b])?;
             shadow = s0;
         }
@@ -140,5 +123,4 @@ impl Filters {
         }
         r.dispatch(&self.shadow, groups, &[src.addr, shadow.addr, dst.addr, src.stride, wh, rgb | u32::from(d.composite_original) << 24, ca.to_bits()])
     }
-
 }

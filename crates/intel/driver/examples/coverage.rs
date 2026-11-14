@@ -1,7 +1,3 @@
-//! Alpha to coverage (`alphaToCoverageEnabled`) on Xe3: a fragment of alpha a (and white color) over a target cleared
-//! black, 4x and 8x, resolved: its red is 255 × the samples a covers / the samples. Swept over a = k / 256, every pixel
-//! against the rule measured: ceil(a n − 1/2) samples of n (a n rounded to nearest, ties down; dither off).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

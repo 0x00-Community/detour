@@ -1,6 +1,3 @@
-//! The smallest job through the xe3 dialect: examples/store.mlir (one MI_STORE_DATA_IMM) laid out, packed, run on the
-//! first xe device; the CPU reads the stored dword back.
-
 use std::time::{Duration, Instant};
 
 use detour::xe3::{Codegen, Device};

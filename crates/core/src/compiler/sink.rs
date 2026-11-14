@@ -1,14 +1,9 @@
-//! Constants where they are read: canonicalize gathers every `arith.constant` at a function's entry, where each would
-//! hold a register through the whole kernel; every backend's lowering first copies each one next to each of its uses.
-
 use alloc::collections::BTreeSet;
 
 use mlirformat::{Op, arith::Constant};
 use mlirpass::{Body, OpData, OpId, Quiet, Rewriter};
 
-/// ⭐ [`Body`]'s constant sinking (a backend calls it on its shaders before lowering them).
 pub trait SinkConstants {
-    /// Every `arith.constant` in `shaders` copied next to each of its uses, the original gone.
     fn sink_constants(&mut self, shaders: &[OpId]);
 }
 

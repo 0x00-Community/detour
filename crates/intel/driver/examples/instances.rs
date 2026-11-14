@@ -1,7 +1,3 @@
-//! Instancing: 16 rectangles in one draw (a unit quad stepped per vertex, each rectangle's place and color stepped per
-//! instance). Through the runtime; every pixel is checked: inside a rectangle its color, outside the clear color (a
-//! pixel off the edges by half a pixel at least, so no fill rule is involved).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -10,7 +6,6 @@ const W: u32 = 256;
 const H: u32 = 256;
 const CLEAR: [u8; 4] = [0, 0, 0, 255];
 
-/// Rectangle `i` of a 4 x 4 grid: 64-pixel cells, the rectangle 40 x 24 pixels at (8, 16) in its cell; in pixels.
 fn rect(i: u32) -> (u32, u32, u32, u32) {
     (i % 4 * 64 + 8, i / 4 * 64 + 16, 40, 24)
 }

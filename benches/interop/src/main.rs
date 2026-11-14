@@ -1,12 +1,3 @@
-//! A GPU image as the fallback makes them (a wgpu texture on Vulkan), its memory exported as a dma-buf
-//! (`detour::fallback::Exported`), imported by Xe3's driver and painted by id in a page (`XeImages`), against vello_cpu
-//! drawing the same bytes as an image: byte for byte. The texels are written by wgpu (a queue write, then waited for).
-//! Then as acde makes them: `Offscreen` (vello on wgpu) draws a scene into a GPU image of an exporting `Shared`,
-//! `detour::SharedImages` imports it on Xe3, a page paints with its brush; the reference is vello_cpu drawing the
-//! image's bytes read back. Last `detour::PageRaster`: two windows' passes in one frame, into canvases the fallback
-//! exported; the one Xe3 can draw is Xe3's (as vello_cpu draws it), the one it refuses (a GPU image it cannot read)
-//! the fallback's, one merged sync_file.
-
 use std::sync::Arc;
 
 use detour::base::{Content, Effect, Gpu, Native, PaintScene, Part, Pass, Px, Scene};
@@ -21,7 +12,6 @@ use detour::vello_cpu::{Pixmap, RasterizerSettings, RenderContext, RenderMode, R
 const IW: u32 = 13;
 const IH: u32 = 9;
 
-/// The one GPU image, by its blob's id.
 struct One(u64, GpuTexels);
 
 impl XeImages for One {
@@ -44,7 +34,6 @@ fn scene(image: &ImageBrush) -> Scene {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let texels: Vec<u8> = (0..IW * IH).flat_map(|i| [(i * 37 % 256) as u8, (i * 91 % 256) as u8, (255 - i * 13 % 256) as u8, [0, 60, 128, 200, 255][(i % 5) as usize]]).collect();
 
-    // the fallback: an exported texture, its texels written by wgpu
     let vk = Device::open()?;
     let (texture, exported) = Exported::texture(&vk.device, (IW, IH))?;
     println!("{}: exported {IW} x {IH}, offset {}, rows of {} bytes", vk.info.name, exported.offset, exported.stride);
@@ -57,7 +46,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     vk.queue.submit([]);
     vk.device.poll(wgpu::PollType::wait_indefinitely())?;
 
-    // Xe3: the dma-buf imported, the image painted by id
     let xe = Xe::open_first()?;
     let mut cx = Context::<Xe, Native>::new(&xe)?;
     let mut pages = Pages::new(&mut cx, &Codegen::default(), [96, 64])?;
@@ -67,7 +55,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table = One(gpu.data.id(), GpuTexels { addr: imported.canvas.addr, stride: imported.canvas.stride, size: (IW as u16, IH as u16), straight: true });
     let got = pages.draw(&mut cx, scene(&ImageBrush::new(gpu)), (96, 64), &table)?;
 
-    // the reference: vello_cpu, the same bytes as an image
     let bytes = ImageData { data: Blob::new(Arc::new(texels)), format: ImageFormat::Rgba8, alpha_type: ImageAlphaType::Alpha, width: IW, height: IH };
     let mut ctx = RenderContext::new(96, 64);
     let mut resources = Resources::new();
@@ -87,7 +74,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// A GPU image drawn by `Offscreen` (vello on wgpu) into an exporting `Shared`, painted on Xe3 through `SharedImages`.
 fn offscreen<'d>(vk: &Device, cx: &mut Context<'d, Xe, Native>, pages: &mut Pages<'d, Xe>) -> Result<(), Box<dyn std::error::Error>> {
     let shared = Shared::exporting(vk.device.clone(), vk.queue.clone());
     let mut off = Offscreen::new(shared.clone())?;
@@ -118,7 +104,6 @@ fn offscreen<'d>(vk: &Device, cx: &mut Context<'d, Xe, Native>, pages: &mut Page
     Ok(())
 }
 
-/// A part drawing one scene, no effects.
 struct One1(Scene);
 
 impl Content for One1 {
@@ -127,13 +112,11 @@ impl Content for One1 {
     }
 }
 
-/// `PageRaster`: plane 0 (Xe3 draws it) and plane 1 (a GPU image not exported: the fallback's) in one frame.
 fn page_raster(xe: &Xe) -> Result<(), Box<dyn std::error::Error>> {
     let (w, h) = (96u32, 64u32);
     let vulkan = Raster::new(Device::open()?, false)?;
     let (device, queue) = (vulkan.device.device.clone(), vulkan.device.queue.clone());
     let shared = Shared::exporting(device.clone(), queue.clone());
-    // a GPU image of the set that is not exported (Xe3 cannot read it): a green disc
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("interop unexported"),
         size: wgpu::Extent3d { width: 16, height: 16, depth_or_array_layers: 1 },
@@ -154,7 +137,6 @@ fn page_raster(xe: &Xe) -> Result<(), Box<dyn std::error::Error>> {
     let image = GpuImage::new(texture, &shared.images);
     let mut raster = PageRaster::new(vulkan, Some(xe), [w, h], shared.images.clone());
     assert!(raster.xe3(), "Xe3's rasterizer did not start");
-    // canvases allocated larger than the pages (as acde's GBM ones are): the passes draw their top left
     let padded = (w + 32, h + 16);
     let canvases: Vec<(wgpu::Texture, Exported)> = (0..2).map(|_| Exported::texture(&device, padded)).collect::<Result<_, _>>()?;
     for (plane, (_, e)) in canvases.iter().enumerate() {
@@ -176,7 +158,6 @@ fn page_raster(xe: &Xe) -> Result<(), Box<dyn std::error::Error>> {
     let ready = rustix::event::poll(&mut fds, Some(&rustix::event::Timespec { tv_sec: 5, tv_nsec: 0 }))?;
     device.poll(wgpu::PollType::wait_indefinitely())?;
 
-    // plane 0: Xe3's, a part without effects over a cleared canvas is the scene as vello_cpu draws it
     let got = shared.read(&canvases[0].0, [0, 0, w, h])?;
     let mut ctx = RenderContext::new(w as u16, h as u16);
     let mut resources = Resources::new();
@@ -184,7 +165,6 @@ fn page_raster(xe: &Xe) -> Result<(), Box<dyn std::error::Error>> {
     let mut want = Pixmap::new(w as u16, h as u16);
     ctx.render_with(&mut want, &mut resources, RasterizerSettings { render_mode: RenderMode::OptimizeSpeed, ..Default::default() });
     let bad = got.as_chunks::<4>().0.iter().zip(want.data_as_u8_slice().as_chunks::<4>().0).filter(|(g, w)| g != w).count();
-    // plane 1: the fallback's, the blurred green disc there
     let other = shared.read(&canvases[1].0, [0, 0, w, h])?;
     let green = other.as_chunks::<4>().0.iter().filter(|p| p[3] > 0 && p[1] > p[0]).count();
     println!("page raster: sync_file signalled {}; plane 0 (Xe3, a {w}x{h} pass in a {}x{} canvas) {bad} of {} pixels differ from vello_cpu; plane 1 (fallback) {green} green pixels", ready == 1, padded.0, padded.1, w * h);

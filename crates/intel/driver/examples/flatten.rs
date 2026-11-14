@@ -1,11 +1,3 @@
-//! vello_common's flatten on Xe3 against vello_common's own, bit for bit (roadmap R8.1): random paths (moves, lines,
-//! quadratics, cubics, closes; some curves degenerate) under a random affine,
-//! culled to a box. A lane flattens one element (`flatten/flatten.mlir`: pass 0 counts its points, pass 1 writes them
-//! at their offsets, a prefix sum of the counts, and its lines: from its start through its points; a subpath's
-//! closing line is an element of its own, drawn when its ends differ); a path with NaN has no lines (the elements'
-//! NaN flags, its moves). The offsets are a prefix sum of the counts on the GPU too (`flatten/scan.mlir`); the CPU
-//! reads back only the total, for the buffers' sizes.
-
 use detour::base::vello_common::flatten::{self, FlattenCtx, Line, Point};
 use detour::base::vello_common::fearless_simd::Level;
 use detour::base::vello_common::geometry::RectU16;
@@ -19,7 +11,6 @@ use detour::xe3::ScanPlan;
 const PATHS: usize = 2000;
 const BOX: RectU16 = RectU16 { x0: 0, y0: 0, x1: 1000, y1: 800 };
 
-/// xorshift64*
 struct Rng(u64);
 
 impl Rng {
@@ -51,7 +42,6 @@ impl Rng {
                 }
                 1 => p.close_path(),
                 2 | 3 => p.line_to(to),
-                // degenerate: a control point on the chord, or at an end
                 4 => p.quad_to(last.lerp(to, self.unit()), to),
                 5 => p.quad_to(last, to),
                 6 => p.quad_to(self.point(), to),
@@ -72,9 +62,6 @@ impl Rng {
     }
 }
 
-/// The GPU elements of a path (its untransformed points): kind (0 line, 1 quadratic, 2 cubic, 3 close), p0 (the point
-/// before it), p1, p2, p3; a close (p0 the last point, p1 the subpath's start) at each move but the first, each close
-/// and the end, as `flatten_simd::flatten` closes; its moves.
 fn elements(path: &BezPath) -> (Vec<(u32, [KPoint; 4])>, Vec<KPoint>) {
     let mut last = KPoint::ZERO;
     let mut start = KPoint::ZERO;
@@ -127,7 +114,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let level = Level::try_detect().unwrap_or(Level::baseline());
     let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
     let paths: Vec<(BezPath, Affine)> = (0..PATHS).map(|_| (rng.path(), rng.affine())).collect();
-    // every path's elements, one dispatch a pass
     let mut bytes = Vec::new();
     let mut firsts = Vec::new();
     for (path, affine) in &paths {
@@ -151,7 +137,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scratch = cx.buffer(&vec![0; n * 640])?;
     let mut nans = cx.buffer(&vec![0; n * 4])?;
     let groups = [n.div_ceil(16) as u32, 1];
-    // the lanes' elements: sorted by kind (a lane's work is its kind's)
     let mut perm: Vec<u32> = (0..n as u32).collect();
     perm.sort_by_key(|&e| bytes[e as usize * 128]);
     let pbuf_perm = cx.buffer(&perm.iter().flat_map(|e| e.to_le_bytes()).collect::<Vec<_>>())?;

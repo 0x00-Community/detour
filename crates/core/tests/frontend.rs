@@ -1,5 +1,3 @@
-//! The three shader forms of the triangle (func / gpu / spirv) are the same module after the frontend.
-
 use detour::base::{Compiler, FRONTEND};
 
 const DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/crates/intel/driver/examples/triangle/");

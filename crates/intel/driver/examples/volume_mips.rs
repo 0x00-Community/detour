@@ -1,9 +1,3 @@
-//! 3D textures with mip levels (`Context::texture_3d_levels`) on Xe3: a 16 x 16 x 8 volume of 5 levels (16 x 16 x 8,
-//! 8 x 8 x 4, 4 x 4 x 2, 2 x 2 x 1, 1 x 1 x 1), every level's every slice one color of its own. Into a 16 x 16 target,
-//! one draw per (level, slice): u and v run 0 ..= 2^level over it (repeat), so the derivatives pick that level, and w
-//! is the slice's center at that level; the nearest level, nearest texel. Every pixel the color of that slice of that
-//! level.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

@@ -1,7 +1,3 @@
-//! vello_cpu's coarse rasterization as detour takes it (crates/vello_cpu, `RenderContext::coarse`): a scene of a
-//! filled circle, a rectangle under a semi-transparent layer clipped to a rounded rectangle, and a linear gradient;
-//! printed row by row (the CPU half of R3: what the GPU's fine rasterization will run). No GPU.
-
 use detour::vello_cpu::detour::{Cmd, Coarse};
 use detour::vello_cpu::color::{AlphaColor, Srgb};
 use detour::vello_cpu::kurbo::{Circle, Point, Rect, RoundedRect, Shape};

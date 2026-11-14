@@ -1,11 +1,5 @@
-//! detour's compute/ints shader through the AGX backend on mlirpass's AGX target, dispatched over 1, 4 and 1024
-//! workgroups: the whole image (CDM stream, pipeline USC words, parameters, kernel; the buffers' places) is what
-//! detour's own AGX backend (crates/apple/{dialect,codegen} before it moved to mlirpass, its last version 4a0ead0)
-//! made on the same mlirpass (0.8.3) with the same features, byte for byte (tests/ints/g*.expected).
-
 use detour::agx_codegen::Codegen;
 
-/// Built::dump with each segment's zero tail cut to `+N zeros` (the buffers are 64 KiB of zeros).
 fn cut(dump: &str) -> String {
     dump.lines()
         .map(|l| match l.strip_prefix("segment ").map(|r| r.split(' ').collect::<Vec<_>>()) {

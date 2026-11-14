@@ -1,12 +1,7 @@
-//! 3D textures (`texture_3d`, `Context::texture_3d`) on Xe3: a 4 x 4 x 4 volume of distinct texels sampled (nearest)
-//! at (u, v, w) with w each slice's center, a 16 x 4 target in four strips: strip k is slice k, pixel by pixel; then a
-//! black and a white slice sampled linearly halfway (w 0.5): grey, filtered in w too.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
 
-/// A pipeline sampling binding 0 at (u, v, w) with `filter`.
 fn pipeline(filter: &str) -> String {
     format!(
         r#"detour.pipeline @volume {{vertex = @vs, fragment = @fs, topology = "triangle-list", targets = ["rgba8unorm"], filter = "{filter}",
@@ -28,7 +23,6 @@ fn texel(x: u32, y: u32, z: u32) -> [u8; 4] {
     [(x * 60 + 10) as u8, (y * 60 + 20) as u8, (z * 60 + 30) as u8, 255]
 }
 
-/// Strips across the target, strip k at w `ws[k]`, u v 0 .. 1 over it: x y u v w per vertex.
 fn strips(ws: &[f32]) -> Vec<f32> {
     let n = ws.len() as f32;
     let mut v = Vec::new();
@@ -69,7 +63,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ok &= bad == 0;
     }
 
-    // linear in w: a black slice and a white one, halfway
     let linear = cx.pipeline(&codegen, &pipeline("linear"), "volume")?;
     let (black, white) = ([0u8, 0, 0, 255].repeat(4), [255u8, 255, 255, 255].repeat(4));
     let two = cx.texture_3d(2, 2, TextureFormat::Rgba8Unorm, &[&black, &white])?;

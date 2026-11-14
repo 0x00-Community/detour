@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::fine::macros::{f32x16_painter, u8x16_painter};
 use crate::vello_cpu::fine::{Splat4thExt, u8_to_f32};
 use vello_common::encode::EncodedImage;
@@ -10,11 +7,8 @@ use vello_common::fearless_simd::{
 use vello_common::pixmap::Pixmap;
 use vello_common::simd::element_wise_splat;
 
-/// A painter for nearest-neighbor images with no skewing.
 #[derive(Debug)]
 pub(crate) struct PlainNNImagePainter<'a, S: Simd> {
-    // detour: the nearest-neighbor painters position every pixel on its own (`detour::Positions`, as the gradients),
-    // where upstream adds the advance in f32 from the span's start
     nn: NNImagePainter<'a, S>,
     simd: S,
 }
@@ -42,11 +36,9 @@ impl<S: Simd> Iterator for PlainNNImagePainter<'_, S> {
 
 u8x16_painter!(PlainNNImagePainter<'_, S>);
 
-/// A painter for nearest-neighbor images with arbitrary transforms.
 #[derive(Debug)]
 pub(crate) struct NNImagePainter<'a, S: Simd> {
     data: ImagePainterData<'a, S>,
-    // detour: each pixel's position from `positions` (the column, its first pixel's x and y)
     positions: crate::vello_cpu::detour::Positions,
     x: f32,
     y: f32,
@@ -91,19 +83,9 @@ impl<S: Simd> Iterator for NNImagePainter<'_, S> {
 
 u8x16_painter!(NNImagePainter<'_, S>);
 
-/// A painter for images with bilinear or bicubic filtering.
-///
-/// The painter is generic over sampler quality using the const-generic `QUALITY` parameter.
-///
-/// - Set `QUALITY` to `1` for bilinear sampling; or
-/// - set `QUALITY` to `2` for bicubic sampling.
-///
-/// These values for `QUALITY` are the same numeric values as defined by
-/// [`crate::vello_cpu::peniko::ImageQuality`].
 #[derive(Debug)]
 pub(crate) struct FilteredImagePainter<'a, S: Simd, const QUALITY: u8> {
     data: ImagePainterData<'a, S>,
-    // detour: each pixel's position from `positions`, the column's first pixel at (x, y) (as the other painters)
     positions: crate::vello_cpu::detour::Positions,
     x: f32,
     y: f32,
@@ -137,16 +119,6 @@ impl<S: Simd, const QUALITY: u8> Iterator for FilteredImagePainter<'_, S, QUALIT
         }
         let x_positions = f32x4::from_slice(self.simd, &xs);
         let y_positions = f32x4::from_slice(self.simd, &ys);
-
-        // We have two versions of filtering: `Medium` (bilinear filtering) and
-        // `High` (bicubic filtering).
-
-        // In bilinear filtering, we sample the pixels of the rectangle that spans the
-        // locations (-0.5, -0.5) and (0.5, 0.5), and weight them by the fractional
-        // x/y position using simple linear interpolation in both dimensions.
-        // In bicubic filtering, we instead span a 4x4 grid around the
-        // center of the location we are sampling, and sample those points
-        // using a cubic filter to weight each location's contribution.
 
         let x_shifted = x_positions + 0.5;
         let y_shifted = y_positions + 0.5;
@@ -184,15 +156,9 @@ impl<S: Simd, const QUALITY: u8> Iterator for FilteredImagePainter<'_, S, QUALIT
         }
 
         match QUALITY {
-            // medium quality: bilinear
             1 => {
-                // <https://github.com/google/skia/blob/220738774f7a0ce4a6c7bd17519a336e5e5dea5b/src/opts/SkRasterPipeline_opts.h#L5039-L5078>
                 let cx = [1.0 - x_fract, x_fract];
                 let cy = [1.0 - y_fract, y_fract];
-
-                // Note that the sum of all cx*cy combinations also yields 1.0 again
-                // (modulo some floating point number impreciseness), ensuring the
-                // colors stay in range.
 
                 const OFFSETS: [f32; 2] = [-1.0, 0.0];
 
@@ -200,7 +166,6 @@ impl<S: Simd, const QUALITY: u8> Iterator for FilteredImagePainter<'_, S, QUALIT
 
                 let y_positions = [extend_y!(0, OFFSETS), extend_y!(1, OFFSETS)];
 
-                // We sample the corners of rectangle that covers our current position.
                 for x_idx in 0..2 {
                     let x_positions = x_positions[x_idx];
 
@@ -215,9 +180,7 @@ impl<S: Simd, const QUALITY: u8> Iterator for FilteredImagePainter<'_, S, QUALIT
 
                 interpolated_color *= f32x16::splat(self.simd, 1.0 / 255.0);
             }
-            // high quality: bicubic
             2 => {
-                // Compare to <https://github.com/google/skia/blob/84ff153b0093fc83f6c77cd10b025c06a12c5604/src/opts/SkRasterPipeline_opts.h#L5030-L5075>.
                 let cx = weights(self.simd, x_fract);
                 let cy = weights(self.simd, y_fract);
 
@@ -237,10 +200,6 @@ impl<S: Simd, const QUALITY: u8> Iterator for FilteredImagePainter<'_, S, QUALIT
                     extend_y!(3, OFFSETS),
                 ];
 
-                // Note in particular that it is guaranteed that, similarly to bilinear filtering,
-                // the sum of all cx*cy is 1 (modulo some edge cases).
-
-                // We sample the 4x4 grid around the position we are currently looking at.
                 for x_idx in 0..4 {
                     let x_positions = x_positions[x_idx];
                     for y_idx in 0..4 {
@@ -257,12 +216,6 @@ impl<S: Simd, const QUALITY: u8> Iterator for FilteredImagePainter<'_, S, QUALIT
 
                 let alphas = interpolated_color.splat_4th();
 
-                // Due to the nature of the cubic filter, it can happen in certain situations
-                // that one of the color components ends up with a higher value than the
-                // alpha component, which isn't permissible because the color is
-                // premultiplied and would lead to overflows when doing source over
-                // compositing with u8-based values. Because of this, we need to clamp
-                // to the alpha value.
                 interpolated_color = interpolated_color
                     .min(alphas)
                     .min(f32x16::splat(self.simd, 1.0))
@@ -279,15 +232,12 @@ impl<S: Simd, const QUALITY: u8> Iterator for FilteredImagePainter<'_, S, QUALIT
     }
 }
 
-// Bilinear
 f32x16_painter!(FilteredImagePainter<'_, S, 1>);
-// Bicubic
+
 f32x16_painter!(FilteredImagePainter<'_, S, 2>);
 
-/// Common data used by different image painters
 #[derive(Debug)]
 pub(crate) struct ImagePainterData<'a, S: Simd> {
-    // detour: no running position (each painter positions every pixel itself, `detour::Positions`)
     pub(crate) image: &'a EncodedImage,
     pub(crate) pixmap: &'a Pixmap,
     pub(crate) height: f32x4<S>,
@@ -360,9 +310,6 @@ pub(crate) fn extend_mode<S: Simd>(
     inv_max: f32x4<S>,
 ) -> f32x4<S> {
     match extend {
-        // Note that max should be exclusive, so subtract one to enforce that.
-        // Since the maximum image dimensions we support is u16::MAX, subtracting 1 in f32
-        // is enough to ensure that all numbers are subtracted correctly.
         crate::vello_cpu::peniko::Extend::Pad => val.min(max - 1.0).max(0.0),
         crate::vello_cpu::peniko::Extend::Repeat => euclid_mod(val.floor(), max, inv_max),
         crate::vello_cpu::peniko::Extend::Reflect => {
@@ -376,14 +323,10 @@ pub(crate) fn extend_mode<S: Simd>(
 #[inline(always)]
 fn euclid_mod<S: Simd>(t: f32x4<S>, m: f32x4<S>, inv_m: f32x4<S>) -> f32x4<S> {
     let q = (t * inv_m).round_ties_even();
-    // Note that `fearless_simd` doesn't guarantee fused multiply-add on all backends, so this
-    // might cause precision issues. Maybe consider using `mul_add_precise`, but this will be slow
-    // on some targets.
     let r = q.mul_add(-m, t);
     r.simd_lt(0.0).select(r + m, r)
 }
 
-/// Calculate the weights for a single fractional value.
 fn weights<S: Simd>(simd: S, fract: f32x4<S>) -> [f32x4<S>; 4] {
     simd.vectorize(
         #[inline(always)]
@@ -425,7 +368,6 @@ fn weights<S: Simd>(simd: S, fract: f32x4<S>) -> [f32x4<S>; 4] {
     )
 }
 
-/// Calculate a weight based on the fractional value t and the cubic coefficients.
 #[inline(always)]
 fn single_weight<S: Simd>(
     t: f32x4<S>,
@@ -437,21 +379,10 @@ fn single_weight<S: Simd>(
     t.mul_add(d, c).mul_add(t, b).mul_add(t, a)
 }
 
-/// Mitchell filter with the variables B = 1/3 and C = 1/3.
 const fn mf_resampler() -> [[f32; 4]; 4] {
     cubic_resampler(1.0 / 3.0, 1.0 / 3.0)
 }
 
-/// Cubic resampling logic is borrowed from Skia. See
-/// <https://github.com/google/skia/blob/220fef664978643a47d4559ae9e762b91aba534a/include/core/SkSamplingOptions.h#L33-L50>
-/// for some links to understand how this works. In principle, this macro allows us to define a
-/// resampler kernel based on two variables B and C which can be between 0 and 1, allowing to
-/// change some properties of the cubic interpolation kernel.
-///
-/// As mentioned above, cubic resampling consists of sampling the 16 surrounding pixels of the
-/// target point and interpolating them with a cubic filter.
-/// The generated matrix is 4x4 and represent the coefficients of the cubic function used to
-/// calculate weights based on the `x_fract` and `y_fract` of the location we are looking at.
 const fn cubic_resampler(b: f32, c: f32) -> [[f32; 4]; 4] {
     [
         [

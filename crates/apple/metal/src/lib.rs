@@ -1,25 +1,3 @@
-//! ⭐ detour's Apple M3 / M4 (Apple9) runtime on macOS: mlirpass's Apple9 machine code (`Apple9Code`, made by
-//! detour-apple-codegen's `apple9`) run on the GPU through Metal.
-//!
-//! macOS's GPU driver (AGXG16G, IOKit's IOGPU) takes work only through Metal; its own submission interface is
-//! Apple's, undocumented. So the code goes in where Metal looks for a pipeline's: a binary archive. A donor kernel
-//! (src/donor.metal: binding 0 the memory, binding 1 the parameter words, many live registers, 16 KiB of threadgroup
-//! memory) is compiled into an archive by build.rs (another process: a pipeline compiled in this one would come back
-//! from Metal's cache instead of the archive, measured); for each kernel the archive's copy has the donor's main (`_agc.main` in
-//! the `applegpu` slice's GPU Mach-O, `__TEXT,__text`) replaced by the code, padded with `halt`, and the pipeline is
-//! made from it with `failOnBinaryArchiveMiss`: Metal runs what the archive holds (no signature on it). Everything
-//! the GPU runs is detour's; Metal only binds the two buffers and dispatches (mlirpass's Apple9 ABI:
-//! targets/apple9.rs).
-//!
-//! ```text
-//!   M4::open()                       the device (an Apple9 GPU), the donor's archive
-//!   M4::kernel(&Apple9Code)          a pipeline running that code
-//!   M4::buffer(bytes)                memory the CPU and the GPU share (binding 0: byte addresses into it)
-//!   M4::dispatch(&kernel, &memory, params, groups)
-//!                                    the parameter words, then the grid's size in workgroups (binding 1); groups of
-//!                                    the kernel's workgroup (32, or 16: two a hardware workgroup), waited for
-//! ```
-
 #![cfg(target_os = "macos")]
 
 use core::ptr::NonNull;
@@ -35,7 +13,6 @@ use objc2_metal::{
 
 pub use mlirpass::Apple9Code;
 
-/// What went wrong, said.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Error(pub String);
 
@@ -53,18 +30,16 @@ fn err(m: impl Into<String>) -> Error {
     Error(m.into())
 }
 
-/// The donor kernel the code runs in (as mlirpass's scripts/apple9_donor.metal).
 const DONOR: &str = include_str!("donor.metal");
-/// Its pipeline's archive, serialized by build.rs (empty without an Apple9 GPU there).
+
 const DONOR_ARCHIVE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/donor.bin"));
-/// The donor's name.
+
 const DONOR_NAME: &str = "donor";
-/// The fat file's `applegpu` slice (CPU type).
+
 const APPLEGPU: u32 = 0x0100_0013;
-/// Threads of a hardware workgroup.
+
 const SIMD: usize = 32;
 
-/// A section of a 64-bit Mach-O: where its bytes are in the file.
 struct Section {
     seg: String,
     sect: String,
@@ -72,7 +47,6 @@ struct Section {
     size: usize,
 }
 
-/// The sections and symbols of the 64-bit Mach-O at `base` in `b`.
 struct MachO {
     sections: Vec<Section>,
     symbols: Vec<(String, usize)>,
@@ -91,14 +65,12 @@ impl MachO {
         for _ in 0..u32_at(base + 16)? {
             let (cmd, size) = (u32_at(p)?, u32_at(p + 4)?);
             match cmd {
-                // LC_SEGMENT_64
                 0x19 => {
                     for s in 0..u32_at(p + 64)? {
                         let q = p + 72 + 80 * s;
                         sections.push(Section { seg: str_at(q + 16, 16)?, sect: str_at(q, 16)?, offset: base + u32_at(q + 48)?, size: u64_at(q + 40)? });
                     }
                 }
-                // LC_SYMTAB
                 0x2 => {
                     let (symoff, nsyms, stroff) = (u32_at(p + 8)?, u32_at(p + 12)?, u32_at(p + 16)?);
                     for k in 0..nsyms {
@@ -120,7 +92,6 @@ impl MachO {
     }
 }
 
-/// Where in a serialized archive the one kernel's main is: its file offset and the bytes up to its `__text`'s end.
 fn main_of(b: &[u8]) -> Result<(usize, usize)> {
     let be = |p: usize| -> Option<usize> { Some(u32::from_be_bytes(b.get(p..p + 4)?.try_into().ok()?) as usize) };
     let slices = be(4).ok_or_else(|| err("the archive is not a fat file"))?;
@@ -140,7 +111,6 @@ fn main_of(b: &[u8]) -> Result<(usize, usize)> {
     Err(err("no applegpu kernel in the archive"))
 }
 
-/// A temporary file, removed when dropped.
 struct Temp(std::path::PathBuf);
 
 impl Temp {
@@ -164,26 +134,20 @@ impl Drop for Temp {
     }
 }
 
-/// ⭐ An Apple9 GPU (an M3 / M4) through Metal.
 pub struct M4 {
     device: Retained<ProtocolObject<dyn MTLDevice>>,
     queue: Retained<ProtocolObject<dyn MTLCommandQueue>>,
     donor: Retained<ProtocolObject<dyn MTLFunction>>,
-    /// The donor's archive serialized, and where its main is (file offset, bytes to the end of `__text`).
     archive: Vec<u8>,
     main: (usize, usize),
 }
 
-/// ⭐ A pipeline running one kernel's code.
 pub struct Kernel {
     pipeline: Retained<ProtocolObject<dyn MTLComputePipelineState>>,
-    /// Invocations of a workgroup: 32, or 16 (two a hardware workgroup).
     pub workgroup: u32,
-    /// Its parameter words.
     pub params: u32,
 }
 
-/// ⭐ Memory the CPU and the GPU share.
 pub struct Buffer {
     buffer: Retained<ProtocolObject<dyn MTLBuffer>>,
     len: usize,
@@ -194,23 +158,18 @@ impl Buffer {
         self.buffer.contents().cast()
     }
 
-    /// Its bytes (not while the GPU runs: [`M4::dispatch`] waits for it).
     pub fn bytes(&self) -> &[u8] {
-        // SAFETY: a shared buffer's contents are `len` bytes, mapped for its life; dispatches finish before returning
         unsafe { core::slice::from_raw_parts(self.ptr().as_ptr(), self.len) }
     }
 
     pub fn bytes_mut(&mut self) -> &mut [u8] {
-        // SAFETY: as `bytes`, and `&mut self` is the one view
         unsafe { core::slice::from_raw_parts_mut(self.ptr().as_ptr(), self.len) }
     }
 
-    /// Its little-endian words.
     pub fn words(&self) -> Vec<u32> {
         self.bytes().chunks_exact(4).map(|w| u32::from_le_bytes(w.try_into().unwrap_or_default())).collect()
     }
 
-    /// `words` written from word `at` on.
     pub fn write_words(&mut self, at: usize, words: &[u32]) {
         for (k, w) in words.iter().enumerate() {
             self.bytes_mut()[4 * (at + k)..4 * (at + k) + 4].copy_from_slice(&w.to_le_bytes());
@@ -227,7 +186,6 @@ impl Buffer {
 }
 
 impl M4 {
-    /// ⭐ The system's GPU, if it is an Apple9 one (Metal's `applegpu_g16*`), and the donor's archive.
     pub fn open() -> Result<M4> {
         let device = MTLCreateSystemDefaultDevice().ok_or_else(|| err("no Metal device"))?;
         let arch = device.architecture().name().to_string();
@@ -245,7 +203,6 @@ impl M4 {
         Ok(M4 { device, queue, donor, archive, main })
     }
 
-    /// ⭐ A pipeline running `code` (its main in the donor's place).
     pub fn kernel(&self, code: &Apple9Code) -> Result<Kernel> {
         let (at, room) = self.main;
         if code.bytes.len() > room || code.bytes.len() % 2 != 0 {
@@ -255,7 +212,6 @@ impl M4 {
             return Err(err(format!("{}: {} GPRs, {} bytes of threadgroup memory (the donor's: 64, 16384)", code.name, code.gprs, code.shared)));
         }
         let mut b = self.archive.clone();
-        // halt (0e 00 00 00) after the code; a 2-byte tail stays as Metal left it (never reached)
         let mut fill = code.bytes.clone();
         while fill.len() + 4 <= room {
             fill.extend([0x0e, 0, 0, 0]);
@@ -277,7 +233,6 @@ impl M4 {
         Ok(Kernel { pipeline, workgroup: code.workgroup, params: code.params })
     }
 
-    /// ⭐ `bytes` of memory the CPU and the GPU share, zeroed.
     pub fn buffer(&self, bytes: usize) -> Result<Buffer> {
         let len = bytes.max(4);
         let buffer = self.device.newBufferWithLength_options(len, MTLResourceOptions::StorageModeShared).ok_or_else(|| err(format!("a buffer of {len} bytes")))?;
@@ -286,8 +241,6 @@ impl M4 {
         Ok(b)
     }
 
-    /// ⭐ `kernel` over `groups` workgroups (x, y, z) of its own size: binding 0 `memory`, binding 1 `params` then the
-    /// grid's size; waited for.
     pub fn dispatch(&self, kernel: &Kernel, memory: &Buffer, params: &[u32], groups: [u32; 3]) -> Result<()> {
         if params.len() != kernel.params as usize {
             return Err(err(format!("{} parameter words, the kernel reads {}", params.len(), kernel.params)));
@@ -301,15 +254,12 @@ impl M4 {
         let cb = self.queue.commandBuffer().ok_or_else(|| err("no command buffer"))?;
         let e = cb.computeCommandEncoder().ok_or_else(|| err("no compute encoder"))?;
         e.setComputePipelineState(&kernel.pipeline);
-        // SAFETY: both buffers live until the dispatch is waited for, below
         unsafe {
             e.setBuffer_offset_atIndex(Some(&memory.buffer), 0, 0);
             e.setBuffer_offset_atIndex(Some(&p.buffer), 0, 1);
         }
         match kernel.workgroup {
-            // a hardware workgroup a workgroup
             32 => e.dispatchThreadgroups_threadsPerThreadgroup(size(gx, gy, gz), size(SIMD, 1, 1)),
-            // two a hardware workgroup: 16 x invocations a workgroup (the last hardware workgroup of a row half full)
             16 => e.dispatchThreads_threadsPerThreadgroup(size(16 * gx, gy, gz), size(SIMD, 1, 1)),
             w => return Err(err(format!("a workgroup of {w}"))),
         }

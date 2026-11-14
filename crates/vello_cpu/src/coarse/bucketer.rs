@@ -1,6 +1,3 @@
-// Copyright 2026 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use super::cmd::{DepthFill, LayerFill, LayerFillAttrs, PaintFill, PaintFillAttrs, RenderCmd};
 use super::depth::{DepthSegment, DepthState};
 use crate::vello_cpu::coarse::depth;
@@ -9,7 +6,7 @@ use crate::vello_cpu::kurbo::{Affine, Vec2};
 use crate::vello_cpu::peniko::{BlendMode, Extend, ImageQuality, ImageSampler};
 use crate::vello_cpu::record::RecordedFill;
 use crate::vello_cpu::span::{Span, TileAlignedSpan};
-// detour: a filter layer's fill takes an image source (`generate_filter_layer_fill`), no pixmap
+
 use alloc::vec;
 use alloc::vec::Vec;
 use vello_common::encode::{EncodedImage, EncodedPaint};
@@ -22,37 +19,18 @@ use vello_common::strip::{Strip, visit_strip_fill_segments};
 use vello_common::tile::Tile;
 use vello_common::util::{Clear, RectExt, RetainVec, VecPool};
 
-/// State for a single row of strips.
 #[derive(Debug, Default)]
 pub(crate) struct RowState {
-    /// Normal render commands rendered in back-to-front with depth buffer read.
     pub(crate) render_cmds: Vec<RenderCmd>,
-    /// Opaque fill commands rendered front-to-back with depth buffer read and write.
     pub(crate) depth_cmds: Vec<DepthFill>,
-    /// State of the depth buffer for this row.
     depth: DepthState,
-    /// Current layer depth.
     pub(super) layer_depth: usize,
     layer_stack: Vec<RowLayerState>,
 }
 
-/// Each recorded layer by itself already stores a bounding box.
-/// However, we want to take this one step further and track a horizontal bounding
-/// box of each row band individually. This allows us to save a lot of work when clearing buffers
-/// during fine rasterization.
-///
-/// For example, let's say that we are rendering a triangle with the points
-/// (0, 0), (500, 0) and (250, 250). The bounding box would be (0, 0) and (500, 500). However,
-/// the triangle gets much more narrow as we advance through the rows. If we just chose
-/// the coarse bounding box, we would always end up clearing a whole width of 500 pixels during
-/// fine rasterization. By tracking the bounding box per row, we can reduce the work to the
-/// absolute minimum necessary for each row.
 #[derive(Debug)]
 struct RowLayerState {
-    /// The index in the command stream where the `PushBuf` command of the corresponding
-    /// layer lives.
     push_cmd_idx: usize,
-    /// The horizontal span of the layer.
     span: Option<TileAlignedSpan>,
 }
 
@@ -146,39 +124,17 @@ fn debug_assert_tile_aligned(point: (u16, u16), description: &str) {
     );
 }
 
-/// A bucketer that groups commands into strip-row-sized buckets.
 #[derive(Debug)]
 pub(crate) struct CommandBucketer {
-    /// The viewport of the root/filter layer we are currently bucketing.
     viewport: RectU16,
-    /// The currently active stack of clip bboxes (from layer clips), always anchored at the
-    /// (0, 0) origin, regardless of the viewport, tracked for two reasons:
-    /// - So we can clamp fill commands to the bbox and avoid unnecessary rendering work.
-    /// - In case we have a filter layer with a clip, it all happens in three steps:
-    ///   1) We first push a new intermediate layer with the clip.
-    ///   2) We composite the whole filter layer **cropped to the active clip bbox**. Note that
-    ///      the filter layer itself is _not_ affected by the clip bbox, as filter layers should
-    ///      always be fully rendered before applying clipping. However, by limiting the composition
-    ///      to the coarse clip bbox we might be able to save a lot of work if only a small part
-    ///      of the filter layer is visible.
-    ///   3) Pop the intermediate layer, which will take care of doing the fine-grained clipping
-    ///      (e.g. applying anti-aliasing from the clip path).
     pub(super) clip_bboxes: Vec<RectU16>,
-    /// The actual render commands for each strip row.
-    ///
-    /// Since this is essentially a 2D-array, we use [`RetainVec`] to preserve inner allocations
-    /// upon resetting.
     pub(super) rows: RetainVec<RowState>,
     pub(crate) paint_fill_attrs: Vec<PaintFillAttrs>,
     pub(crate) layer_fill_attrs: Vec<LayerFillAttrs>,
     pub(crate) filter_paints: Vec<EncodedPaint>,
-    /// Keeping track of currently active layers to enable lazy layer pushing.
     pub(super) active_layers: Vec<ActiveLayer>,
-    /// A vector pool for keeping track of occupied rows in a layer.
     occupied_rows_pool: VecPool<usize>,
-    /// Scratch space used when replaying clip strips while popping clipped layers.
     occupied_rows_bool_scratch: Vec<bool>,
-    /// A counter to assign monotonically increasing IDs to draws to enable depth buffer rendering.
     pub(super) next_draw_id: u32,
 }
 
@@ -188,13 +144,8 @@ impl CommandBucketer {
     }
 
     pub(crate) fn new(mut viewport: RectU16) -> Self {
-        // It's _very_ important that we snap to tile coordinates. Fine rasterization assumes
-        // that the width is a multiple of the tile width, so if that's not the case bad things
-        // could happen!
         viewport = viewport.snap_to_tile_coordinates();
         let clip_bbox = RectU16::new(0, 0, viewport.width(), viewport.height());
-        // Note: `clip_bbox` is already snapped to tile coordinates because `viewport` is, so no
-        // need to `div_ceil` here.
         let num_rows = usize::from(clip_bbox.height() / Tile::HEIGHT);
 
         Self {
@@ -207,15 +158,11 @@ impl CommandBucketer {
             active_layers: Vec::new(),
             occupied_rows_pool: VecPool::default(),
             occupied_rows_bool_scratch: vec![false; num_rows],
-            // It is important to start at 1, because the depth buffer uses 0 for "no entries yet".
             next_draw_id: 1,
         }
     }
 
     fn bbox_span(bbox: RectU16) -> TileAlignedSpan {
-        // Bbox might be empty vertically but not horizontally. In this case,
-        // it should still be considered a zero-sized span, though.
-        // TODO: Discard empty layers in an earlier stage.
         if bbox.is_empty() {
             TileAlignedSpan::try_from(Span::new(bbox.x0, 0)).unwrap()
         } else {
@@ -236,7 +183,6 @@ impl CommandBucketer {
     }
 
     pub(crate) fn reset(&mut self, mut viewport: RectU16) {
-        // See comments in `CommandBucketer::reset`.
         viewport = viewport.snap_to_tile_coordinates();
         let clip_bbox = RectU16::new(0, 0, viewport.width(), viewport.height());
         let num_rows = usize::from(viewport.height() / Tile::HEIGHT);
@@ -286,14 +232,6 @@ impl CommandBucketer {
         encoded_paints: &[EncodedPaint],
         filter_ctx: &FilterContext,
     ) {
-        // When rendering filter layers, we always anchor them so that the top-left of the bounding
-        // box lands at (0, 0), even if the bounding box's top-left is for example at (200, 200).
-        // This is to ensure that the pixmap is as small as possible. Otherwise, if we for example
-        // had a filter layer that draws something small in the bottom right but nowhere else, we
-        // would still need to allocate a full viewport-sized pixmap!
-        // Therefore, we need to keep track of this offset so that for example paints know that
-        // they should actually be sampled at (200, 200) instead of (0, 0).
-
         debug_assert_tile_aligned(self.viewport_origin(), "viewport origin");
 
         for node in nodes {
@@ -323,10 +261,7 @@ impl CommandBucketer {
 
                 match &layer.kind {
                     RecordedLayerKind::Regular => {
-                        // Regular layers are inlined and bucketed into the same command stream.
                         self.push_layer(props);
-                        // TODO: Avoid recursion to prevent stack overflows for deeply nested
-                        // layers.
                         self.bucket_commands(
                             &layer.nodes,
                             draws,
@@ -347,9 +282,6 @@ impl CommandBucketer {
                             self.push_layer(props);
                         }
 
-                        // Note: At this point, we've already rasterized all dependent
-                        // filter layers, so this should never fail.
-                        // detour: its pixmap, or its image by id when drawn elsewhere
                         if let Some(source) = filter_ctx.filter_source(id as usize) {
                             self.generate_filter_layer_fill(
                                 source,
@@ -373,8 +305,6 @@ impl CommandBucketer {
             .clip_path
             .as_ref()
             .map(|clip| {
-                // Make sure to translate the clip path from viewport-space to local space, since
-                // `clip_bboxes` uses this coordinate system.
                 let clip_bbox = clip.bbox.relative_to_origin(self.viewport_origin());
                 clip_bbox.intersect(parent_bbox)
             })
@@ -385,9 +315,6 @@ impl CommandBucketer {
         }
 
         self.active_layers.push(ActiveLayer {
-            // TODO: Masks are currently probably broken if they are used inside of a filter layer,
-            // since they aren't shifted and also only work if the mask has the same dimensions as
-            // our allocated filter layer.
             mask: props.mask.clone(),
             blend_mode: props.blend_mode,
             opacity: props.opacity,
@@ -396,9 +323,6 @@ impl CommandBucketer {
             occupied_rows: self.occupied_rows_pool.take(),
         });
 
-        // If the blend mode is destructive, we need to eagerly push to all rows in the clip bbox,
-        // since even areas where we didn't draw anything need to be blended with the destructive
-        // blend mode.
         if props.blend_mode.is_destructive() && !bbox.is_empty() {
             let row_start = usize::from(bbox.y0 / Tile::HEIGHT);
             let row_end = usize::from(bbox.y1.div_ceil(Tile::HEIGHT)).min(self.rows.len());
@@ -413,16 +337,6 @@ impl CommandBucketer {
         let opacity = layer.opacity;
         let blend_mode = layer.blend_mode;
 
-        // Two cases that need to be distinguished.
-        //
-        // If no clip was associated, we simply iterate over all rows that
-        // were lazily associated with some rendered contents and emit a `LayerFill`
-        // instructions across the whole width of the bounding box of the layer.
-        //
-        // If there _was_ a clip, things get trickier because the `LayerFill` commands
-        // need to be generated on a more fine-grained basis, and might in certain cases
-        // also require anti-aliasing.
-
         if let Some(clip) = layer.clip {
             let attrs_idx = self.layer_fill_attrs.len() as u32;
             let draw_id = self.next_draw_id();
@@ -436,27 +350,12 @@ impl CommandBucketer {
             });
             self.clip_bboxes.pop();
 
-            // Note: The clip strips themselves are still in viewport space, not in local space.
-            // They will be converted to local space when calling `generate`.
             let clip_strips = &strips[clip.strip_range];
 
-            // We need to make sure that we only emit `LayerFill` commands for rows that actually
-            // have been pushed into. If we don't have a destructive blend mode and only parts of
-            // the layer were painted, it can happen that the clip path itself covers a row
-            // that actually doesn't have an associated `PushBuf` command.
-            // For such rows, we don't want to emit any layer fill commands, because there is
-            // nothing to fill into in the first place!
-
-            // `occupied_rows` stores the indices of all rows that have been marked, but they
-            // are not sorted or anything. Therefore, we convert it into an indexable array
-            // such that in the `generate` closure, we can easily check whether the row is included
-            // or now.
             for &row_idx in &layer.occupied_rows {
                 self.occupied_rows_bool_scratch[row_idx] = true;
             }
 
-            // Only generate layer fill commands if it actually lies within a row that has
-            // been touched by the contents of the layer.
             self.generate(
                 clip_strips,
                 |bucketer, fill| {
@@ -479,7 +378,6 @@ impl CommandBucketer {
 
             for row_idx in layer.occupied_rows.drain(..) {
                 self.rows[row_idx].pop_buf();
-                // Make sure to reset it so that by the end, the vector is all `false` again.
                 self.occupied_rows_bool_scratch[row_idx] = false;
             }
 
@@ -499,8 +397,6 @@ impl CommandBucketer {
             for row_idx in layer.occupied_rows.drain(..) {
                 let row = &mut self.rows[row_idx];
 
-                // TODO: Instead of always pushing the full layer bbox across all rows, it
-                // would be nice to instead only emit the per-row bounding box.
                 row.push_cmd(RenderCmd::LayerFill(LayerFill::new(
                     layer.span, None, attrs_idx,
                 )));
@@ -521,29 +417,13 @@ impl CommandBucketer {
         let dest_bbox = placement.dest_bbox();
         let src_sample_shift = placement.src_origin();
 
-        // Here, we want to determine the absolute transform that needs to be applied to the filter
-        // image for it to be placed correctly. On the one hand, we position it such that it starts
-        // at the top-left of `dest_bbox`, which is the intended location the filter layer should
-        // be composited into. On the other hand, we optionally apply a correction to ensure we
-        // are sampling from the right location of the filter pixmap (see
-        // `FilterLayerPlacement::new` for a more detailed description of how/what this offset
-        // represents).
         let src_offset = (
             i32::from(src_sample_shift.0) - i32::from(dest_bbox.x0),
             i32::from(src_sample_shift.1) - i32::from(dest_bbox.y0),
         );
 
-        // Now that we have determined the image transform, we next need to determine which
-        // strip rows in the bucketer should actually be emitted. Keep in mind that regardless
-        // of what `viewport_origin` is, when actually rendering we always shift the origin to
-        // (0, 0). (Note: We did _not_ do this for computing `src_offset` because the shift for the
-        // paint itself will be applied later when resolving the indexed paint)
         let dest_bbox = dest_bbox.relative_to_origin(origin);
         let clip_bbox = *self.clip_bboxes.last().unwrap();
-        // As noted in [`CommandBucketer::clip_bboxes`], we only need to composite the parts
-        // of the filter layer that actually lie within clip bounding box.
-        // `clip_bbox` already is in viewport-local coordinates, so we don't need to shift it
-        // like we did for `dest_bbox`.
         let clipped_dest_bbox = dest_bbox.intersect(clip_bbox);
         if clipped_dest_bbox.is_empty() {
             return;
@@ -598,9 +478,6 @@ impl CommandBucketer {
         self.paint_fill_attrs.push(attrs.clone());
 
         let draw_id =
-            // While in certain cases it _might_ be okay to use depth culling while inside of
-            // a layer, it can get very finicky with blend modes etc., so we just outright
-            // reject those for now.
             (self.active_layers.is_empty()
                 && attrs.blend_mode == BlendMode::default()
                 && attrs.mask.is_none()
@@ -610,7 +487,6 @@ impl CommandBucketer {
         self.generate(
             strip_buf,
             |bucketer, fill| {
-                // `push_fill` already calls `ensure_row_layers` so no need to call it twice.
                 bucketer.push_fill(fill, attrs_idx, draw_id);
             },
             |bucketer, fill| {
@@ -640,13 +516,10 @@ impl CommandBucketer {
 
         let clip_bbox = *self.clip_bboxes.last().unwrap();
 
-        // TODO: Don't emit layers with empty clip bboxes (and non-destructive blend modes)
-        // in the first place during recordings.
         if clip_bbox.is_empty() {
             return;
         }
 
-        // Note: Those will always be aligned to tile coordinates.
         let clip_x0 = clip_bbox.x0;
         let clip_x1 = clip_bbox.x1;
 
@@ -656,23 +529,13 @@ impl CommandBucketer {
         let origin = self.viewport_origin();
         debug_assert_tile_aligned(origin, "viewport origin");
 
-        // Note: the viewport of a filter layer is based on the bounds of its rendered contents.
-        // Therefore, those are always guaranteed to be within the viewport rect. However, this does not
-        // apply to any clip paths associated with the filter layer. Including those in the filter
-        // layer bbox could unnecessarily balloon the size of the pixmap we allocate if it is
-        // very large, since those don't actually contribute any visible output. However, this does
-        // mean that this method might be called with strips that do not lie within the viewport.
-        // Therefore, we need to make sure to clip those appropriately.
-
         let origin_tile_x = origin.0 / Tile::WIDTH;
         let origin_tile_y = origin.1 / Tile::HEIGHT;
         let clip_scene_y0 = origin.1.saturating_add(clip_bbox.y0);
         let clip_scene_y1 = origin.1.saturating_add(clip_bbox.y1);
-        // Convert to scene coordinates.
         let clip_scene_x0 = origin.0.saturating_add(clip_x0);
         let clip_scene_x1 = origin.0.saturating_add(clip_x1);
 
-        // Clip bounding box in tile units.
         let tile_bounds = RectU16::new(
             clip_scene_x0 / Tile::WIDTH,
             clip_scene_y0 / Tile::HEIGHT,
@@ -714,14 +577,12 @@ impl CommandBucketer {
         );
     }
 
-    /// Note: If depth-culling should be disabled, pass `None` to `draw_id`.
     fn push_fill(&mut self, fill: GeneratedFill, attrs_idx: u32, draw_id: Option<u32>) {
         self.ensure_row_layers(fill.row_idx);
         let row = &mut self.rows[fill.row_idx];
         let draw_id = draw_id.filter(|_| row.layer_depth == 0);
 
         let Some(draw_id) = draw_id else {
-            // If depth-culling is disabled, we can just push it as a single contiguous command.
             row.push_cmd(RenderCmd::PaintFill(PaintFill::new(
                 fill.span, None, attrs_idx,
             )));
@@ -740,7 +601,6 @@ impl CommandBucketer {
     }
 }
 
-/// Metadata about the currently active layer.
 #[derive(Debug, Clone)]
 pub(crate) struct ActiveLayer {
     pub(crate) mask: Option<Mask>,
@@ -748,18 +608,15 @@ pub(crate) struct ActiveLayer {
     pub(crate) opacity: f32,
     pub(crate) clip: Option<LayerClip>,
     pub(crate) span: TileAlignedSpan,
-    /// Which rows have been drawn into and thus contain lazily-allocated `PushBuf` instructions.
     pub(crate) occupied_rows: Vec<usize>,
 }
 
-/// A generic fill to allow using `generate_fill` to create either paint fills or blend fills.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GeneratedFill {
     pub(crate) row_idx: usize,
     pub(crate) span: TileAlignedSpan,
 }
 
-/// A generic alpha fill to allow using `generate_fill` to create either paint fills or blend fills.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct GeneratedAlphaFill {
     pub(crate) row_idx: usize,
@@ -954,12 +811,9 @@ mod tests {
 
     #[test]
     fn clips_fills_correctly_inside_nonzero_origin_viewport() {
-        // Viewport spans scene (32, 32) to (96, 96). Local space is 64x64, the origin at (32, 32).
         let mut bucketer = CommandBucketer::new(RectU16::new(32, 32, 96, 96));
-        // Clip bbox in scene coordinates: (40, 32)..(72, 96) => local (8, 0)..(40, 64).
         bucketer.push_layer(&clipped_layer_props(RectU16::new(40, 32, 72, 96)));
 
-        // A 32px-wide alpha strip at scene (40, 32) => local (8, 0), fully inside the clip.
         let strips = [
             Strip::new(40, 32, 0, false),
             Strip::new(72, 32, 32 * u32::from(Tile::HEIGHT), false),
@@ -969,7 +823,6 @@ mod tests {
         let row = &bucketer.rows()[0];
 
         assert!(matches!(row.render_cmds[0], RenderCmd::PushBuf(_)));
-        // The fill inside should not have been clipped.
         assert!(matches!(
             row.render_cmds[1],
             RenderCmd::PaintFill(cmd)
@@ -981,23 +834,18 @@ mod tests {
 
     #[test]
     fn culls_clip_strips_above_viewport_origin() {
-        // Viewport spans scene (0, 32) to (64, 96). Local space is 64x64, the origin at (0, 32).
         let mut bucketer = CommandBucketer::new(RectU16::new(0, 32, 64, 96));
 
         let alpha = u32::from(Tile::HEIGHT);
         let strips = [
-            // Content: 16px alpha strip at scene (0, 32) => local row 0.
             Strip::new(0, 32, 0, false),
             Strip::new(16, 32, 16 * alpha, false),
-            // Clip strip above the viewport origin at scene y = 0, covering nothing visible.
             Strip::new(0, 0, 16 * alpha, false),
             Strip::new(16, 0, 32 * alpha, false),
-            // Clip strip at scene y = 32 => local row 0: the real coverage.
             Strip::new(0, 32, 32 * alpha, false),
             Strip::new(16, 32, 48 * alpha, false),
         ];
 
-        // Clip bbox in scene coordinates: (0, 0)..(16, 40) => local (0, 0)..(16, 8).
         bucketer.push_layer(&clipped_layer_props_with_strips(
             RectU16::new(0, 0, 16, 40),
             2..6,

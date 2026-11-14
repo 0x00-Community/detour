@@ -1,9 +1,3 @@
-//! Events (Vulkan `vkCmdSetEvent` / `vkCmdWaitEvents`: `Recorder::set_event` / `wait_event`, a post-sync write and an
-//! MI_SEMAPHORE_WAIT) on Xe3, across the three engines with no syncobj between the frames: submitted first, a compute
-//! frame waits for event 1 and doubles A into B, then sets event 2; a copy frame waits for event 2 and blits B into C;
-//! last, a render frame fills A (A[i] = 3 i + 1) and sets event 1. B and C element by element: each waiter really
-//! waited (submitted before what it waits for was even recorded).
-
 use detour::base::{Gpu, Native};
 use detour::xe3::{Codegen, Context, Linear};
 use detour::xe::Xe;
@@ -74,7 +68,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let got: Vec<u32> = c.bytes()?[..(N * 4) as usize].chunks(4).map(|w| u32::from_le_bytes(w.try_into().expect("4"))).collect();
     let bad = got.iter().enumerate().filter(|(i, v)| **v != 2 * (3 * *i as u32 + 1)).count();
     println!("render fills, compute (waiting for event 1) doubles, copy (waiting for event 2) blits: {bad} of {N} wrong");
-    // the control: the same without the wait, the doubling reads A before it is filled
     let (a2, mut b2) = (cx.buffer(&zeros)?, cx.buffer(&zeros)?);
     let mut f = cx.record_compute()?;
     f.dispatch(&twice, groups, &[a2.addr as u32, b2.addr as u32])?;

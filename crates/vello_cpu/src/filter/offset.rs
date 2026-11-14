@@ -1,8 +1,3 @@
-// Copyright 2026 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! `feOffset` filter primitive implementation.
-
 use vello_common::filter::offset::Offset;
 use vello_common::pixmap::Pixmap;
 
@@ -32,13 +27,11 @@ mod tests {
     fn offset_moves_pixels_and_clears_uncovered_area() {
         let mut filter_scratch = ScratchBuffer::new();
         let mut pixmap = Pixmap::new(4, 3);
-        pixmap.set_pixel(1, 1, PremulRgba8::from_u32(0xff_00_00_ff)); // premul red, opaque
+        pixmap.set_pixel(1, 1, PremulRgba8::from_u32(0xff_00_00_ff));
 
         Offset::new(2.0, -1.0).execute_lowp(&mut pixmap, &mut filter_scratch);
 
-        // Original pixel (1,1) moved to (3,0).
         assert_eq!(pixmap.sample(3, 0), PremulRgba8::from_u32(0xff_00_00_ff));
-        // Original location cleared.
         assert_eq!(pixmap.sample(1, 1), PremulRgba8::from_u32(0));
     }
 }

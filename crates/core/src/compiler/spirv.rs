@@ -1,9 +1,3 @@
-//! `detour-from-spirv`: shaders written in the `spirv` dialect (what a SPIR-V binary deserializes to). Every
-//! `spirv.EntryPoint` of a `spirv.module` becomes a `func.func` with its stage: the `Input` variables of its interface
-//! the arguments (by location), the `Output` ones the results (the position first, then by location); loads of an
-//! input are the argument, the last store to an output is the result. The arithmetic becomes `arith` / `vector`
-//! (patterns, one to one).
-
 use std::collections::BTreeMap;
 
 use mlirformat::spirv_types::SpirvType;
@@ -14,7 +8,6 @@ use crate::base::{Attrs, Stage};
 
 type Cr<'r, 'a, 'p> = ConversionRewriter<'r, 'a, 'p>;
 
-/// An interface variable.
 #[derive(Clone)]
 struct Var<'a> {
     ty: Type<'a>,
@@ -36,7 +29,6 @@ impl<'a> Var<'a> {
     }
 }
 
-/// The spirv arithmetic ⇒ arith / vector.
 pub struct SpirvToArith;
 
 #[patterns]
@@ -47,7 +39,6 @@ pub struct SpirvToArith;
 #[map("spirv.FNegate" => "arith.negf", via = Self::plain)]
 #[map("spirv.CompositeConstruct" => "vector.from_elements", via = Self::plain)]
 impl SpirvToArith {
-    /// Operands and result type as they are.
     fn plain(cr: &mut Cr<'_, '_, '_>, op: OpId, operands: &[Vec<ValueId>], to: &str) -> bool {
         let Some(ops) = Cr::one_to_one(operands) else { return false };
         let ty = cr.rw.body[cr.rw.body[op].results[0]].ty.clone();
@@ -55,7 +46,6 @@ impl SpirvToArith {
         true
     }
 
-    /// The integers of an `[i : i32, ...]` attribute, as a `array<i64: ...>`.
     fn indices<'a>(cr: &Cr<'_, 'a, '_>, op: OpId, name: &str) -> Option<Attribute<'a>> {
         let Attribute::Array(v) = cr.rw.body[op].get(name)? else { return None };
         let v: Vec<i64> = v.iter().map(Attrs::as_int).collect::<Result<_, _>>().ok()?;
@@ -87,14 +77,12 @@ impl SpirvToArith {
     }
 }
 
-/// One entry point being turned into a function.
 struct Entry<'r, 'b, 'a> {
     rw: &'b mut Rewriter<'r, 'a>,
     vars: &'b BTreeMap<String, Var<'a>>,
 }
 
 impl<'a> Entry<'_, '_, 'a> {
-    /// `spirv.func @f` with entry point `stage` and `interface` ⇒ `func.func @f`, placed before `before`.
     fn func(&mut self, f: OpId, stage: Stage, interface: &[String], before: OpId) -> Result<OpId, Error> {
         let var = |n: &String| self.vars.get(n).cloned().map(|v| (n.clone(), v)).ok_or_else(|| Error(format!("no variable @{n}")));
         let vars = interface.iter().map(var).collect::<Result<Vec<_>, _>>()?;
@@ -149,7 +137,6 @@ impl<'a> Entry<'_, '_, 'a> {
     }
 }
 
-/// `detour-from-spirv`.
 #[pass("detour-from-spirv", on = "builtin.module")]
 pub fn detour_from_spirv<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     let top = body.top_block(op);

@@ -1,8 +1,3 @@
-//! The runtime, frame after frame: pipelines compiled once, then each frame recorded from templates (a clear and the
-//! triangle into a 1920x1080 target) and submitted through the batch ring. Measures recording, throughput (frames
-//! submitted back to back) and latency (each frame waited for), then checks the last frame pixel by pixel and exports
-//! the target as a dma-buf and the frame's fence as a sync_file. `frames [N]` (default 1000).
-
 use std::time::{Duration, Instant};
 
 use detour::base::{Gpu, MemType, Native, TextureFormat};
@@ -14,7 +9,6 @@ const BLUE: [u8; 4] = [0, 0, 255, 255];
 const W: u32 = 1920;
 const H: u32 = 1080;
 
-/// One frame: the clear, then the triangle.
 struct Scene<'s, 'd> {
     target: &'s Target<'d, Xe>,
     clear: &'s Pipeline,
@@ -57,7 +51,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut record = Vec::new();
     let scene = Scene { target: &target, clear: &clear, corners: &corners, tri: &tri, vb: &vb };
 
-    // throughput: back to back, the ring waits for a slot only when all four are in flight
     let t = Instant::now();
     let mut last = 0;
     for _ in 0..n {
@@ -69,7 +62,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{n} frames back to back in {total:?}: {:.0} frames/s, {} dwords a frame", n as f64 / total.as_secs_f64(), scene.record(&cx, &mut Vec::new()).dw.len());
     println!("recording: p50 {:?} p99 {:?}", percentile(&mut record, 0.5), percentile(&mut record, 0.99));
 
-    // latency: each frame submitted and waited for
     let mut latency = Vec::new();
     for _ in 0..n.min(200) {
         let dw = scene.record(&cx, &mut Vec::new());
@@ -91,7 +83,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for x in 0..W {
             let p: [u8; 4] = px[((y * W + x) * 4) as usize..][..4].try_into().unwrap();
             orange += usize::from(p == ORANGE);
-            // the triangle is x / W + y / H < 1 (pixel centers); within a pixel of the edge the fill rule decides
             let s = (f64::from(x) + 0.5) / f64::from(W) + (f64::from(y) + 0.5) / f64::from(H);
             let edge = 1.0 / f64::from(W.min(H));
             let want = if s < 1.0 - edge { Some(ORANGE) } else if s > 1.0 + edge { Some(BLUE) } else { None };

@@ -1,7 +1,3 @@
-//! Varyings: a triangle with a color at each vertex (red, green, blue), interpolated across it (the vertex shader
-//! passes the color on, the fragment shader returns it). Through the runtime; every pixel inside is checked against
-//! the barycentric blend of the three colors (within one step of unorm8 rounding).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

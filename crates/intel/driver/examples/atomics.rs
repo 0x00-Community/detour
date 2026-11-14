@@ -1,6 +1,3 @@
-//! `detour.atomic` on Xe3 (LSC atomics): many lanes adding into a few counters (each old value once), signed max,
-//! unsigned min, exchange (`atomics/atomics.mlir`), checked against what they must come to.
-
 use detour::base::{Gpu, Native};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -27,7 +24,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     cx.wait(s)?;
     let read = |b: &[u8]| b.chunks(4).map(|c| u32::from_le_bytes(c.try_into().unwrap())).collect::<Vec<u32>>();
 
-    // each counter: its lanes' count, their old values 0 .. count each once
     let cs = read(&counters.bytes()?[..32]);
     let os = read(&olds.bytes()?[..N * 4]);
     let adds_ok = (0..8).all(|k| {
@@ -39,7 +35,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let got_max: Vec<i32> = read(&maxes.bytes()?[..16]).into_iter().map(|w| w as i32).collect();
     let want_umin: Vec<u32> = (0..4).map(|u| (0..N).filter(|i| (i >> 4) & 3 == u).map(|i| (i as u32).wrapping_mul(7919) & 65535).min().unwrap()).collect();
     let got_umin = read(&umins.bytes()?[..16]);
-    // the exchanges: the values taken and the one left are the start and every lane's, each once
     let mut seen: Vec<u32> = read(&swaps.bytes()?[..N * 4]);
     seen.push(read(&swap.bytes()?[..4])[0]);
     seen.sort_unstable();

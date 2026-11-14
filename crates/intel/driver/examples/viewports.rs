@@ -1,9 +1,3 @@
-//! Viewports and scissor rectangles (`setViewport` / `setScissorRect`) on Xe3, pixel by pixel in a 64x64 target cleared
-//! blue: a quad over all of clip space drawn through a viewport inside the target (and a quarter of clip space: the
-//! viewport's quarter, its transform), one past its edges (clamped), a
-//! scissor, a viewport and a scissor together (their intersection), an empty scissor (nothing), and back to the whole
-//! target after each pass starts.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context, Scissor, Viewport};
 use detour::xe::Xe;
@@ -12,10 +6,8 @@ const ORANGE: [u8; 4] = [255, 128, 64, 255];
 const BLUE: [u8; 4] = [0, 0, 255, 255];
 const N: u32 = 64;
 
-/// A case: its name, its viewport and scissor (none: the target's), the pixels it lights.
 type Case = (&'static str, Option<Viewport>, Option<Scissor>, Vec<(u32, u32)>);
 
-/// The pixels of [x0, x1) × [y0, y1).
 fn rect(x0: u32, y0: u32, x1: u32, y1: u32) -> Vec<(u32, u32)> {
     (y0..y1).flat_map(|y| (x0..x1).map(move |x| (x, y))).collect()
 }
@@ -28,7 +20,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let clear = cx.clear_pipeline(&codegen, [0.0, 0.0, 1.0, 1.0])?;
     let corners = cx.clear_vertices()?;
     let quad = cx.floats(&[-1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0])?;
-    // the top left quarter of clip space (y down)
     let quarter = cx.floats(&[-1.0, -1.0, 0.0, -1.0, -1.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0])?;
     let size = [N, N];
     let cases: Vec<Case> = vec![
@@ -71,7 +62,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{name}: {} pixels lit, {}", lit.len(), if good { "as expected" } else { "wrong" });
         ok &= good;
     }
-    // the same viewport twice is one state
     let (a, b) = (cx.viewport([1.0, 2.0, 3.0, 4.0], [0.0, 1.0], size)?, cx.viewport([1.0, 2.0, 3.0, 4.0], [0.0, 1.0], size)?);
     println!("the same viewport made twice: {:?} {:?}", a, b);
     assert!(ok);

@@ -1,27 +1,5 @@
-//! detour MLIR ⇒ AGX (Apple M1, AGX2's USC), on mlirpass's AGX target (and Apple M3 / M4 on its Apple9 target:
-//! [`apple9`]): detour's compute shaders (after detour-core's
-//! frontend) become upstream `gpu.func` kernels (detour-core's bridge), which mlirpass lowers, allocates and encodes.
-//!
-//! ```text
-//!   func.func {detour.stage = "compute"}
-//!      │  agx-check                what mlirpass's AGX target lowers, else refused here (this crate)
-//!      │  convert-detour-to-gpu     ⇒ gpu.module @shaders { gpu.func kernel } (detour-core)
-//!      │  convert-gpu-to-agx       ⇒ agx.kernel of virtual agx.usc (mlirpass)
-//!      │  agx-regalloc, agx-wait   GPR halves, waits for the loads (mlirpass)
-//!      │  agx-end, agx-layout      Stream Terminate, addresses (mlirpass)
-//!      ▼
-//!   AGX_IMAGE: the memories' bytes and the CDM stream ⇒ asahi
-//! ```
-//!
-//! A dispatch is [`Dispatch`] (mlirpass's `AgxDispatch`): the pipeline (USC words), the parameter buffer, the CDM
-//! stream. Not run on an M1: the instructions decode with Mesa's own model as the IR says; the whole is unchecked
-//! against hardware. What detour's own AGX backend made before it moved to mlirpass is the golden test
-//! (tests/ints.rs).
-
-// mlirpass-macros' #[pass] expands to `alloc::…`
 extern crate alloc;
 
-/// Apple M3 / M4 (mlirpass's Apple9 target).
 pub mod apple9;
 
 use mlirformat::{Error, Op};
@@ -29,28 +7,19 @@ use mlirpass::{A, AgxDialect, Body, Emit, Heads, Image, ImageData, ImageDialect,
 
 use crate::base::{Compiler, FRONTEND, GpuPasses, Lane, Load, Stage, Store, WorkgroupId};
 
-// ⚠ mlirpass-macros' #[pass] expands to `crate::agx_codegen::…`: the names it uses, at the root.
 #[allow(unused_imports, reason = "for mlirpass' macro expansions")]
 pub(crate) use mlirpass::{OptionValue, Options, PassDecl, Run};
 
 pub use mlirpass::{AGX_IMAGE, AgxCode, AgxDispatch as Dispatch, AgxEmit, AgxImage as Agx, AgxKernel};
 
-/// ⭐ The AGX backend's shader passes, after [`FRONTEND`].
 pub const BACKEND: &str = "agx-check, convert-detour-to-gpu, convert-gpu-to-agx, agx-regalloc, agx-wait";
 
-/// ⭐ The image's passes, once the dispatch and the memories are in the module.
 pub const END: &str = "agx-end, agx-layout";
 
 crate::pass_set! {
-    /// This crate's pass ([`BACKEND`]'s first; the bridge is detour-core's, the rest mlirpass's).
     AgxPasses: AgxCheck
 }
 
-/// `agx-check`: what mlirpass's AGX target lowers, checked before detour-core's bridge spells it upstream (which it
-/// does for every target): compute shaders of one thread a workgroup (the target's are 16 invocations, whatever
-/// `known_block_size` says) and no shared memory; of detour's ops only the workgroup id, the lane, and loads / stores of
-/// 4 bytes a component at a flat global address. Everything else is refused here, as detour's own AGX backend did,
-/// rather than left to the target (which refuses most of it, but would ignore a block size).
 #[pass("agx-check", on = "builtin.module")]
 pub fn agx_check<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     let top = body.top_block(op);
@@ -89,9 +58,6 @@ pub fn agx_check<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     Ok(())
 }
 
-/// ⭐ The compiler with the AGX backend: mlirpass's `agx` and `image` dialects loaded (its image has no
-/// `image.kernel`: a kernel is an `agx.kernel`), the check and detour-core's bridge registered beside mlirpass's own
-/// passes.
 pub struct Codegen<'i>(pub Compiler<'i>);
 
 impl Default for Codegen<'_> {
@@ -111,25 +77,19 @@ impl Codegen<'_> {
         Ok(body)
     }
 
-    /// The shader pipeline: the frontend, then the shaders.
     pub fn pipeline() -> String {
         format!("builtin.module({FRONTEND}, {BACKEND})")
     }
 }
 
-/// ⭐ A shader built into an image with its dispatch ([`Codegen::image`]).
 pub struct Built {
-    /// The module at the end, printed.
     pub module: String,
     pub image: Image,
-    /// The kernel's instructions, and where they are.
     pub kernel: Vec<u8>,
     pub kernel_addr: u64,
 }
 
 impl Built {
-    /// The image as text: `stream ADDR END`, then each memory `segment NAME ADDR HEX` (code, src, dst; the
-    /// format of tests/ints/*.expected, where zero tails are cut to `+N zeros`).
     pub fn dump(&self) -> String {
         let mut s = format!("stream {:#x} {:#x}\n", self.image.stream, self.image.stream_end);
         for name in ["code", "src", "dst"] {
@@ -142,9 +102,6 @@ impl Built {
 }
 
 impl Codegen<'_> {
-    /// ⭐ The one compute shader of `src` dispatched over `groups` workgroups, its parameters the addresses of two
-    /// 64 KiB buffers @src and @dst: @code (the CDM stream, the pipeline, the parameters, the kernel: all in the USC
-    /// window) and the buffers, laid out and emitted.
     pub fn image(&self, src: &str, groups: u32) -> Result<Built, Error> {
         let mut body = self.lower(src, &Codegen::pipeline())?;
         let mut kernels = Vec::new();
@@ -177,7 +134,6 @@ impl Codegen<'_> {
         }
         let shaders = rw.body.parent_op(k);
         rw.move_before(k, block, None);
-        // the gpu.module the kernel came out of is empty now
         if let Some(m) = shaders.filter(|m| rw.body[*m].name == "gpu.module" && rw.body.ops(rw.body.top_block(*m)).next().is_none()) {
             rw.erase_op(m);
             let root = rw.body.root;

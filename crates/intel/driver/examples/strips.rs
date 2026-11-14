@@ -1,18 +1,3 @@
-//! The 2D rasterizer against vello_cpu: the same scene (a circle, a star filled nonzero, a rounded rectangle, a thin
-//! diagonal sliver, overlapping translucent shapes, linear gradients with pad extend, some of them through clip
-//! paths) rendered by vello_cpu 0.3 and by detour (vello_common's strips and clips, detour-raster's instances and
-//! atlases, the Xe3 compositor), then every pixel compared (premultiplied RGBA8). Coverage comes from the same
-//! strips, a gradient's colors from the same LUT; only compositing rounds differently.
-//!
-//! Exactness is checked against a model of what the GPU computes (found on this GPU, see docs/xe3.md「混合」): the same
-//! instances and atlases composited on the CPU in f64, each instance's output `paint * color * coverage` rounded to
-//! unorm8 (paint the paint atlas texel at u interpolated to the pixel center), then blended `src + dst * (255 -
-//! src.a) / 255` over the target as it holds it (unorm8) and rounded again. It must match exactly, or by one where a
-//! rounding in the model is a tie (within 0.01 of .5: the GPU's own conversions are not exact f64), or anything where
-//! u falls within 0.01 texel of a texel edge (the interpolation is f32). vello_cpu's f32 pipeline rounds once at the
-//! end instead of at each layer, its u8 pipeline approximates; both are shown, the f32 one must be within the
-//! layers' rounding (two).
-
 use detour::base::{Gpu, LUT_WIDTH, MemType, Native, StripPaint, Strips, TextureFormat};
 use detour::xe3::{Codegen, Compositor, Context};
 use detour::xe::Xe;
@@ -28,14 +13,12 @@ use detour::vello_cpu::{Level, Pixmap, RasterizerSettings, RenderContext, Render
 const W: u16 = 512;
 const H: u16 = 384;
 
-/// A step of the scene.
 enum Item {
     Fill(BezPath, PaintType),
     Clip(BezPath),
     Pop,
 }
 
-/// The scene, in painting order.
 fn scene() -> Vec<Item> {
     let mut star = BezPath::new();
     for i in 0..5 {
@@ -72,7 +55,6 @@ fn scene() -> Vec<Item> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // the reference
     let mut ctx = RenderContext::new(W, H);
     for item in scene() {
         match item {
@@ -93,7 +75,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let reference = render(RenderMode::OptimizeQuality);
     let fast = render(RenderMode::OptimizeSpeed);
 
-    // detour
     let xe = Xe::open_first()?;
     let codegen = Codegen::default();
     let mut cx = Context::<Xe, Native>::new(&xe)?;
@@ -154,13 +135,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("vs {name}: {} channels, {} equal, {} off by one, {} off by more (worst {worst})", ours.len(), diff[0], diff[1], diff[2]);
         diff
     };
-    // the model of what the GPU computes: instances in order over the cleared target; each one's output (color *
-    // coverage) rounded to unorm8, then blended over what the target holds (unorm8), the result rounded again
     let (w, h) = (usize::from(W), usize::from(H));
     let mut model = vec![0.0f64; w * h * 4];
-    // per channel: how close any of its roundings came to a tie (.5)
     let mut tie = vec![1.0f64; w * h * 4];
-    // per channel: whether a paint texel was picked near its edge
     let mut edge = vec![false; w * h * 4];
     let near = |v: f64| (v - v.floor() - 0.5).abs();
     let aw = detour::base::ATLAS_WIDTH as f64;
@@ -179,7 +156,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let (x, y) = (x0 + dx, y0 + dy);
                 let (c, r) = if solid { (0, 0) } else { (c0 + dx, r0 + dy) };
                 let cov = f64::from(strips.atlas[r * detour::base::ATLAS_WIDTH as usize + c]) / 255.0;
-                // the paint atlas texel at u at the pixel center (clamped: pad), and how close u came to its edge
                 let u = (u0 + du * (dx as f64 + 0.5) / n as f64 + dv * (dy as f64 + 0.5) / 4.0) * lw;
                 let at_edge = (du != 0.0 || dv != 0.0) && (u - u.round()).abs() < 0.01;
                 let texel = (u.floor().clamp(0.0, lw - 1.0) as usize + row * LUT_WIDTH as usize) * 4;
@@ -197,7 +173,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let model: Vec<u8> = model.iter().map(|v| *v as u8).collect();
     compare("the model (source and result rounded to unorm8 at each layer)", &model);
-    // the channels off the model: at a paint texel's edge (either texel), else by one at a rounding tie, else wrong
     let (mut at_edge, mut at_tie, mut wrong) = (0, 0, 0);
     for (i, (a, b)) in ours.iter().zip(&model).enumerate().filter(|(_, (a, b))| a != b) {
         match () {

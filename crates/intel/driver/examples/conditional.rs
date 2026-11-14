@@ -1,9 +1,3 @@
-//! Conditional rendering (Vulkan `VK_EXT_conditional_rendering`: `Recorder::begin_conditional` / `end_conditional`, an
-//! MI_PREDICATE the draws test) on Xe3: a quarter-wide quad pushed into each quarter of 1920x1080 under the conditions
-//! [0, 1, 7, 0] at bytes 0, 4, 8, 12: q0 (0) skipped, q1 (1) drawn, q2 (7, inverted) skipped, q3 (0, inverted) drawn.
-//! Then over q1 a draw under 0 again (skipped), and after `end_conditional` one over q2 (drawn: the predicate no longer
-//! tested). Pixel by pixel.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

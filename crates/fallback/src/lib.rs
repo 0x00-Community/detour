@@ -1,9 +1,3 @@
-//! detour's fallback (feature `fallback-vulkan` of the `detour` crate): what detour's own drivers cannot do here (no driver
-//! for this GPU, or a capability the driver does not have yet) is done on Vulkan, with vello on wgpu drawing the 2D
-//! [`Scene`]. acde does not choose: it asks detour ([`detour::Backend::pick`]), detour picks the path.
-//!
-//! [`Scene`]: crate::base::Scene
-
 mod blur_plan;
 mod compose;
 mod offscreen;

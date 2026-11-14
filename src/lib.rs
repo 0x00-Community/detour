@@ -1,14 +1,3 @@
-//! detour as its users see it, aggregated at the repository root (a git dependency on detour gets this crate): the 2D
-//! scene ([`PaintScene`], [`Scene`], [`Filter`]) and a page's parts as the compositor draws them ([`Part`], [`Pass`])
-//! always, the drivers of the GPU models whose features are on (`xe3`,
-//! `agx-g13`, `rdna2`), the Vulkan fallback (`fallback-vulkan`) and the `<canvas>` 3D contexts (`webgl`, `webgl2`,
-//! `webgpu`), these four on by default. Building only the models a machine has keeps the rest of detour (their dialects,
-//! codegen, kernel interfaces) out of the build.
-//!
-//! Who does a job is detour's call, not the caller's: [`Backend::pick`] answers for a [`Capability`]. A driver that is
-//! built in and has the capability does it; otherwise the Vulkan fallback; with neither (the fallback turned off), it
-//! panics — no silent degradation.
-
 extern crate alloc;
 
 #[cfg(feature = "compiler")]
@@ -54,7 +43,7 @@ pub use crate::base::{
 };
 #[cfg(unix)]
 pub use crate::base::{Dmabuf, Submitted};
-/// Opening a driver's device (`Xe::open_first`) for [`PageRaster`], and the host its `Context` runs on.
+
 #[cfg(feature = "xe3")]
 pub use crate::base::{Gpu, Native};
 
@@ -71,21 +60,15 @@ mod page_raster;
 #[cfg(all(feature = "xe3", feature = "fallback-vulkan", target_os = "linux"))]
 pub use page_raster::PageRaster;
 
-/// Something a user asks detour to do.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Capability {
-    /// Draw pages (2D scenes, their layers, filters and shadows) into dma-buf canvases.
     Pages,
-    /// WebGPU for pages (`navigator.gpu`, `<canvas>` `webgpu` contexts); feature `webgpu`.
     WebGpu,
-    /// `<canvas>` `webgl` contexts (WebGL 1); feature `webgl`.
     WebGl,
-    /// `<canvas>` `webgl2` contexts; feature `webgl2`.
     WebGl2,
 }
 
 impl Capability {
-    /// Whether this build of detour has the capability at all (its feature is on).
     pub const fn built(self) -> bool {
         match self {
             Self::Pages => true,
@@ -96,29 +79,21 @@ impl Capability {
     }
 }
 
-/// Who does a [`Capability`] here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Backend {
-    /// detour's driver for Intel Xe3.
     #[cfg(feature = "xe3")]
     Xe3,
-    /// The Vulkan fallback ([`fallback`]).
     #[cfg(feature = "fallback-vulkan")]
     Vulkan,
 }
 
 impl Backend {
-    /// The built-in drivers that have `capability` today (none for WebGPU yet, M6). Pages are drawn by [`PageRaster`]
-    /// (with `xe3`): each pass by Xe3 when it can, the rest by the fallback; so for pages this answers the fallback,
-    /// which is always there underneath.
     const fn native(capability: Capability) -> Option<Self> {
         match capability {
             Capability::Pages | Capability::WebGpu | Capability::WebGl | Capability::WebGl2 => None,
         }
     }
 
-    /// ⭐ Who does `capability` here. Panics when the capability's feature is off, or when no driver built in has it and
-    /// `fallback-vulkan` is off.
     pub fn pick(capability: Capability) -> Self {
         assert!(capability.built(), "detour: built without {capability:?} (its feature is off)");
         if let Some(native) = Self::native(capability) {

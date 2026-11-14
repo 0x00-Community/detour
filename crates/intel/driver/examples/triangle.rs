@@ -1,10 +1,3 @@
-//! The triangle, end to end on the GPU: `triangle [func|gpu|spirv|arith ...]` (default: all four). Each form of
-//! examples/triangle/*.mlir goes through the whole pipeline (frontend, convert-detour-to-xe3, xe3-regalloc, xe3-swsb,
-//! xe3-pad, xe3-end, xe3-layout), the image runs on the first xe device, and the target is checked pixel by pixel: the render pass
-//! clears it to blue, the triangle (corners (-1, -1), (1, -1), (-1, 1)) is orange (255, 128, 64, 255). In window
-//! coordinates that is x + y < 64: every pixel whose center is inside (x + y ≤ 62) orange, outside (x + y ≥ 64)
-//! blue; on the edge (x + y = 63) the rasterizer's fill rule decides.
-
 use std::time::{Duration, Instant};
 
 use detour::xe3::{Codegen, Device};

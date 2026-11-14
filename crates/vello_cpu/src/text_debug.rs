@@ -1,8 +1,3 @@
-// Copyright 2026 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! Debug helpers for glyph atlas and CPU text resources.
-
 #![allow(dead_code, reason = "only used for debugging purposes")]
 
 #[cfg(all())]
@@ -17,9 +12,6 @@ use glifo::atlas::GlyphCacheStats;
 
 #[cfg(all())]
 impl GlyphAtlasResources {
-    /// Save all atlas pages to PNG files with a custom path prefix.
-    ///
-    /// Files are saved as `{path_prefix}_atlas_page_{index}.png`.
     pub(crate) fn save_atlas_pages_to(&self, path_prefix: &str) {
         for (i, pixmap) in self.pixmaps.iter().enumerate() {
             let path = format!("{path_prefix}_atlas_page_{i}.png");
@@ -27,13 +19,10 @@ impl GlyphAtlasResources {
         }
     }
 
-    /// Save all atlas pages to PNG files for debugging.
-    ///
-    /// Files are saved to `examples/_output/vello_cpu_atlas_page_{index}.png`.
     pub(crate) fn save_atlas_pages(&self) {
         for (i, pixmap) in self.pixmaps.iter().enumerate() {
             let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-            path.pop(); // up from vello_cpu to workspace root
+            path.pop();
             path.push("examples");
             path.push("_output");
             let _ = std::fs::create_dir_all(&path);
@@ -44,22 +33,18 @@ impl GlyphAtlasResources {
 }
 
 impl GlyphAtlasResources {
-    /// Get detailed statistics about cached glyphs.
     pub(crate) fn stats(&self) -> GlyphCacheStats {
         self.glyph_atlas.stats(self.pixmaps.len())
     }
 
-    /// Log detailed atlas statistics at info level.
     pub(crate) fn log_atlas_stats(&self) {
         self.glyph_atlas.log_atlas_stats(self.pixmaps.len());
     }
 
-    /// Returns all cached glyph keys (for debugging).
     pub(crate) fn all_keys(&self) -> impl Iterator<Item = &GlyphCacheKey> {
         self.glyph_atlas.all_keys()
     }
 
-    /// Log all cached keys grouped by glyph ID at info level.
     pub(crate) fn log_keys_grouped(&self) {
         self.glyph_atlas.log_keys_grouped();
     }
@@ -80,7 +65,6 @@ impl Resources {
     }
 }
 
-/// Save a pixmap to a PNG file (diagnostic utility).
 #[cfg(all())]
 pub(crate) fn save_pixmap_to_png(pixmap: &Pixmap, path: &std::path::Path) -> std::io::Result<()> {
     use std::fs::File;

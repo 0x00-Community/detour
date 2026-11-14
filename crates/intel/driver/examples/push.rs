@@ -1,9 +1,3 @@
-//! Push constants (WGSL `var<immediate>`, `setImmediates`; Vulkan push constants: `Recorder::push_constants`,
-//! `detour.push_constant {offset}`) on Xe3: a quarter-wide quad drawn four times in 1920x1080, each draw pushing its own
-//! translation (vertex shader) and color. Quarters 0 and 1: the color pushed (fragment shader, byte 16); 2 and 3: a
-//! pipeline reading a color from a bound buffer as well, scaled by a pushed scalar (byte 8). Checked pixel by pixel; a
-//! draw whose pipeline reads more than was pushed is refused.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

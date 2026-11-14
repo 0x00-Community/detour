@@ -1,9 +1,3 @@
-//! vello_common's tiling on Xe3 against vello_common's own, bit for bit (roadmap R8.2): the lines of random paths
-//! (flattened by vello_common, many reaching past the viewport's left and top) into tiles, sorted, and the windings
-//! of what lies left of the viewport (`Tiles::make_tiles_analytic_aa`, `sort_tiles`, `CulledWindings`). A lane tiles
-//! one path (`tiles/tiles.mlir`: pass 0 counts its tiles, pass 1 writes them at a prefix sum of the counts, sorts
-//! them and writes its windings).
-
 use detour::base::vello_common::fearless_simd::Level;
 use detour::base::vello_common::flatten::{self, FlattenCtx, Line};
 use detour::base::vello_common::geometry::RectU16;
@@ -17,7 +11,6 @@ const PATHS: usize = 2000;
 const WIDTH: u16 = 1000;
 const HEIGHT: u16 = 800;
 
-/// xorshift64*
 struct Rng(u64);
 
 impl Rng {
@@ -42,7 +35,6 @@ impl Rng {
         p.move_to(last);
         for _ in 0..(1 + self.next() % 10) {
             let to = match self.next() % 6 {
-                // vertical and horizontal lines, lines within a tile
                 0 => KPoint::new(last.x, self.unit() * 1200.0 - 300.0),
                 1 => KPoint::new(self.unit() * 1400.0 - 300.0, last.y),
                 2 => KPoint::new(last.x + self.unit() * 3.0, last.y + self.unit() * 3.0),

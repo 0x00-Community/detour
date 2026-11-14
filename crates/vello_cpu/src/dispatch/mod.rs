@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 #[cfg(any())]
 pub(crate) mod multi_threaded;
 pub(crate) mod record;
@@ -38,7 +35,6 @@ pub(crate) trait Dispatcher: Debug + Send {
         aliasing_threshold: Option<u8>,
         mask: Option<Mask>,
     );
-    /// Fill a pixel-aligned rectangle with the current paint.
     fn fill_rect_fast(
         &mut self,
         rect: &Rect,
@@ -79,15 +75,12 @@ pub(crate) trait Dispatcher: Debug + Send {
         image_resolver: &dyn ImageResolver,
     );
     fn is_multi_threaded(&self) -> bool;
-    // detour: the coarse rasterization alone (the single-threaded dispatcher's)
     fn coarse<'s>(&'s self, _scene: (u16, u16), _encoded_paints: &'s [EncodedPaint], _image_resolver: &dyn ImageResolver) -> Option<crate::vello_cpu::detour::Coarse<'s>> {
         None
     }
-    // detour: the scene recorded for the GPU (the recording dispatcher's)
     fn recording(&self) -> Option<&crate::vello_cpu::detour::Recording> {
         None
     }
-    // detour: the coarse rasterization with the filter layers drawn elsewhere (the single-threaded dispatcher's)
     fn coarse_layered<'s>(&'s self, _scene: (u16, u16), _encoded_paints: &'s [EncodedPaint]) -> Option<crate::vello_cpu::detour::Layered<'s>> {
         None
     }

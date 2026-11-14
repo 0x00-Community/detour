@@ -1,8 +1,3 @@
-//! Buffer bindings of part of a buffer (`GPUBufferBinding` offset and size, dynamic offsets: `Recorder::bind_ranges`)
-//! on Xe3: one buffer of uniform blocks 256 bytes apart (a translation, then a color), a quarter-wide quad drawn four
-//! times, each binding block k's translation and color: quarter k in color k, checked pixel by pixel in 1920x1080.
-//! The last binds 8 bytes of its color: what the shader reads past them is 0 (blue and alpha).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -21,7 +16,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let clear = cx.clear_pipeline(&codegen, [0.0, 0.0, 1.0, 1.0])?;
     let corners = cx.clear_vertices()?;
     let vb = cx.floats(&QUAD)?;
-    // blocks k (256 bytes each): the translation at 256 k, the color at 256 k + 16
     let colors = [[1.0, 0.0, 0.0, 1.0], [0.0, 1.0, 0.0, 1.0], [1.0, 1.0, 0.0, 1.0], [1.0, 0.5, 0.75, 1.0]];
     let mut words = vec![0f32; 4 * 64];
     for (k, c) in colors.iter().enumerate() {

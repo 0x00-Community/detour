@@ -1,9 +1,3 @@
-//! Async compute (a second queue on the compute engine, CCS: `Context::open_compute`, `record_compute`, `submit_waiting`, `Done`) on
-//! Xe3: 2^16 u32s. The compute queue fills A[i] = 3 i + 1; the render queue, waiting for it on the GPU, doubles A into
-//! B; the render queue fills C[i] = 7 i + 5; the compute queue, waiting for that, doubles C into D. B and D checked
-//! element by element. Then the first pair again without the wait, for contrast (racing: what it reads is printed, not
-//! checked). Last, storage textures written from the compute queue (`dispatch_with`: its binding table).
-
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
 use detour::base::{Gpu, Native, TextureFormat};
@@ -80,7 +74,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ok &= bad == 0;
     }
 
-    // the same pair, no wait: the render queue may read A before the compute queue wrote it
     a.bytes()?[..(N * 4) as usize].fill(0);
     b.bytes()?[..(N * 4) as usize].fill(0);
     let mut f = cx.record_compute()?;
@@ -94,7 +87,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let got = words(&b.bytes()?[..(N * 4) as usize]);
     let early = got.iter().enumerate().filter(|(i, v)| **v != 2 * (3 * *i as u32 + 1)).count();
     println!("without the wait: {early} of {N} read before they were written (racing; not checked)");
-    // storage textures from the compute queue (dispatch_with: its binding table and pool)
     let src = include_str!("storage/kernels.mlir");
     let store = cx.kernel(&codegen, src, "fill")?;
     let (w, h) = (37u32, 23u32);

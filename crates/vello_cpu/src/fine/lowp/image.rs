@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::fine::common::image::{ImagePainterData, extend_mode, sample};
 use crate::vello_cpu::fine::macros::u8x16_painter;
 use vello_common::encode::EncodedImage;
@@ -9,12 +6,9 @@ use vello_common::pixmap::Pixmap;
 use vello_common::simd::element_wise_splat;
 use vello_common::util::{Div255Ext, f32_to_u8, narrow, widen};
 
-/// A faster bilinear image renderer for the u8 pipeline.
 #[derive(Debug)]
 pub(crate) struct BilinearImagePainter<'a, S: Simd> {
     data: ImagePainterData<'a, S>,
-    // detour: each pixel's position from `positions` (as the gradients and the nearest-neighbor painters), the
-    // column's first pixel at (x, y); upstream adds the advance from the span's start
     positions: crate::vello_cpu::detour::Positions,
     x: f32,
     y: f32,
@@ -108,10 +102,6 @@ impl<S: Simd> Iterator for BilinearImagePainter<'_, S> {
 
 u8x16_painter!(BilinearImagePainter<'_, S>);
 
-/// A faster bilinear image renderer for axis-aligned images (no skew) in the u8 pipeline.
-///
-/// detour: the general painter (`BilinearImagePainter`), each pixel positioned on its own; upstream precomputes the
-/// y positions and weights once a span.
 #[derive(Debug)]
 pub(crate) struct PlainBilinearImagePainter<'a, S: Simd> {
     bilinear: BilinearImagePainter<'a, S>,

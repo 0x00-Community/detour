@@ -1,12 +1,3 @@
-//! Sample shading (pipeline `sample_shading = true`: Vulkan `sampleShadingEnable`, WGSL `@interpolate(..., sample)`)
-//! on Xe3: a whole-target quad into a 4x target, its varying the pixel position (x, y), the fragment shader one color
-//! where x − 0.4 y > 300.1 and another elsewhere, resolved. Shaded per sample, a pixel the edge crosses is the mean of
-//! its four samples' colors, each decided at the sample's position (Mesa's 4x positions); shaded per pixel (the same
-//! pipeline without it, the control), every sample takes the pixel center's color. Pixel by pixel, both; pixels with
-//! a sample within 0.01 of the edge are not checked (interpolation rounding). The colors are multiples of 8, so every
-//! mean is a whole unorm8 value. Then `detour.sample_index`: shaded per sample, the color (s · 64, s² · 16, 248 where s
-//! is 0) of sample s, resolved: every pixel (96, 56, 62), the means over s = 0, 1, 2, 3 (each once).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -43,7 +34,6 @@ func.func @fs(%xy: vector<2xf32>) -> vector<4xf32> attributes {{detour.stage = "
     )
 }
 
-/// Whether the point (x, y) of the target is on the first color's side; `None` within 0.01 of the edge.
 fn side(x: f64, y: f64) -> Option<bool> {
     let d = x - 0.4 * y - 300.1;
     (d.abs() > 0.01).then_some(d > 0.0)

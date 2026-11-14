@@ -1,10 +1,3 @@
-//! Primitive state (`GPUPrimitiveState`) on Xe3, pixel by pixel in a 64x64 target cleared blue: point-list (each point
-//! at a pixel center lights that pixel), line-list and line-strip (horizontal and vertical lines along pixel centers:
-//! the diamond-exit rule, each segment's first pixel lit and its last not),
-//! triangle-strip with a restart index (u16 and u32: two quads, not one shape joined across the restart), and
-//! culling: a counter-clockwise and a clockwise triangle (as seen on the target) under cull back / front, with
-//! front face ccw and cw.
-
 use detour::base::{Gpu, IndexFormat, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -29,19 +22,16 @@ func.func @fs() -> vector<4xf32> attributes {detour.stage = "fragment"} {
 }
 "#;
 
-/// A pipeline of the shaders above, its primitive state `extra` (`topology = ...`, ...).
 fn pipeline(name: &str, extra: &str) -> String {
     format!(
         "detour.pipeline @{name} {{vertex = @vs, fragment = @fs, {extra}, targets = [\"rgba8unorm\"],\n  vertex_buffers = [{{stride = 8, attributes = [{{location = 0, format = \"float32x2\", offset = 0}}]}}]}}\n{SHADERS}"
     )
 }
 
-/// Pixel (x, y)'s center in clip space (y down).
 fn center(x: u32, y: u32) -> [f32; 2] {
     [(x as f32 + 0.5) / N as f32 * 2.0 - 1.0, (y as f32 + 0.5) / N as f32 * 2.0 - 1.0]
 }
 
-/// Pixel corner (x, y) in clip space.
 fn corner(x: u32, y: u32) -> [f32; 2] {
     [x as f32 / N as f32 * 2.0 - 1.0, y as f32 / N as f32 * 2.0 - 1.0]
 }
@@ -54,7 +44,6 @@ struct Run<'c, 'd> {
 }
 
 impl<'d> Run<'_, 'd> {
-    /// `draw` into a cleared target with the pipeline `extra` makes; the orange pixels.
     fn orange(&mut self, extra: &str, draw: impl FnOnce(&mut detour::xe3::Recorder<'_, 'd, Xe, Native>, &detour::xe3::Pipeline) -> Result<(), detour::xe3::Error>) -> Result<Vec<(u32, u32)>, Box<dyn std::error::Error>> {
         let p = self.cx.pipeline(self.codegen, &pipeline("p", extra), "p")?;
         let mut target = self.cx.target(N, N, TextureFormat::Rgba8Unorm, MemType::Coherent)?;
@@ -80,7 +69,6 @@ impl<'d> Run<'_, 'd> {
     }
 }
 
-/// The pixels of rectangle [x0, x1) × [y0, y1).
 fn rect(x0: u32, y0: u32, x1: u32, y1: u32) -> Vec<(u32, u32)> {
     (y0..y1).flat_map(|y| (x0..x1).map(move |x| (x, y))).collect()
 }
@@ -102,23 +90,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut run = Run { cx: &mut cx, codegen: &codegen, clear, corners };
     let mut ok = true;
 
-    // points at four pixel centers
     let pts = [(3, 4), (10, 10), (40, 7), (63, 63)];
     let vb = run.cx.floats(&pts.iter().flat_map(|&(x, y)| center(x, y)).collect::<Vec<_>>())?;
     let got = run.orange("topology = \"point-list\"", |r, p| r.draw(p, &[&vb], &[], 4, 1))?;
     ok &= check("point-list", got, pts.to_vec());
 
-    // lines along pixel centers: (5, 20) → (25, 20) and (30, 2) → (30, 12)
     let vb = run.cx.floats(&[center(5, 20), center(25, 20), center(30, 2), center(30, 12)].concat())?;
     let lines = run.orange("topology = \"line-list\"", |r, p| r.draw(p, &[&vb], &[], 4, 1))?;
-    // the diamond-exit rule: a line lights its first pixel, not its last
     ok &= check("line-list (diamond exit: first pixel, not the last)", lines, [rect(5, 20, 25, 21), rect(30, 2, 31, 12)].concat());
-    // a strip through (5, 40) → (25, 40) → (25, 55)
     let vb = run.cx.floats(&[center(5, 40), center(25, 40), center(25, 55)].concat())?;
     let strip = run.orange("topology = \"line-strip\"", |r, p| r.draw(p, &[&vb], &[], 3, 1))?;
     ok &= check("line-strip", strip, [rect(5, 40, 25, 41), rect(25, 40, 26, 55)].concat());
 
-    // triangle strips with a restart: quads [4, 12) × [4, 12) and [20, 28) × [8, 16)
     let quads = [corner(4, 4), corner(12, 4), corner(4, 12), corner(12, 12), corner(20, 8), corner(28, 8), corner(20, 16), corner(28, 16)].concat();
     let vb = run.cx.floats(&quads)?;
     let want = [rect(4, 4, 12, 12), rect(20, 8, 28, 16)].concat();
@@ -133,8 +116,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ok &= check(&format!("triangle-strip, restart {name}"), got, want.clone());
     }
 
-    // culling: a counter-clockwise triangle on the left (framebuffer: y down) and a clockwise one on the right, each
-    // half of an 8 x 8 square split by its diagonal
     let ccw = [corner(4, 40), corner(4, 48), corner(12, 48)];
     let cw = [corner(30, 40), corner(38, 40), corner(38, 48)];
     let vb = run.cx.floats(&[ccw.concat(), cw.concat()].concat())?;

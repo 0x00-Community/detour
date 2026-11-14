@@ -1,14 +1,3 @@
-//! What `against_vulkan` and `against_opengl` share: the three workloads, the harness that times them the same way
-//! through every API (`Api`), the pixel / word checks, and detour's side. Each API draws the same thing into the same
-//! 1920x1080 RGBA8 target and hands back the pixels with memory row 0 at clip y = -1 (detour's and Vulkan's top row,
-//! GL's bottom row: the same rows in memory), so one check serves all.
-//!
-//! - `tri`: a clear and one triangle covering half the target (the runtime's `frames` example): per-frame CPU cost,
-//!   frames back to back (up to four in flight, detour's ring), submit-to-done latency.
-//! - `fill`: a clear and `LAYERS` full-target quads blended as premultiplied alpha (one instanced draw): fill-bound.
-//! - `dispatch`: a 16-lane-workgroup kernel writing its index, 1 and `DISPATCHES` dispatches in one submission, each
-//!   one's writes visible to the next (detour flushes after every dispatch; Vulkan / GL get the matching barrier).
-
 use std::time::{Duration, Instant};
 
 use detour::base::{Gpu, MemType, Native, TextureFormat};
@@ -17,34 +6,32 @@ use detour::xe3::{Buffer, Codegen, Context, Error, Kernel, Pipeline, Target};
 
 pub const W: u32 = 1920;
 pub const H: u32 = 1080;
-/// `tri`'s clear color and triangle color
+
 pub const BLUE: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
 pub const ORANGE: [f32; 4] = [1.0, 0.5, 0.25, 1.0];
-/// `tri`: the triangle (clip space), half the target
+
 pub const TRIANGLE: [f32; 6] = [-1.0, -1.0, 1.0, -1.0, -1.0, 1.0];
-/// `fill`: the clear color, then `LAYERS` full-target quads of the premultiplied `LAYER` color
+
 pub const FILL_CLEAR: [f32; 4] = [0.2, 0.4, 0.6, 1.0];
 pub const LAYERS: u32 = 32;
 pub const LAYER: [f32; 4] = [0.25, 0.125, 0.0625, 0.25];
-/// `fill`: the unit quad's corners (triangle strip) and one instance: (x, y, w, h) in clip space, premultiplied color
+
 pub const QUAD: [f32; 8] = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
 const FULL: [f32; 8] = [-1.0, -1.0, 2.0, 2.0, LAYER[0], LAYER[1], LAYER[2], LAYER[3]];
-/// `fill`'s instance buffer: `FULL` once per layer, as little-endian bytes
+
 pub fn instances() -> Vec<u8> {
     FULL.iter().cycle().take(FULL.len() * LAYERS as usize).flat_map(|f| f.to_le_bytes()).collect()
 }
-/// `dispatch`: grid sizes (invocations, 16 a workgroup) and dispatches in the long submission
+
 pub const LANES: [u32; 3] = [16, 4096, 1 << 20];
 pub const DISPATCHES: u32 = 200;
-/// frames in flight at most (detour's batch ring)
+
 pub const RING: usize = 4;
-/// frames run before anything is timed (the GPU clocks up)
+
 const WARMUP: usize = 100;
-/// the most `fill` hardware may be off the step-by-step unorm8 model, per channel: implementations round each blend
-/// step a little differently and the 0.75 contraction keeps the drift within a few steps
+
 const FILL_SLACK: f64 = 2.0;
 
-/// The same shaders for Vulkan (through naga's GLSL frontend to SPIR-V) and GL (compiled by the driver).
 pub const TRI_VS: &str = "#version 450
 layout(location = 0) in vec2 p;
 void main() { gl_Position = vec4(p, 0.0, 1.0); }
@@ -71,7 +58,6 @@ layout(std430, binding = 0) buffer Out { uint v[]; };
 void main() { uint i = gl_GlobalInvocationID.x; v[i] = i; }
 ";
 
-/// detour's kernel: the same as `COMPUTE`.
 const KERNEL: &str = r#"
 func.func @k(%out: i32) attributes {detour.stage = "compute"} {
   %c4 = arith.constant 4 : i32
@@ -93,31 +79,20 @@ pub enum Scene {
     Fill,
 }
 
-/// One API driving the GPU. `frame` records and submits a frame (waiting first only when `RING` frames are in
-/// flight) and returns what `wait` waits for, and the time spent recording when the API records separately from
-/// submitting (GL does not).
 pub trait Api {
     type Done: Copy;
     fn name(&self) -> String;
     fn frame(&mut self, scene: Scene) -> (Self::Done, Option<Duration>);
     fn wait(&mut self, done: Self::Done);
-    /// The target after the last frame (waited for), `W` × `H` RGBA8, row 0 at clip y = -1.
     fn pixels(&mut self) -> Vec<u8>;
-    /// `count` dispatches of `lanes` invocations in one submission, waited for; the time spent recording them, as
-    /// `frame`.
     fn dispatch(&mut self, lanes: u32, count: u32) -> Option<Duration>;
-    /// The first `lanes` words the kernel wrote.
     fn words(&mut self, lanes: u32) -> Vec<u32>;
 }
 
-/// What one API measured; `Report::table` sets two side by side.
 pub struct Report {
     name: String,
-    /// recording p50, frame (record + submit) p50, frames/s back to back, submit to done p50 / p99
     tri: (Option<Duration>, Duration, f64, Duration, Duration),
-    /// a `fill` frame, back to back
     fill: Duration,
-    /// per grid: one dispatch, `DISPATCHES` in one submission, per dispatch, per dispatch recording
     dispatch: Vec<(Duration, Duration, Duration, Option<Duration>)>,
 }
 
@@ -133,7 +108,6 @@ impl Percentile for Vec<Duration> {
 }
 
 impl Report {
-    /// Runs the three workloads on `api` (`n` frames each timing loop) and checks what it drew and wrote.
     pub fn run<A: Api>(api: &mut A, n: usize) -> Report {
         let name = api.name();
         eprintln!("{name}: tri");
@@ -152,7 +126,6 @@ impl Report {
                     let record = api.dispatch(lanes, count);
                     (t.elapsed(), record)
                 };
-                // the second of each: the first pays for whatever is set up lazily
                 let (_, (one, _), _, (many, record)) = (time(1), time(1), time(DISPATCHES), time(DISPATCHES));
                 Check::words(&api.words(lanes), lanes, &name);
                 (one, many, many.saturating_sub(one) / (DISPATCHES - 1), record.map(|r| r / DISPATCHES))
@@ -161,7 +134,6 @@ impl Report {
         Report { name, tri, fill, dispatch }
     }
 
-    /// Warm up, then frames back to back (throughput) and one at a time (CPU cost and latency).
     fn frames<A: Api>(api: &mut A, scene: Scene, n: usize) -> (Option<Duration>, Duration, f64, Duration, Duration) {
         let mut last = None;
         for _ in 0..WARMUP {
@@ -187,7 +159,6 @@ impl Report {
         (record, cpu.at(0.5), fps, latency.at(0.5), latency.at(0.99))
     }
 
-    /// The reports side by side, one column each, as a Markdown table.
     pub fn table(reports: &[Report], n: usize) {
         let us = |d: Duration| format!("{:.1} µs", d.as_secs_f64() * 1e6);
         let ms = |d: Duration| format!("{:.3} ms", d.as_secs_f64() * 1e3);
@@ -213,7 +184,6 @@ impl Report {
     }
 }
 
-/// The checks: every pixel / word against what the workload means.
 struct Check;
 
 impl Check {
@@ -227,7 +197,6 @@ impl Check {
         for y in 0..H {
             for x in 0..W {
                 let p: [u8; 4] = px[((y * W + x) * 4) as usize..][..4].try_into().unwrap();
-                // inside is x / W + y / H < 1 at pixel centers; within a pixel of the edge the fill rule decides
                 let s = (f64::from(x) + 0.5) / f64::from(W) + (f64::from(y) + 0.5) / f64::from(H);
                 let edge = 1.0 / f64::from(W.min(H));
                 let want = if s < 1.0 - edge { Some(orange) } else if s > 1.0 + edge { Some(blue) } else { None };
@@ -241,7 +210,6 @@ impl Check {
     }
 
     fn fill(px: &[u8], name: &str) {
-        // each step blends onto what the target holds, unorm8
         let mut want = FILL_CLEAR.map(f64::from);
         for _ in 0..LAYERS {
             want = std::array::from_fn(|i| {
@@ -263,7 +231,6 @@ impl Check {
     }
 }
 
-/// detour on Xe3: its runtime, the pipelines and kernel compiled once.
 pub struct Detour<'d> {
     cx: Context<'d, Xe, Native>,
     clear: [Pipeline; 2],
@@ -280,7 +247,6 @@ pub struct Detour<'d> {
 }
 
 impl<'d> Detour<'d> {
-    /// The first render node driven by xe.
     pub fn device() -> Result<Xe, Error> {
         Ok(Xe::open_first()?)
     }
@@ -366,7 +332,6 @@ impl Api for Detour<'_> {
     }
 }
 
-/// `cargo bench ... -- [N]`: frames per timing loop (default 2000); cargo's own `--bench` flag is skipped.
 pub fn frames_arg() -> usize {
     std::env::args().skip(1).find(|a| !a.starts_with('-')).map_or(2000, |a| a.parse().expect("N"))
 }

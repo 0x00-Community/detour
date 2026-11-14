@@ -1,19 +1,9 @@
-//! `rdna2-precheck`: what RDNA2 takes of detour's shaders, checked before any lowering, so that nothing it does not
-//! take is dropped or lowered as something else. Of every shader (`func.func {detour.stage}`):
-//!
-//! - the stage is compute, a workgroup of one thread (no `detour.workgroup`) and no shared memory (no `detour.shared`):
-//!   anything else would leave the image without it (the lowering takes compute kernels only);
-//! - its detour ops are `workgroup_id` (x, y, z), `lane`, `unpack4xu8`, and `load` / `store` of flat global memory
-//!   (no `binding`, not `shared`; detour's own RDNA2 backend lowered those as global ones) of 1 ..= 4 dwords, or one
-//!   byte / short: global_load / global_store's forms.
-
 use mlirformat::{Error, FloatKind, Op, ShapedKind, Type};
 use mlirpass::{Body, OpId, pass};
 
 use crate::base::{Lane, Load, Stage, Store, Unpack4xu8, WorkgroupId};
 use mlirpass::Heads;
 
-/// `rdna2-precheck`.
 #[pass("rdna2-precheck", on = "builtin.module")]
 pub fn rdna2_precheck<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     let top = body.top_block(op);
@@ -24,7 +14,6 @@ pub fn rdna2_precheck<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     Ok(())
 }
 
-/// One shader against what RDNA2 takes.
 struct Precheck;
 
 impl Precheck {
@@ -65,7 +54,6 @@ impl Precheck {
         Ok(())
     }
 
-    /// A global load / store's form: 1 ..= 4 components of 32 bits (i32 / f32), or one integer of 1 or 2 bytes.
     fn global(size: Option<u32>, ty: &Type<'_>) -> bool {
         let (n, elem) = match ty {
             Type::Shaped(s) if s.kind == ShapedKind::Vector => match ty.dims().as_deref() {

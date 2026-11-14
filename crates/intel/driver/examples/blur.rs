@@ -1,8 +1,3 @@
-//! vello_cpu's gaussian blur on Xe3 (R5, `Filters::blur`) against vello_cpu running it (`detour::filter`, the u8
-//! kernel), byte for byte: premultiplied noise with shapes, σ from 0.4 (direct convolution) to 40 (four decimations),
-//! whole tiles whose decimated sizes are odd (the upsampling's clamped sizes), the source's rows padded. Then drop
-//! shadows (offsets fractional, negative, past the size; no blur; translucent colors). `blur K` runs case K alone.
-
 use std::sync::Arc;
 
 use detour::base::vello_common::filter::PreparedFilter;
@@ -13,7 +8,6 @@ use detour::vello_cpu::filter_effects::{EdgeMode, Filter, FilterGraph, FilterPri
 use detour::vello_cpu::kurbo::Affine;
 use detour::vello_cpu::Pixmap;
 
-/// A premultiplied image: noise under a few bright discs, transparent corners.
 fn image(w: u16, h: u16, seed: u32) -> Vec<[u8; 4]> {
     let mut s = seed.wrapping_mul(2654435761) | 1;
     (0..u32::from(w) * u32::from(h))
@@ -31,8 +25,6 @@ fn image(w: u16, h: u16, seed: u32) -> Vec<[u8; 4]> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // whole tiles (a filter layer's pixmap is; vello_cpu's in-place upsampling writes past an odd-sized pixmap), the
-    // decimated sizes odd: 60 → 30 → 15 → 8 and back clamped
     let cases: [(u16, u16, f32); 9] = [(40, 24, 0.4), (40, 24, 1.0), (36, 20, 2.0), (64, 40, 2.6), (60, 44, 5.0), (100, 68, 9.0), (108, 76, 17.0), (124, 92, 40.0), (8, 8, 3.0)];
     let only: Option<usize> = std::env::args().nth(1).and_then(|a| a.parse().ok());
     let xe = Xe::open_first()?;
@@ -42,7 +34,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut bad_total = 0;
     for (k, &(w, h, sigma)) in cases.iter().enumerate().filter(|(k, _)| only.is_none_or(|o| o == *k)) {
         let px = image(w, h, k as u32 + 1);
-        // vello_cpu
         let mut graph = FilterGraph::new();
         let out = graph.add(FilterPrimitive::GaussianBlur { std_deviation: sigma, edge_mode: EdgeMode::None }, None);
         graph.set_output(out);
@@ -52,7 +43,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         detour::vello_cpu::detour::filter(&filter, &mut want, Affine::IDENTITY);
         let PreparedFilter::GaussianBlur(plan) = PreparedFilter::new(&filter, &Affine::IDENTITY) else { unreachable!("a blur") };
 
-        // Xe3: the source's rows 5 pixels longer
         let (uw, uh) = (u32::from(w), u32::from(h));
         let stride = uw + 5;
         let mut src = vec![[0x77u8; 4]; (stride * uh) as usize];
@@ -80,8 +70,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         bad_total += bad.len();
     }
-    // drop shadows (`Filters::drop_shadow`): (w, h, dx, dy, σ, color): fractional, negative, past the size (vello_cpu's
-    // u16 wrap: a negative offset as large as the layer clears nothing), no blur, translucent
     let shadows: [(u16, u16, f32, f32, f32, [f32; 4]); 6] = [
         (40, 24, 3.4, 2.6, 2.0, [0.0, 0.0, 0.3, 0.6]),
         (60, 44, -5.5, 4.0, 5.0, [0.9, 0.2, 0.1, 1.0]),

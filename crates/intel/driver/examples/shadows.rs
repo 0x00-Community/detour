@@ -1,8 +1,3 @@
-//! Depth textures and comparison samplers (`texture_depth_2d`, `sampler_comparison`, `textureSampleCompare`) on Xe3:
-//! a depth pass (left half at z 0.25, right half 0.75 over a depth cleared to 1), `Recorder::depth_barrier`, then the
-//! depth buffer sampled in another pass into an rgba32float target: its depths exactly (0.25 | 0.75); compared with ref
-//! 0.5 / 0.25 under each compare function (1 where `ref compare depth`, e.g. `less`: the right half). Pixel by pixel.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -10,7 +5,6 @@ use detour::xe::Xe;
 const W: u32 = 64;
 const H: u32 = 32;
 
-/// A full-target quad sampling binding 0 at uv: `fs` its fragment shader's body (returning `%out`), `sampler` its sampler.
 fn pipeline(sampler: &str, fs: &str) -> String {
     format!(
         r#"detour.pipeline @p {{vertex = @vs, fragment = @fs, topology = "triangle-strip", targets = ["rgba32float"], sampler = {sampler},
@@ -29,7 +23,7 @@ func.func @fs(%uv: vector<2xf32>) -> vector<4xf32> attributes {{detour.stage = "
 }
 
 const PLAIN: &str = r#"  %out = "detour.sample"(%uv) {binding = 0 : i64} : (vector<2xf32>) -> vector<4xf32>"#;
-/// The comparison with reference `r` (0.5 or 0.25), its result in r, g, b.
+
 fn compare(r: &str) -> String {
     format!(
         r#"  %ref = arith.constant {r} : f32
@@ -50,7 +44,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (left, right) = (cx.floats(&half(-1.0, 0.0, 0.25))?, cx.floats(&half(0.0, 1.0, 0.75))?);
     let quad = cx.floats(&[-1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0])?;
     let mut cases = vec![("the depths".to_owned(), pipeline("{}", PLAIN), [0.25, 0.75])];
-    // (function, reference, left | right): ref compare depth, the depths 0.25 | 0.75
     for (f, r, want) in [
         ("less", "0.5", [0.0, 1.0]),
         ("greater", "0.5", [1.0, 0.0]),

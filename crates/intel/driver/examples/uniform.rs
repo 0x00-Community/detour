@@ -1,7 +1,3 @@
-//! Uniform buffers in render shaders: a quad over the left half (x −1 .. 0) is moved right by 0.5 with a translation
-//! the vertex shader reads from binding 0, colored with what the fragment shader reads from binding 1; 1920x1080,
-//! cleared blue, checked pixel by pixel (orange exactly over x 480 .. 1440).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

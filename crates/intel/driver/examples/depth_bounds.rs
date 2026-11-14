@@ -1,9 +1,3 @@
-//! The depth bounds test (Vulkan `depthBoundsTestEnable`; pipeline `depth = {depth_bounds_min, depth_bounds_max}`) on
-//! Xe3: a depth buffer holding 0.25 on the left half and 0.75 on the right (drawn, depth cleared to 1), then a
-//! whole-target draw (depth test always, not written) in white bounded by [min, max]: it lands only where the depth
-//! already there is inside. [0, 0.5]: the left half; [0.5, 1]: the right; [0.3, 0.7]: nowhere; [0.25, 0.25]: the left
-//! (the bounds are inclusive). Pixel by pixel.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

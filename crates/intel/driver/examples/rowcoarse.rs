@@ -1,9 +1,3 @@
-//! vello_cpu's coarse rasterization of plain fills on Xe3 against vello_cpu's own, bit for bit (roadmap R8.4, its
-//! first part): a page of glyph-like paths, each filled with its own solid colour (opaque or not; non-zero or
-//! even-odd), drawn by a `detour::vello_cpu::RenderContext` whose `coarse()` is the reference; the GPU takes each path's strips
-//! and alphas (vello_common's, as that context makes them) and buckets them into the strip rows' render and depth
-//! commands (`rowcoarse/rowcoarse.mlir`, a row a lane, every path in draw order).
-
 use detour::base::vello_common::fearless_simd::Level;
 use detour::base::vello_common::flatten::{self, FlattenCtx, Line};
 use detour::base::vello_common::geometry::RectU16;
@@ -24,7 +18,6 @@ const PATHS: usize = 4000;
 const WIDTH: u16 = 1280;
 const HEIGHT: u16 = 800;
 
-/// xorshift64*
 struct Rng(u64);
 
 impl Rng {
@@ -43,7 +36,6 @@ impl Rng {
         KPoint::new(ox + self.unit() * size, oy + self.unit() * size)
     }
 
-    /// A glyph-like path (14 px), or now and then a big one (up to 600 px: its gaps span depth buckets).
     fn glyph(&mut self) -> BezPath {
         let size = if self.next() % 40 == 0 { 100.0 + self.unit() * 500.0 } else { 14.0 };
         let (ox, oy) = (self.unit() * (f64::from(WIDTH) - size * 0.5) - size * 0.25, self.unit() * (f64::from(HEIGHT) - size * 0.5) - size * 0.25);
@@ -74,7 +66,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = Rng(0x51ed_270b_27a6_12b4);
     let bbox = RectU16 { x0: 0, y0: 0, x1: WIDTH, y1: HEIGHT };
 
-    // vello_cpu's: the paths drawn, their coarse rasterization; and each path's strips and alphas as it makes them
     let mut ctx = RenderContext::new(WIDTH, HEIGHT);
     let mut resources = Resources::new();
     let mut tiles = Tiles::new(level, WIDTH, HEIGHT);
@@ -130,7 +121,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     r.dispatch(&kernel, groups, &[p0.addr as u32, nrows as u32, 0])?;
     let s = cx.submit(r.finish())?;
     cx.wait(s)?;
-    // the counts split, scanned, paired back (on the CPU here: a few hundred rows)
     let cv: Vec<(u32, u32)> = counts.bytes()?[..nlanes * 8].chunks(8).map(|c| (u32::from_le_bytes(c[..4].try_into().unwrap()), u32::from_le_bytes(c[4..].try_into().unwrap()))).collect();
     let _ = (&ccounts, &dcounts, &coffs, &doffs, &mut cblocks, &mut dblocks, &scan);
     let mut offs = Vec::with_capacity(nlanes);
@@ -155,7 +145,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db = depth.bytes()?.to_vec();
     let word = |b: &[u8], at: usize| u32::from_le_bytes(b[at..][..4].try_into().unwrap());
 
-    // a path a lane: its commands' slots from a (row, path) table's prefix sum, on the GPU
     let nt = nrows * PATHS;
     let (mut ctab, mut dtab) = (cx.buffer(&vec![0; nt * 4])?, cx.buffer(&vec![0; nt * 4])?);
     let (mut coffs, mut doffs) = (cx.buffer(&vec![0; nt * 4])?, cx.buffer(&vec![0; nt * 4])?);
@@ -206,7 +195,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })
             .collect();
         let want_d: Vec<(u16, u16, u32)> = row.depth.iter().map(|d| (d.buckets.start, d.buckets.end, d.attrs)).collect();
-        // the row's commands: its chunks' in turn
         let (co, dn) = offs[r * nchunks];
         let (rc, rd) = cv[r * nchunks..][..nchunks].iter().fold((0, 0), |(a, b), (c, d)| (a + c, b + d));
         let got_c: Vec<(u16, u16, u32, u32)> = (0..rc as usize).map(|i| {
@@ -219,7 +207,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let se = word(&db, at);
             (se as u16, (se >> 16) as u16, word(&db, at + 4))
         }).collect();
-        // the per-path version's row: its table row's slots, from (row, 0) to (row + 1, 0)
         let span = |o: &[u8], t: u32| -> (usize, usize) {
             let a = word(o, 4 * r * PATHS) as usize;
             let b = if r + 1 < nrows { word(o, 4 * (r + 1) * PATHS) as usize } else { t as usize };

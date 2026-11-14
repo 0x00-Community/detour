@@ -1,12 +1,3 @@
-//! Blur effects (`Frost`) on the GPU against a Rust model of the same definition (`detour::xe3::Frost`'s module
-//! docs), byte for byte. A 512 x 320 premultiplied canvas (gradients, stripes, noise, translucent patches) under, in
-//! order: frosted glass of 1 to 5 Kawase levels (fractional and off-canvas rects, radii past half the height, a region
-//! whose deep levels are 1 x 1, saturation past the unorm range, two overlapping, one over the wallpaper layer under a
-//! window), CSS filters of a straight and a premultiplied layer (with and without blur, colour matrices with offsets
-//! past the range, clipped, partly off the canvas) and drop shadows (fractional offsets, clipped, off the canvas).
-//! Then 1200 x 700 panels (σ 24) on 1920 x 1080: checked, and the GPU's time a panel (11 a frame against 1).
-//! `frost K` runs effect K of the first scene alone; `frost --mlir` prints the shaders.
-
 use detour::base::{Backdrop, Effect, Shadow};
 use detour::xe3::{Buffer, Canvas, Codegen, Context, Frost, Layer};
 use detour::xe::Xe;
@@ -16,7 +7,6 @@ use detour::base::{Gpu, Native};
 mod model;
 use model::*;
 
-/// xorshift64*
 struct Rng(u64);
 
 impl Rng {
@@ -28,8 +18,6 @@ impl Rng {
     }
 }
 
-/// Gradients, stripes and noise, opaque but for translucent patches (premultiplied: no channel above alpha); with
-/// `seed`'s noise.
 fn scene(w: usize, h: usize, seed: u64) -> Image {
     let mut rng = Rng(seed);
     let px = (0..w * h)
@@ -45,7 +33,6 @@ fn scene(w: usize, h: usize, seed: u64) -> Image {
     Image { w, h, px }
 }
 
-/// A layer: a disc, a ring and a translucent band on transparency, straight alpha (or premultiplied).
 fn layer(w: usize, h: usize, premultiplied: bool) -> Image {
     let px = (0..w * h)
         .map(|i| {
@@ -66,17 +53,14 @@ fn layer(w: usize, h: usize, premultiplied: bool) -> Image {
     Image { w, h, px }
 }
 
-/// One effect of a scene.
 #[derive(Clone, Copy)]
 enum Op {
-    /// over the wallpaper under a window when true
     Backdrop(Backdrop, bool),
     Filter(usize, Effect, [u32; 4], [u32; 4]),
     Shadow(usize, Shadow, [u32; 4], [u32; 4]),
 }
 
 impl Image {
-    /// `ops` over this canvas on the GPU `times` times, each checked against the model; the times, sorted.
     fn frost<'d>(&self, cx: &mut Context<'d, Xe, Native>, frost: &mut Frost<'d, Xe>, layers: &[(Image, bool)], under: &Image, ops: &[Op], times: usize) -> Result<Vec<std::time::Duration>, Box<dyn std::error::Error>> {
         let mut want = self.clone();
         for op in ops {
@@ -132,7 +116,6 @@ impl Image {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // `--mlir`: the shaders' source (for `--example lower`), no GPU
     if std::env::args().any(|a| a == "--mlir") {
         let codegen = Codegen::default();
         Frost::<Xe>::shaders(&codegen.0).iter().for_each(|(_, body)| println!("{}", codegen.0.show(body)));
@@ -155,7 +138,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Op::Shadow(1, Shadow { dx: -3.0, dy: 10.0, blur: 0.0, color: [0.9, 0.2, 0.1, 1.0] }, [10, 250, 140, 90], [0, 260, 512, 50]),
         Op::Shadow(0, Shadow { dx: 30.0, dy: -12.75, blur: 20.0, color: [0.2, 0.2, 0.2, 0.8] }, [430, 200, 140, 90], [0, 0, 512, 320]),
     ];
-    // `frost K`: effect K alone
     let only: Option<usize> = std::env::args().nth(1).and_then(|a| a.parse().ok());
     let ops: Vec<Op> = ops.into_iter().enumerate().filter(|(k, _)| only.is_none_or(|o| o == *k)).map(|(_, b)| b).collect();
     let layers = [(layer(140, 90, false), false), (layer(140, 90, true), true)];
@@ -173,8 +155,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let panel = Op::Backdrop(Backdrop { rect: [360.0, 190.0, 1200.0, 700.0], radius: 24.0, effect: model::frosted(24.0, 1.8, 1.05) }, false);
     let (canvas, under) = (scene(1920, 1080, 1), scene(1920, 1080, 2));
     canvas.frost(&mut cx, &mut frost, &layers, &under, &[panel; 3], 1)?;
-    // the GPU's time a panel: frames of 1 and of 11 back to back (no checking between them: the GPU stays clocked
-    // up), the best of 9 each
     let Op::Backdrop(b, _) = panel else { unreachable!() };
     let c = cx.buffer(&canvas.px.concat())?;
     let target = Canvas { addr: c.addr, size: [1920, 1080], stride: 1920 };

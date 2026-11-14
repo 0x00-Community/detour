@@ -1,11 +1,3 @@
-//! vello_cpu's coarse rasterization with layers on Xe3, bit for bit (roadmap R8.7): glyph-like fills inside nested
-//! clip and opacity layers, drawn by a `detour::vello_cpu::RenderContext` whose `coarse()` is the reference. The GPU takes the
-//! scene's events (fills, layer pops) with each one's strips and alphas (vello_common's, in recording order: a clip's
-//! at its push), the layers' boxes; it marks each (row, layer)'s first fill (`rowcoarse/layers.mlir`, pass 2), counts
-//! each event's commands a row into its (row, event) pairs, puts them in (row, event) order (`rowcoarse/pairs.mlir`),
-//! writes them (PushBuf / PaintFill / depth / LayerFill / PopBuf); bins them as fine.rs's Packed does (pushes taken
-//! back by a pop right after), and fine draws them: the pixels against vello_cpu's.
-
 use detour::base::vello_common::fearless_simd::Level;
 use detour::base::vello_common::flatten::{self, FlattenCtx, Line};
 use detour::base::vello_common::geometry::RectU16;
@@ -27,7 +19,6 @@ const FILLS: usize = 3000;
 const WIDTH: u16 = 1280;
 const HEIGHT: u16 = 800;
 
-/// xorshift64*
 struct Rng(u64);
 
 impl Rng {
@@ -46,7 +37,6 @@ impl Rng {
         KPoint::new(ox + self.unit() * size, oy + self.unit() * size)
     }
 
-    /// A glyph-like path of `size` px somewhere (a quarter of it past the left and top at most).
     fn glyph(&mut self, size: f64) -> BezPath {
         let (ox, oy) = (self.unit() * f64::from(WIDTH) - size * 0.25, self.unit() * f64::from(HEIGHT) - size * 0.25);
         let mut p = BezPath::new();
@@ -65,17 +55,12 @@ impl Rng {
     }
 }
 
-/// The scene as the GPU takes it.
 #[derive(Default)]
 struct Scene {
-    /// two u32 a strip
     strips: Vec<u32>,
     alphas: Vec<u8>,
-    /// eight i32 an event
     events: Vec<u32>,
-    /// eight i32 a layer: parent, its box in tiles
     layers: Vec<u32>,
-    /// an event's first row and rows
     prow: Vec<u32>,
     prcount: Vec<u32>,
     paints: u32,
@@ -83,7 +68,6 @@ struct Scene {
 }
 
 impl Scene {
-    /// A path's strips (fill rule `rule`) appended: (first, count, alpha base, its pixel box).
     fn strips(&mut self, level: Level, tiles: &mut Tiles, path: &BezPath, rule: Fill) -> (u32, u32, u32, Option<RectU16>) {
         let bbox = RectU16 { x0: 0, y0: 0, x1: WIDTH, y1: HEIGHT };
         let mut lines: Vec<Line> = Vec::new();
@@ -101,7 +85,6 @@ impl Scene {
         (first, s.len() as u32, base, strip_bbox(&s))
     }
 
-    /// Layer m's box in tiles (the viewport's for none).
     fn bx(&self, m: i32) -> [u32; 4] {
         if m < 0 {
             return [0, 0, u32::from(WIDTH.div_ceil(4)), u32::from(HEIGHT.div_ceil(4))];
@@ -110,7 +93,6 @@ impl Scene {
         [l[1], l[2], l[3], l[4]]
     }
 
-    /// An event's rows: first and count (none past the box).
     fn rows(&mut self, first: u32, last: u32) {
         let n = if last >= first { last - first + 1 } else { 0 };
         self.prow.extend([first, n]);
@@ -132,11 +114,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let level = Level::try_detect().unwrap_or(Level::baseline());
     let mut rng = Rng(0x0dd_ba11_cafe_f00d);
 
-    // the scene, into vello_cpu and into the GPU's events alike
     let mut ctx = RenderContext::new(WIDTH, HEIGHT);
     let mut tiles = Tiles::new(level, WIDTH, HEIGHT);
     let mut sc = Scene::default();
-    // the open layers: (index, its clip's strips (first, count, alpha base))
     let mut open: Vec<(i32, (u32, u32, u32))> = Vec::new();
     let (mut clips, mut max_depth) = (0, 0);
     let pop = |sc: &mut Scene, ctx: &mut RenderContext, (m, (cf, cn, ca)): (i32, (u32, u32, u32))| {
@@ -153,7 +133,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     for _ in 0..FILLS {
         if open.len() < 3 && rng.next() % 40 == 0 {
-            // a layer: a clip (2 in 3) of a big glyph, an opacity
             let parent = open.last().map_or(-1, |o| o.0);
             let clip = rng.next() % 3 != 0;
             let opacity = if rng.next() % 2 == 0 { 1.0 } else { 0.3 + rng.unit() as f32 * 0.6 };
@@ -194,7 +173,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let m = open.last().map_or(-1, |o| o.0);
         sc.events.extend([0, f, n, ab, sc.paints, u32::from(opaque && m < 0), m as u32, 0]);
         sc.paints += u32::from(n > 0);
-        // its rows: its strips' (but the sentinel) within its box
         let b = sc.bx(m);
         let row = |i: u32| sc.strips[2 * (f + i) as usize] >> 18;
         let (r0, r1) = if n >= 2 { (row(0).max(b[1]), row(n - 2).min(b[3].max(1) - 1)) } else { (1, 0) };
@@ -214,7 +192,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     sc.strips.resize(sc.strips.len().max(2), 0);
     println!("{FILLS} fills, {} layers ({clips} clipped, {max_depth} deep at most), {nev} events", sc.layers.len() / 8);
 
-    // the GPU
     let (cols, rows) = (u32::from(WIDTH.div_ceil(4)), u32::from(HEIGHT.div_ceil(4)));
     let nrows = rows as usize;
     let words = |v: &[u32]| v.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<u8>>();
@@ -268,7 +245,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     cx.wait(s)?;
     let coarse_ms = t.elapsed().as_secs_f64() * 1e3;
 
-    // the rows against vello_cpu's (a push's span left out: fine does not read it)
     let word = |b: &[u8], at: usize| u32::from_le_bytes(b[at..][..4].try_into().unwrap());
     let (mut coffs, mut doffs, mut rowstart) = (coffs, doffs, rowstart);
     let (cob, dob, rsb, cb, db) = (coffs.bytes()?.to_vec(), doffs.bytes()?.to_vec(), rowstart.bytes()?.to_vec(), cmds.bytes()?.to_vec(), depth.bytes()?.to_vec());
@@ -306,7 +282,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  first wrong: row {}: {} commands (want {}), first differing {:?}; {} depth (want {})", b.0, b.1, b.2, b.3, b.4, b.5);
     }
 
-    // binned for fine, drawn
     let nb = usize::from(WIDTH).div_ceil(128);
     let nbl = nrows * nb;
     let (bcc, bdc, bco, bdo) = (cx.buffer(&zeros(nbl))?, cx.buffer(&zeros(nbl))?, cx.buffer(&zeros(nbl))?, cx.buffer(&zeros(nbl))?);
@@ -340,7 +315,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let s = cx.submit(r.finish())?;
     cx.wait(s)?;
     let got = fbuf.bytes()?[(at.out - faddr) as usize..][..ftiles.pixels()].to_vec();
-    // the bins against fine.rs's packing of vello_cpu's rows
     let (mut want_rows, mut want_cmds, mut want_depth) = (Vec::<u32>::new(), Vec::<u32>::new(), Vec::<u32>::new());
     for row in coarse.rows.iter().take(nrows) {
         for b in 0..nb as u32 {

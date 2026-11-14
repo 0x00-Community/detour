@@ -1,10 +1,3 @@
-//! Indirect draws (`drawIndirect`, `drawIndexedIndirect`): the arguments read from a buffer when the GPU draws, into a
-//! 1920x1080 target cleared blue, checked pixel by pixel. The `indexed` example's two quads, now indexed indirect (the
-//! second from index 3 with base vertex 4, in the arguments), a third quad drawn sequentially from vertex 4 (indirect,
-//! first vertex in the arguments), a draw of 0 instances (nothing), and a quad whose vertex count a compute shader
-//! writes into the arguments in the same frame, just before the draw reads them. Then indirect dispatches
-//! (`dispatchWorkgroupsIndirect`): a 3 x 2 x 2 grid, and one whose counts a dispatch writes in the same frame.
-
 use detour::base::{Gpu, IndexFormat, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -14,8 +7,6 @@ const BLUE: [u8; 4] = [0, 0, 255, 255];
 const W: u32 = 1920;
 const H: u32 = 1080;
 
-/// Quads (x, y in clip space, y down), 4 vertices each: the left half, the bottom of the right quarter; then two
-/// triangle-list quads of 6 vertices: the last eighth's top quarter, the fifth eighth's top quarter.
 #[rustfmt::skip]
 const VERTICES: [f32; 40] = [
     -1.0, -1.0,   0.0, -1.0,   -1.0, 1.0,   0.0, 1.0,
@@ -25,8 +16,6 @@ const VERTICES: [f32; 40] = [
 ];
 const QUAD: [u32; 6] = [0, 1, 2, 2, 1, 3];
 
-/// Each workgroup (x, y, z) of an `nx × ny × nz` grid stores its index + 1 at dword (z ny + y) nx + x of `out` (one
-/// invocation does).
 const MARK: &str = r#"
 func.func @mark(%out: i32, %nx: i32, %ny: i32) attributes {detour.stage = "compute"} {
   %x = "detour.workgroup_id"() {dim = 0 : i32} : () -> i32
@@ -51,7 +40,6 @@ func.func @mark(%out: i32, %nx: i32, %ny: i32) attributes {detour.stage = "compu
 }
 "#;
 
-/// Stores `value` at byte address `at` (one invocation does).
 const WRITE: &str = r#"
 func.func @write(%at: i32, %value: i32) attributes {detour.stage = "compute"} {
   %l = "detour.lane"() : () -> i32
@@ -77,10 +65,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ib16 = cx.buffer(&short)?;
     let long: Vec<u8> = [9, 9, 9].iter().chain(&QUAD).flat_map(|i: &u32| i.to_le_bytes()).collect();
     let ib32 = cx.buffer(&long)?;
-    // the arguments, u32s: indexed [count, instances, first index, base vertex, first instance] × 2 (from 0, 20), then
-    // sequential [count, instances, first vertex, first instance] × 3 (from 40, 56, 72): the third quad, 0 instances
-    // of vertices 0 ..= 5 (a triangle over blue if drawn),
-    // and the fourth quad with a count of 0 the compute shader makes 6
     let words: [u32; 22] = [6, 1, 0, 0, 0, 6, 1, 3, 4, 0, 6, 1, 8, 0, 6, 0, 0, 0, 0, 1, 14, 0];
     let args = cx.buffer(&words.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<_>>())?;
     let mut target = cx.target(W, H, TextureFormat::Rgba8Unorm, MemType::Coherent)?;
@@ -102,9 +86,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for y in 0..H {
         for x in 0..W {
             let p: [u8; 4] = px[((y * W + x) * 4) as usize..][..4].try_into()?;
-            // the left half; the right quarter's bottom (indexed, base vertex 4); the last eighth's top quarter
-            // (sequential from 8);
-            // the fifth eighth's top quarter (the count the compute shader wrote)
             let right = x >= W * 3 / 4;
             let third = (W / 2..W * 5 / 8).contains(&x);
             let last = x >= W * 7 / 8;
@@ -122,8 +103,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Indirect dispatches: a 3 x 2 x 2 grid from arguments in a buffer, then a 4 x 1 x 3 one whose counts a dispatch
-/// writes in the same frame; each workgroup's mark where it should be, nothing past the grid.
 fn dispatches<'d>(cx: &mut Context<'d, Xe, Native>, codegen: &Codegen<'_>, write: &detour::xe3::Kernel) -> Result<(), Box<dyn std::error::Error>> {
     let mark = cx.kernel(codegen, MARK, "mark")?;
     let args = cx.buffer(&[3u32, 2, 2, 0, 0, 0].iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<_>>())?;

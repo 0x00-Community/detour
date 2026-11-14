@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::RasterizerSettings;
 use crate::vello_cpu::coarse::CommandBucketer;
 use crate::vello_cpu::coarse::depth::DepthBuffer;
@@ -28,28 +25,16 @@ use vello_common::strip_generator::{GenerationMode, StripStorage};
 use vello_common::util::strip_bbox;
 use vello_common::viewport::ViewportState;
 
-/// Single-threaded implementation of the rendering dispatcher.
 #[derive(Debug)]
 pub(crate) struct SingleThreadedDispatcher {
-    /// Reusable coarse bucketer that converts recorded commands into per-row render commands.
     bucketer: RefCell<CommandBucketer>,
-    /// Viewport state.
     viewport: ViewportState,
-    /// Recorder for root and filter-layer command streams, plus layer metadata.
     recorder: CommandRecorder<RecordedFill>,
-    /// Storage for generated strips and alpha coverage data.
     strip_storage: StripStorage,
-    /// SIMD level for fearless SIMD dispatch.
     level: Level,
 }
 
 impl SingleThreadedDispatcher {
-    /// Creates a new single-threaded dispatcher for the given dimensions.
-    ///
-    /// # Arguments
-    /// * `width` - Width of the rendering surface in pixels.
-    /// * `height` - Height of the rendering surface in pixels.
-    /// * `level` - SIMD level to use for rasterization.
     pub(crate) fn new(width: u16, height: u16, level: Level) -> Self {
         Self {
             bucketer: RefCell::new(CommandBucketer::from_wh(width, height)),
@@ -60,10 +45,6 @@ impl SingleThreadedDispatcher {
         }
     }
 
-    /// Rasterizes the scene using f32 precision (high quality).
-    ///
-    /// This dispatches to the appropriate SIMD implementation based on the
-    /// configured level, using f32 for intermediate calculations.
     #[cfg(all())]
     fn rasterize_f32(
         &self,
@@ -79,10 +60,6 @@ impl SingleThreadedDispatcher {
         dispatch!(self.level, simd => self.rasterize_with::<_, F32Kernel>(simd, target, scene_width, scene_height, settings, encoded_paints, image_resolver));
     }
 
-    /// Rasterizes the scene using u8 precision (fast).
-    ///
-    /// This dispatches to the appropriate SIMD implementation based on the
-    /// configured level, using u8 for intermediate calculations to maximize speed.
     #[cfg(all())]
     fn rasterize_u8(
         &self,
@@ -98,8 +75,6 @@ impl SingleThreadedDispatcher {
         dispatch!(self.level, simd => self.rasterize_with::<_, U8Kernel>(simd, target, scene_width, scene_height, settings, encoded_paints, image_resolver));
     }
 
-    // Note: We purposefully don't add `vectorize` to each of these helpers,
-    // since vectorization is applied wherever necessary in child functions.
     fn rasterize_with<S: Simd, F: FineKernel<S>>(
         &self,
         simd: S,
@@ -186,7 +161,6 @@ impl SingleThreadedDispatcher {
         target_init: TargetInit<PremulColor>,
         root_is_blend_target: bool,
     ) {
-        // TODO: Reuse fine and depth buffer across targets?
         let mut fine = Fine::<S, F>::new(simd, bucketer.width());
         let mut depth = DepthBuffer::new(bucketer.width());
         regions.update(|region| {
@@ -223,12 +197,7 @@ impl SingleThreadedDispatcher {
         encoded_paints: &[EncodedPaint],
         image_resolver: &dyn ImageResolver,
     ) -> FilterContext {
-        // TODO: Reuse across frames so that pixmaps can be reused.
         let mut filter_ctx = FilterContext::new(self.recorder.layers.len());
-        // We record filter layers upon "push", so nested filter layers get added after their
-        // parents. Subsequent sibling filter layers also get added after the previous layer they
-        // are composited into. Therefore, iterating in reverse order is enough to ensure that all
-        // dependencies have been rendered before they are invoked.
         for id in self.recorder.filter_layers.iter().rev().copied() {
             let RecordedLayerKind::Filter {
                 filter_data: filter_plan,
@@ -244,8 +213,6 @@ impl SingleThreadedDispatcher {
 
             let width = pixmap_bbox.width();
             let height = pixmap_bbox.height();
-            // TODO: See https://github.com/linebender/vello/pull/1701#discussion_r3400709986, explore
-            // using pools for more resources.
             let mut pixmap = Pixmap::new(width, height);
             let params = FineRenderParams {
                 scene_size: (width, height),
@@ -271,10 +238,6 @@ impl SingleThreadedDispatcher {
                 filter_ctx.scratch(),
                 filter_plan.transform,
             );
-
-            // Save the filtered pixmap to disk for debugging.
-            // #[cfg(all(debug_assertions, all(), all()))]
-            // save_filtered_layer_debug(&pixmap, id);
 
             filter_ctx.set_layer(id as usize, pixmap);
         }
@@ -416,14 +379,12 @@ impl Dispatcher for SingleThreadedDispatcher {
     }
 
     fn reset(&mut self, width: u16, height: u16) {
-        // Bucketer will be reset on demand, so no need to reset it here.
         self.recorder.reset(width, height);
         self.strip_storage.clear();
         self.viewport.reset(width, height);
     }
 
     fn flush(&mut self) {
-        // No-op for single-threaded dispatcher (no work queue to flush).
     }
 
     fn rasterize(
@@ -435,7 +396,6 @@ impl Dispatcher for SingleThreadedDispatcher {
         encoded_paints: &[EncodedPaint],
         image_resolver: &dyn ImageResolver,
     ) {
-        // If only the u8 pipeline is enabled, then use it.
         #[cfg(all(all(), not(all())))]
         {
             self.rasterize_u8(
@@ -448,7 +408,6 @@ impl Dispatcher for SingleThreadedDispatcher {
             );
         }
 
-        // If only the f32 pipeline is enabled, then use it.
         #[cfg(all(all(), not(all())))]
         {
             self.rasterize_f32(
@@ -461,11 +420,9 @@ impl Dispatcher for SingleThreadedDispatcher {
             );
         }
 
-        // If both pipelines are enabled, select precision based on render mode parameter.
         #[cfg(all(all(), all()))]
         match settings.render_mode {
             crate::vello_cpu::RenderMode::OptimizeSpeed => {
-                // Use u8 precision for faster rendering.
                 self.rasterize_u8(
                     target,
                     scene_width,
@@ -476,7 +433,6 @@ impl Dispatcher for SingleThreadedDispatcher {
                 );
             }
             crate::vello_cpu::RenderMode::OptimizeQuality => {
-                // Use f32 precision for higher quality.
                 self.rasterize_f32(
                     target,
                     scene_width,
@@ -490,8 +446,6 @@ impl Dispatcher for SingleThreadedDispatcher {
 
         #[cfg(all(not(all()), not(all())))]
         {
-            // This case never gets hit because there is a compile_error in the root.
-            // But have this code disables some warnings and makes the compile error easier to read
             let _ = (
                 target,
                 scene_width,
@@ -522,8 +476,6 @@ impl Dispatcher for SingleThreadedDispatcher {
         self.viewport.pop_clip();
     }
 
-    // detour: the filter layers rendered and filtered (the u8 kernel: what detour's fine rasterization reproduces), then
-    // the root bucketed, as `rasterize_with` up to its fine rasterization
     fn coarse<'s>(&'s self, (width, height): (u16, u16), encoded_paints: &'s [EncodedPaint], image_resolver: &dyn ImageResolver) -> Option<crate::vello_cpu::detour::Coarse<'s>> {
         use crate::vello_cpu::fine::U8Kernel;
         use vello_common::fearless_simd::dispatch;
@@ -536,8 +488,6 @@ impl Dispatcher for SingleThreadedDispatcher {
         }))
     }
 
-    // detour: each filter layer bucketed alone over its pixmap's bbox (the order `rasterize_filter_layers` draws them),
-    // painted with as an image by id, then the root
     fn coarse_layered<'s>(&'s self, (width, height): (u16, u16), encoded_paints: &'s [EncodedPaint]) -> Option<crate::vello_cpu::detour::Layered<'s>> {
         let filter_ctx = FilterContext::elsewhere();
         let mut bucketer = self.bucketer.borrow_mut();
@@ -566,8 +516,6 @@ impl Dispatcher for SingleThreadedDispatcher {
     }
 }
 
-/// Saves a filtered pixmap to disk for debugging purposes.
-/// Only available in debug builds with `std` and `png` features enabled.
 #[allow(
     dead_code,
     reason = "useful debug utility, can be enabled by uncommenting the call site"
@@ -592,15 +540,10 @@ mod tests {
     use vello_common::color::palette::css::BLUE;
     use vello_common::paint::PremulColor;
 
-    /// Verifies that `reset()` properly clears all internal buffers and state.
-    ///
-    /// This is important to ensure that a dispatcher can be reused for multiple
-    /// rendering passes without accumulating stale data from previous frames.
     #[test]
     fn buffers_cleared_on_reset() {
         let mut dispatcher = SingleThreadedDispatcher::new(100, 100, Level::new());
 
-        // Render a simple shape to populate internal buffers.
         dispatcher.fill_path(
             &Rect::new(0.0, 0.0, 50.0, 50.0).to_path(0.1),
             Fill::NonZero,
@@ -611,13 +554,11 @@ mod tests {
             None,
         );
 
-        // Ensure there is data to clear.
         assert!(!dispatcher.strip_storage.strips.is_empty());
         assert!(!dispatcher.recorder.nodes.is_empty());
 
         dispatcher.reset(100, 100);
 
-        // Verify all buffers are cleared.
         assert!(dispatcher.strip_storage.strips.is_empty());
         assert!(dispatcher.strip_storage.alphas.is_empty());
         assert!(dispatcher.recorder.nodes.is_empty());

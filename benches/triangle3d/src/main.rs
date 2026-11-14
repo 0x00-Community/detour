@@ -1,36 +1,27 @@
-//! A triangle turning in 3D: every frame the CPU turns it (about y, tilted about x), places it in front of a
-//! perspective camera and writes the clip-space corners (with w) into the vertex buffer; the GPU divides by w and
-//! interpolates the colors. `cargo run -p triangle3d` on Xe3.
-
 use detour::base::{Gpu, Native};
 use detour::xe3::{Buffer, Codegen, Context, Error, Pipeline, Recorder};
 use detour::xe::Xe;
 use triangle::{BACKGROUND, Scene, Shown};
 
-/// The corners in model space (y up), and their colors.
 const CORNERS: [([f32; 3], [f32; 4]); 3] = [
     ([0.0, 0.8, 0.0], [1.0, 0.0, 0.0, 1.0]),
     ([-0.8, -0.6, 0.0], [0.0, 1.0, 0.0, 1.0]),
     ([0.8, -0.6, 0.0], [0.0, 0.0, 1.0, 1.0]),
 ];
-/// Turns per second about y, and the fixed tilt about x.
+
 const SPIN: f32 = 0.25;
 const TILT: f32 = 0.35;
 
-/// A perspective camera at the origin looking down +z.
 struct Camera {
-    /// 1 / tan(fov / 2) for a 60° vertical field of view
     focal: f32,
     near: f32,
     far: f32,
-    /// how far in front of the camera the triangle turns
     distance: f32,
 }
 
 impl Camera {
     const SEEN: Self = Self { focal: 1.732_050_8, near: 0.1, far: 10.0, distance: 2.5 };
 
-    /// A model-space point, turned by `angle` about y and the tilt about x, in clip space (x, y down, z in [0, w], w).
     fn clip(&self, [x, y, z]: [f32; 3], angle: f32, aspect: f32) -> [f32; 4] {
         let (s, c) = angle.sin_cos();
         let (x, z) = (c * x + s * z, -s * x + c * z);
@@ -47,7 +38,6 @@ struct Triangle3d<'d> {
 }
 
 impl Triangle3d<'_> {
-    /// The vertex buffer's floats at `angle`: per corner its clip position, then its color.
     fn vertices(angle: f32, aspect: f32) -> [f32; 24] {
         let mut out = [0.0; 24];
         for (to, (p, color)) in out.as_chunks_mut::<8>().0.iter_mut().zip(CORNERS) {
@@ -67,7 +57,6 @@ impl<'d> Scene<'d> for Triangle3d<'d> {
     }
 
     fn record(&mut self, r: &mut Recorder<'_, 'd, Xe, Native>, seconds: f32, (w, h): (u32, u32)) -> Result<(), Error> {
-        // the previous frame was waited for, so the buffer is free to rewrite
         let angle = seconds * SPIN * std::f32::consts::TAU;
         let floats = Self::vertices(angle, w as f32 / h as f32);
         for (to, f) in self.vertices.bytes()?.as_chunks_mut::<4>().0.iter_mut().zip(floats) {
@@ -80,9 +69,6 @@ impl<'d> Scene<'d> for Triangle3d<'d> {
         true
     }
 
-    /// The first frame is at (about) angle 0: the corners of the window are background, and the projected centroid is
-    /// inside the triangle (not background) with the colors mixed — perspective-correct, so equal only at w-equal
-    /// corners, hence the loose bound.
     fn check(&self, px: &[u8], (w, h): (u32, u32)) -> Result<(), String> {
         let at = |x: u32, y: u32| -> [u8; 4] { px[((y * w + x) * 4) as usize..][..4].try_into().unwrap_or_default() };
         for (x, y) in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)] {

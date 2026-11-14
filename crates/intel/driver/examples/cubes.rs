@@ -1,9 +1,3 @@
-//! Cube textures (`texture_cube`, `Context::texture_cube`) on Xe3, pixel by pixel: six 4 x 4 faces of distinct
-//! texels, a 24 x 4 target whose pixel (x, y) samples (nearest) face x / 4, texel (x % 4, y), by the direction that
-//! picks it: Vulkan / WebGPU's cube map face selection (major axis; +x: s = −z, t = −y; −x: s = z, t = −y; +y: s = x,
-//! t = z; −y: s = x, t = −z; +z: s = x, t = −y; −z: s = −x, t = −y) inverted at the texel's center, scaled by 3 (only
-//! the direction matters: `cube = true` normalizes it, as Xe3's sampler clamps coordinates to −1 ..= 1 first).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -28,7 +22,6 @@ fn texel(face: u32, x: u32, y: u32) -> [u8; 4] {
     [(face * 40 + 10) as u8, (x * 60 + 5) as u8, (y * 60 + 7) as u8, 255]
 }
 
-/// The direction sampling face `f`'s texel at (u, v) (s, t = 2u − 1, 2v − 1, the major axis 1).
 fn direction(f: u32, u: f32, v: f32) -> [f32; 3] {
     let (s, t) = (2.0 * u - 1.0, 2.0 * v - 1.0);
     match f {
@@ -48,7 +41,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let p = cx.pipeline(&codegen, PIPELINE, "cubed")?;
     let faces: Vec<Vec<u8>> = (0..6).map(|f| (0..4).flat_map(|y| (0..4).flat_map(move |x| texel(f, x, y))).collect()).collect();
     let tex = cx.texture_cube(4, TextureFormat::Rgba8Unorm, [&faces[0], &faces[1], &faces[2], &faces[3], &faces[4], &faces[5]])?;
-    // a quad a pixel, its direction constant over it
     let mut v = Vec::new();
     for y in 0..H {
         for x in 0..W {

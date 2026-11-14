@@ -1,8 +1,3 @@
-//! The depth test, 1920x1080, checked pixel by pixel. Clear: blue, depth 1. A red quad (left two thirds) at z 0.25,
-//! then a green one (right two thirds) at z 0.75 drawn after it: where they overlap the nearer red stays. Then a
-//! yellow full-target quad at z 0.5 that does not write depth (passes only over the green), then a cyan one at z 0.6:
-//! it passes where yellow went only if yellow left the depth at 0.75. So: left two thirds red, the rest cyan.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -12,7 +7,6 @@ const H: u32 = 1080;
 const RED: [u8; 4] = [255, 0, 0, 255];
 const CYAN: [u8; 4] = [0, 255, 255, 255];
 
-/// A rectangle `x0..x1` (clip space, full height) at depth `z` in one color: two triangles, each vertex x y z w r g b a.
 fn quad(x0: f32, x1: f32, z: f32, rgba: [f32; 4]) -> Vec<f32> {
     let corners = [(x0, -1.0), (x1, -1.0), (x0, 1.0), (x0, 1.0), (x1, -1.0), (x1, 1.0)];
     corners.iter().flat_map(|&(x, y)| [x, y, z, 1.0].into_iter().chain(rgba)).collect()
@@ -50,7 +44,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for y in 0..H {
         for x in 0..W {
             let p: [u8; 4] = px[((y * W + x) * 4) as usize..][..4].try_into()?;
-            // clip x = 1/3 is the pixel edge at 2 W / 3
             let want = if x < W * 2 / 3 { RED } else { CYAN };
             if p != want {
                 bad.push((x, y, p));

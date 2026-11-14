@@ -1,17 +1,11 @@
-// Copyright 2026 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use vello_common::pixmap::Pixmap;
 
 #[derive(Debug, Default)]
 pub(crate) struct FilterContext {
-    /// The rendered pixmaps for each filter layer.
     layers: Vec<Option<Arc<Pixmap>>>,
     scratch: ScratchBuffer,
-    /// detour: the filter layers are drawn elsewhere (on the GPU): each one an image by id
-    /// (`detour::FILTER_IMAGE_BASE` + its layer id) rather than a pixmap
     elsewhere: bool,
 }
 
@@ -24,12 +18,10 @@ impl FilterContext {
         }
     }
 
-    /// detour: every filter layer drawn elsewhere, an image by id.
     pub(crate) fn elsewhere() -> Self {
         Self { elsewhere: true, ..Self::default() }
     }
 
-    /// detour: what filter layer `id` is painted with: its pixmap, or its image by id when drawn elsewhere.
     pub(crate) fn filter_source(&self, id: usize) -> Option<vello_common::paint::ImageSource> {
         use vello_common::paint::{ImageId, ImageSource};
         if self.elsewhere {

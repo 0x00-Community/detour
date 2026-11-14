@@ -1,16 +1,3 @@
-// Copyright 2025 the Vello Authors and the Parley Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! Vello CPU glyph rendering backend.
-//!
-//! Provides [`GlyphAtlas`] (atlas backed by per-page [`Pixmap`]s) and the
-//! [`GlyphRenderer`](glifo::GlyphRenderer) implementation for [`RenderContext`] that
-//! rasterises glyphs into CPU-accessible pixel buffers.
-//!
-//! The key difference from the GPU backend is that atlas pages are owned as
-//! [`Arc<Pixmap>`]s here, so the CPU renderer can read pixels directly without
-//! any GPU upload step.
-
 use crate::vello_cpu::render::{ATLAS_IMAGE_ID_BASE, DEFAULT_GLYPH_ATLAS_SIZE};
 use crate::vello_cpu::{
     Image, ImageSource, PaintType, Pixmap, RasterizerSettings, RenderContext, RenderMode,
@@ -42,19 +29,8 @@ pub(crate) struct GlyphAtlasResources {
     pub(crate) glyph_atlas: GlyphAtlas,
     pub(crate) image_cache: ImageCache,
     pub(crate) glyph_renderer: Box<RenderContext>,
-    /// One `Pixmap` per atlas page, grown on demand.
-    // It's a bit annoying to have this in an `Arc`, but it needs to be this way. During fine
-    // rasterization, we need to be able to easily clone the atlas page so that it can be shared
-    // across multiple threads. However, we also need to be able to mutate the pixmap to
-    // sync new glyphs. The way this is achieved is by calling `Arc::get_mut` when syncing
-    // (at this point, the pixmap isn't shared anywhere else). Before fine rasterization, we
-    // then share it with the image registry such that it can easily be fetched and cloned during
-    // fine rasterization. After that, we remove it from the image registry, such that it's uniquely
-    // owned again and can be mutated in the next frame.
     pub(crate) pixmaps: Vec<Arc<Pixmap>>,
-    /// Width of each atlas page in pixels.
     page_width: u16,
-    /// Height of each atlas page in pixels.
     page_height: u16,
 }
 
@@ -87,7 +63,6 @@ impl GlyphAtlasResources {
     }
 }
 
-/// Ensure a pixmap exists for the given page, creating it if needed.
 fn ensure_page(
     pixmaps: &mut Vec<Arc<Pixmap>>,
     page_width: u16,
@@ -130,14 +105,12 @@ impl Resources {
         }
     }
 
-    /// Upload all pending bitmaps, rasterize pending outline/COLR glyphs, etc.
     fn sync_glyph_cache(&mut self, render_mode: RenderMode) {
         let glyph_resources = self
             .glyph_resources
             .as_mut()
             .expect("glyph atlas resources must exist before syncing");
 
-        // Upload all pending bitmap glyphs to the image atlas.
         for upload in glyph_resources.glyph_atlas.drain_pending_uploads() {
             let page_index = upload.atlas_slot.page_index as usize;
             ensure_page(
@@ -158,8 +131,6 @@ impl Resources {
             );
         }
 
-        // Draw all new COLR/outline glyphs into the render context, and then composite them into the
-        // existing atlas page.
         let glyph_renderer = glyph_resources.glyph_renderer.as_mut();
         glyph_resources
             .glyph_atlas
@@ -306,13 +277,8 @@ impl<'a> GlyphRunBackend<'a> for CpuGlyphRunBackend<'a> {
     }
 }
 
-/// A glyph run builder.
 pub type GlyphRunBuilder<'a> = glifo::GlyphRunBuilder<'a, CpuGlyphRunBackend<'a>>;
 
-/// Zero out a rectangular region in the atlas pixmap.
-///
-/// Necessary because atlas rendering uses `SrcOver` blending,
-/// so stale pixels from evicted glyphs would bleed through if not cleared.
 fn clear_pixmap_region(dst: &mut Pixmap, rect: PendingClearRect) {
     let dst_stride = dst.width() as usize;
     let dst_data = dst.data_as_u8_slice_mut();
@@ -326,7 +292,6 @@ fn clear_pixmap_region(dst: &mut Pixmap, rect: PendingClearRect) {
     }
 }
 
-/// Copy bitmap glyph pixels into a rectangular region of an atlas page.
 fn copy_pixmap_to_atlas(
     src: &Pixmap,
     dst: &mut Pixmap,
@@ -473,7 +438,6 @@ impl glifo::GlyphRenderer for RenderContext {
     }
 }
 
-/// Debug utilities for visualizing glyph bounds during rasterization.
 #[cfg(debug_assertions)]
 #[allow(
     dead_code,
@@ -491,25 +455,21 @@ mod debug {
 
     static COLOR_INDEX: AtomicUsize = AtomicUsize::new(0);
 
-    /// Twelve semi-transparent rotating colours for distinguishing adjacent
-    /// glyph bounds. Each call to [`fill_glyph_bounds`] advances the index.
     const COLORS: [peniko::Color; 12] = [
-        peniko::Color::new([1.0, 0.0, 0.0, 0.5]), // Red
-        peniko::Color::new([0.0, 1.0, 0.0, 0.5]), // Green
-        peniko::Color::new([0.0, 0.0, 1.0, 0.5]), // Blue
-        peniko::Color::new([1.0, 1.0, 0.0, 0.5]), // Yellow
-        peniko::Color::new([1.0, 0.0, 1.0, 0.5]), // Magenta
-        peniko::Color::new([0.0, 1.0, 1.0, 0.5]), // Cyan
-        peniko::Color::new([1.0, 0.5, 0.0, 0.5]), // Orange
-        peniko::Color::new([0.5, 0.0, 1.0, 0.5]), // Purple
-        peniko::Color::new([0.0, 1.0, 0.5, 0.5]), // Mint
-        peniko::Color::new([1.0, 0.5, 0.5, 0.5]), // Pink
-        peniko::Color::new([0.5, 1.0, 0.5, 0.5]), // Light green
-        peniko::Color::new([0.5, 0.5, 1.0, 0.5]), // Light blue
+        peniko::Color::new([1.0, 0.0, 0.0, 0.5]),
+        peniko::Color::new([0.0, 1.0, 0.0, 0.5]),
+        peniko::Color::new([0.0, 0.0, 1.0, 0.5]),
+        peniko::Color::new([1.0, 1.0, 0.0, 0.5]),
+        peniko::Color::new([1.0, 0.0, 1.0, 0.5]),
+        peniko::Color::new([0.0, 1.0, 1.0, 0.5]),
+        peniko::Color::new([1.0, 0.5, 0.0, 0.5]),
+        peniko::Color::new([0.5, 0.0, 1.0, 0.5]),
+        peniko::Color::new([0.0, 1.0, 0.5, 0.5]),
+        peniko::Color::new([1.0, 0.5, 0.5, 0.5]),
+        peniko::Color::new([0.5, 1.0, 0.5, 0.5]),
+        peniko::Color::new([0.5, 0.5, 1.0, 0.5]),
     ];
 
-    /// Fill the glyph's pixel bounds with the next rotating debug colour.
-    /// Call before rendering the actual glyph content to visualise the extent.
     pub fn fill_glyph_bounds(renderer: &mut RenderContext, raster_metrics: &RasterMetrics) {
         let idx = COLOR_INDEX.fetch_add(1, Ordering::Relaxed) % COLORS.len();
         renderer.set_transform(Affine::IDENTITY);

@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::fine::NumericVec;
 use crate::vello_cpu::peniko;
 use core::slice::ChunksExact;
@@ -23,9 +20,6 @@ pub(crate) fn calculate_t_vals<S: Simd, U: SimdGradientKind<S>>(
     start_x: f64,
     start_y: f64,
 ) {
-    // detour: every pixel's position on its own, in f32 with fused multiply-adds, from the transform's image of the
-    // first pixel center (`Positions`): what detour's fine rasterization on the GPU computes the same way. Upstream
-    // adds `2 x_advance` in f64 from the span's start, which depends on where the span starts.
     let p = Positions::of(gradient);
     simd.vectorize(
         #[inline(always)]
@@ -87,9 +81,6 @@ impl<S: Simd> Iterator for GradientPainter<'_, S> {
         let t_vals = apply_extend(pos, extend);
         let valid = pos.simd_eq(pos);
         let indices = (t_vals * self.scale_factor).to_int::<u32x8<S>>();
-        // In case we had any NaN's, set the index to an explicit invalid sentinel. There
-        // probably is architecture-specific behavior how NaN will be converted to
-        // f32, so we apply our own handling of that.
         let indices = self.simd.select_u32x8(
             valid,
             indices,
@@ -139,7 +130,6 @@ impl<S: Simd> crate::vello_cpu::fine::Painter for GradientPainter<'_, S> {
             },
         );
 
-        // Mask any potential NaN positions.
         if let Some(mut masked_iter) = masked_iter.take() {
             self.simd.vectorize(
                 #[inline(always)]
@@ -193,7 +183,6 @@ impl<S: Simd> crate::vello_cpu::fine::Painter for GradientPainter<'_, S> {
             },
         );
 
-        // Mask any potential NaN positions.
         if let Some(mut masked_iter) = masked_iter.take() {
             self.simd.vectorize(
                 #[inline(always)]
@@ -237,7 +226,6 @@ pub(crate) fn apply_extend<S: Simd>(val: f32x8<S>, extend: peniko::Extend) -> f3
     match extend {
         peniko::Extend::Pad => val.max(0.0).min(1.0),
         peniko::Extend::Repeat => (val - val.floor()).fract(),
-        // See <https://github.com/google/skia/blob/220738774f7a0ce4a6c7bd17519a336e5e5dea5b/src/opts/SkRasterPipeline_opts.h#L6472-L6475>
         peniko::Extend::Reflect => ((val - 1.0) - 2.0 * ((val - 1.0) * 0.5).floor() - 1.0)
             .abs()
             .max(0.0)

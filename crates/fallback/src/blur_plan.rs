@@ -1,6 +1,3 @@
-//! A dual Kawase blur for a gaussian sigma (moved back from acde's acde-model plan.rs): how many levels, the sampling
-//! offset that matches the variance, and a mix toward the source when the blur is smaller than one level.
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Blur {
     pub levels: u32,

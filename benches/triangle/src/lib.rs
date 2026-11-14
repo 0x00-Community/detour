@@ -1,10 +1,3 @@
-//! A window detour draws into: each frame is recorded on Xe3 into a render target the size of the window, read back,
-//! and shown through softbuffer (a CPU copy; zero-copy into the compositor is acde's job, not this example's).
-//!
-//! A [`Scene`] says what is drawn after the clear; [`Shown::run`] opens the window and drives it (`Xe::open_first`
-//! gives it the GPU). Esc or closing the
-//! window quits.
-
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::time::Instant;
@@ -18,49 +11,40 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
-/// The clear color, as the target holds it (RGBA8).
 pub const BACKGROUND: [u8; 4] = [26, 26, 31, 255];
 
-/// ⭐ What a window shows: made once with the context, recorded every frame.
 pub trait Scene<'d>: Sized {
     const TITLE: &'static str;
 
     fn new(cx: &mut Context<'d, Xe, Native>, codegen: &Codegen<'_>) -> Result<Self, Error>;
 
-    /// Draws after the clear. `seconds` since the first frame (0 in it); `size` the target's.
     fn record(&mut self, r: &mut Recorder<'_, 'd, Xe, Native>, seconds: f32, size: (u32, u32)) -> Result<(), Error>;
 
-    /// Keeps redrawing (an animation) instead of drawing only when the window needs it.
     fn animated(&self) -> bool {
         false
     }
 
-    /// Checks the first frame's pixels (RGBA8 rows), so a wrong picture fails instead of just showing.
     fn check(&self, pixels: &[u8], size: (u32, u32)) -> Result<(), String>;
 }
 
-/// The window, its surface and the target behind it.
 struct Window2<'d> {
     window: Rc<Window>,
     surface: softbuffer::Surface<Rc<Window>, Rc<Window>>,
     target: Option<(Target<'d, Xe>, (u32, u32))>,
 }
 
-/// ⭐ A scene in a window.
 pub struct Shown<'d, S: Scene<'d>> {
     cx: Context<'d, Xe, Native>,
     clear: Pipeline,
     corners: Buffer<'d, Xe>,
     scene: S,
     shown: Option<Window2<'d>>,
-    /// when the first frame was drawn: frames count time from it
     start: Option<Instant>,
     checked: bool,
     failed: Option<String>,
 }
 
 impl<'d, S: Scene<'d>> Shown<'d, S> {
-    /// Compiles the scene on `xe` and runs the window until it closes.
     pub fn run(xe: &'d Xe) -> Result<(), Box<dyn std::error::Error>> {
         let codegen = Codegen::default();
         let mut cx = Context::<Xe, Native>::new(xe)?;
@@ -76,7 +60,6 @@ impl<'d, S: Scene<'d>> Shown<'d, S> {
         }
     }
 
-    /// Records, submits and waits for one frame, then copies it into the window.
     fn frame(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let Some(w) = &mut self.shown else { return Ok(()) };
         let size = w.window.inner_size();

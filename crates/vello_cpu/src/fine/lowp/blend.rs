@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::fine::{Splat4thExt, highp, u8_to_f32};
 use crate::vello_cpu::peniko::{BlendMode, Mix};
 use vello_common::fearless_simd::*;
@@ -18,8 +15,6 @@ fn mix_inner<S: Simd>(src_c: u8x32<S>, bg_c: u8x32<S>, blend_mode: BlendMode) ->
     if let Some(res) = try_u8_mix(blend_mode, src_c, bg_c) {
         return res;
     }
-
-    // Fallback for blend modes that aren't supported in u8.
 
     let (mut src_1, mut src_2) = to_f32(src_c);
     let (bg_1, bg_2) = to_f32(bg_c);
@@ -53,12 +48,6 @@ fn to_u8<S: Simd>(val1: f32x16<S>, val2: f32x16<S>) -> u8x32<S> {
 
 #[inline(always)]
 fn try_u8_mix<S: Simd>(blend_mode: BlendMode, src_c: u8x32<S>, bg_c: u8x32<S>) -> Option<u8x32<S>> {
-    // We implement the u8 fast path for blend modes that
-    // 1) are separable.
-    // 2) don't have too many divisions, since integer normalization is
-    // relatively expensive.
-    // In the future, it's possible to do further experimentation to see whether
-    // some more blend modes are worth doing in integer space.
     Some(match blend_mode.mix {
         Mix::Normal => src_c,
         Mix::Multiply => Multiply::mix(src_c, bg_c),
@@ -95,19 +84,6 @@ macro_rules! u8_mix {
     };
 }
 
-// Formula for blending is (see https://www.w3.org/TR/compositing-1/#generalformula):
-//   Cs' = (1 - Ab) * Cs + Ab * B(Cb, Cs)
-// Since vello_cpu expects premultiplied colors, we need to return:
-//   M = As * Cs'
-//     = As * ((1 - Ab) * Cs + Ab * B(Cb, Cs))
-//     = As * (1 - Ab) * Cs + As * Ab * B(Cb, Cs)
-//     = S * (1 - Ab) + As * Ab * B(Cb, Cs)
-// where S = As * Cs and D = Ab * Cb (so just the premultiplied color).
-
-// Multiply:
-//   B(Cb, Cs) = Cb * Cs
-//   M = S * (1 - Ab) + As * Ab * Cb * Cs
-//     = S * (1 - Ab) + S * D
 u8_mix!(Multiply, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     let one_minus_bg_a = 255 - bg_c.splat_4th();
     let p1 = normalized_mul_u8(src_c, one_minus_bg_a);
@@ -116,10 +92,6 @@ u8_mix!(Multiply, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     saturating_narrow(p1 + p2)
 });
 
-// Screen:
-//   B(Cb, Cs) = Cb + Cs - Cb * Cs
-//   M = S * (1 - Ab) + As * D + S * Ab - S * D
-//     = S + As * D - S * D
 u8_mix!(Screen, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     let p1 = normalized_mul_u8(src_c.splat_4th(), bg_c);
     let p2 = normalized_mul_u8(src_c, bg_c);
@@ -128,14 +100,10 @@ u8_mix!(Screen, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     saturating_narrow(res)
 });
 
-// Overlay is hard-light with source and backdrop swapped.
 u8_mix!(Overlay, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     hard_light_inner(src_c, bg_c, bg_c)
 });
 
-// Darken:
-//   B(Cb, Cs) = min(Cb, Cs)
-//   M = S * (1 - Ab) + min(S * Ab, D * As)
 u8_mix!(Darken, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     let src_a = src_c.splat_4th();
     let bg_a = bg_c.splat_4th();
@@ -145,9 +113,6 @@ u8_mix!(Darken, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     saturating_narrow(p1 + p2)
 });
 
-// Lighten:
-//   B(Cb, Cs) = max(Cb, Cs)
-//   M = S * (1 - Ab) + max(S * Ab, D * As)
 u8_mix!(Lighten, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     let src_a = src_c.splat_4th();
     let bg_a = bg_c.splat_4th();
@@ -157,16 +122,10 @@ u8_mix!(Lighten, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     saturating_narrow(p1 + p2)
 });
 
-// Hard-light:
-//   if Cs <= 0.5: B(Cb, Cs) = 2 * Cb * Cs
-//   otherwise:    B(Cb, Cs) = 1 - 2 * (1 - Cb) * (1 - Cs)
 u8_mix!(HardLight, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     hard_light_inner(src_c, bg_c, src_c)
 });
 
-// Difference:
-//   B(Cb, Cs) = abs(Cb - Cs)
-//   M = S * (1 - Ab) + abs(S * Ab - D * As)
 u8_mix!(Difference, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     let src_a = src_c.splat_4th();
     let bg_a = bg_c.splat_4th();
@@ -178,10 +137,6 @@ u8_mix!(Difference, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     saturating_narrow(p1 + diff)
 });
 
-// Exclusion:
-//   B(Cb, Cs) = Cb + Cs - 2 * Cb * Cs
-//   M = S * (1 - Ab) + As * D + S * Ab - 2 * S * D
-//     = S + As * D - 2 * S * D
 u8_mix!(Exclusion, |src_c: u8x32<S>, bg_c: u8x32<S>| {
     let simd = src_c.simd;
     let p1 = normalized_mul_u8(src_c.splat_4th(), bg_c);
@@ -204,15 +159,9 @@ fn hard_light_inner<S: Simd>(src_c: u8x32<S>, bg_c: u8x32<S>, condition: u8x32<S
     let condition = widen(condition);
 
     let base = src * (255 - bg_a);
-    // Multiply branch: As * Ab * 2 * Cb * Cs = 2 * S * D.
     let multiply = 2 * src * bg;
-    // Screen branch: As * Ab * (1 - 2 * (1 - Cb) * (1 - Cs))
-    //              = As * Ab - 2 * (As - S) * (Ab - D).
     let screen = src_a * bg_a - 2 * (src_a - src) * (bg_a - bg);
     let blended = simd.select_u16x32(
-        // The spec condition is `Cs <= 0.5` but on unpremultiplied color.
-        // Since `Cs = S / As`, we avoid division by multiplying both sides
-        // by alpha: `Cs <= 0.5` => `S <= 0.5 * As` => `2 * S <= As`.
         (condition + condition).simd_le(condition_a),
         multiply,
         screen,
@@ -225,9 +174,6 @@ fn hard_light_inner<S: Simd>(src_c: u8x32<S>, bg_c: u8x32<S>, condition: u8x32<S
 #[inline(always)]
 fn with_src_alpha<S: Simd>(simd: S, rgb: u8x32<S>, src_c: u8x32<S>) -> u8x32<S> {
     let alpha_mask = u32x8::splat(simd, u32::from_ne_bytes([0, 0, 0, 255])).to_bytes();
-    // It can happen that we end up with an R/G/B larger than the alpha value due to
-    // arithmetic errors. We need to clamp to the alpha to ensure the color is still a valid
-    // premultiplied color.
     let rgb = rgb.min(src_c.splat_4th());
 
     (rgb & !alpha_mask) | (src_c & alpha_mask)

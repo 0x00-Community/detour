@@ -1,10 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! Drawing blurred, rounded rectangles.
-//!
-//! Implementation is adapted from: <https://git.sr.ht/~raph/blurrr/tree/master/src/distfield.rs>.
-
 use crate::vello_cpu::fine::{NumericVec, ShaderResultF32};
 use vello_common::encode::EncodedBlurredRoundedRectangle;
 use vello_common::fearless_simd::{Simd, SimdBase, SimdFloat, f32x8, u8x16};
@@ -32,7 +25,6 @@ impl<S: Simd> BlurredRoundedRectFiller<S> {
         simd.vectorize(
             #[inline(always)]
             || {
-                // detour: each pixel positioned on its own (`detour::Positions`), from the column pair's first pixel
                 let start = ((start_x - crate::vello_cpu::detour::PIXEL_CENTER) as f32, (start_y - crate::vello_cpu::detour::PIXEL_CENTER) as f32);
                 let color_components = rect.color.as_premul_f32().components;
                 let r = f32x8::splat(simd, color_components[0]);
@@ -122,7 +114,6 @@ impl<S: Simd> crate::vello_cpu::fine::Painter for BlurredRoundedRectFiller<S> {
 
 #[derive(Debug)]
 struct AlphaCalculator<S: Simd> {
-    // detour: the column pair's first pixel and the positions, in place of upstream's running position
     x: f32,
     y: f32,
     positions: crate::vello_cpu::detour::Positions,
@@ -141,7 +132,6 @@ impl<S: Simd> Iterator for AlphaCalculator<S> {
 
     #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
-        // two columns of four (splat_pos's order)
         let (mut is, mut js) = ([0.0_f32; 8], [0.0_f32; 8]);
         for k in 0..8 {
             (is[k], js[k]) = self.positions.at(self.x + (k / 4) as f32, self.y + (k % 4) as f32);
@@ -151,12 +141,10 @@ impl<S: Simd> Iterator for AlphaCalculator<S> {
         let r = &self.r;
 
         let y = j - r.v1 * r.height;
-        // Equivalent to r.r1 + y.abs() - (r.h * r.v1)
         let y0 = r.r1 - r.h.mul_sub(r.v1, y.abs());
         let y1 = y0.max(r.v0);
 
         let x = i - r.v1 * r.width;
-        // Equivalent to r.r1 + x.abs() - (r.w * r.v1)
         let x0 = r.r1 - r.w.mul_sub(r.v1, x.abs());
         let x1 = x0.max(r.v0);
         let d_pos = (x1.powf(r.exponent) + y1.powf(r.exponent)).powf(r.recip_exponent);
@@ -226,9 +214,6 @@ impl<S: Simd> SimdRoundedBlurredRect<S> {
 }
 
 trait FloatExt<S: Simd> {
-    // See https://raphlinus.github.io/audio/2018/09/05/sigmoid.html for a little
-    // explanation of this approximation to the erf function.
-    /// Approximate the erf function.
     fn compute_erf7(simd: S, x: Self) -> Self;
     fn powf(self, x: f32) -> Self;
 }
@@ -236,9 +221,6 @@ trait FloatExt<S: Simd> {
 impl<S: Simd> FloatExt<S> for f32x8<S> {
     #[inline(always)]
     fn compute_erf7(simd: S, x: Self) -> Self {
-        // Clamp `x`, because for large `x` the terms here become `inf`, causing the result to be 0 or
-        // `NaN`. This clamping doesn't lose any information, because `erf(±10) ≈ 1` well within `f64`
-        // machine precision, let alone `f32`.
         let x = x.max(Self::splat(simd, -10.0)).min(Self::splat(simd, 10.0));
         let x = x * Self::splat(simd, core::f32::consts::FRAC_2_SQRT_PI);
         let xx = x * x;
@@ -250,7 +232,6 @@ impl<S: Simd> FloatExt<S> for f32x8<S> {
         x / denom
     }
 
-    // detour: `detour::pow`, what the GPU computes too (upstream: libm's `powf`)
     #[inline]
     fn powf(mut self, x: f32) -> Self {
         for k in 0..8 {

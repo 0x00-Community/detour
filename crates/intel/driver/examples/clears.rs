@@ -1,9 +1,3 @@
-//! One clear pipeline for every color (`Context::clear_any_pipeline`, `Recorder::clear`: the color is the draw's blend
-//! constant) on Xe3, byte for byte against a pipeline compiled for each color (`Context::clear_pipeline`, the color in
-//! its shader) over colors that round every way (halves of a byte step, thirds, the ends, ties); with a depth
-//! attachment, the depth cleared too (a quad at z 0.5 passes after a clear to 1, fails after one to 0.25); and the draws
-//! after a clear blending with the constant they had.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{ClearDepth, Codegen, Context};
 use detour::xe::Xe;
@@ -52,7 +46,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ok &= same && pb.chunks(4).all(|p| p == &pb[..4]);
     }
 
-    // with a depth attachment: the depth cleared to the corners' z
     let any_depth = cx.clear_any_pipeline(&codegen, 1, ClearDepth::Depth)?;
     let flat = cx.pipeline(&codegen, &include_str!("depth/flat.mlir").replace("WRITE", "true"), "flat")?;
     let quad: Vec<f32> = [(-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)].iter().flat_map(|&(x, y)| [x, y, 0.5, 1.0, 0.0, 1.0, 0.0, 1.0]).collect();
@@ -75,8 +68,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("depth cleared to {z}: a quad at 0.5 {} ({})", if passes { "passes" } else { "fails" }, if good { "every pixel" } else { "wrong" });
         ok &= good;
     }
-    // after a clear, the draws blend with the constant they had (0 here): the clear pipeline drawn as a plain draw (its
-    // fragment 1, blended 1 · constant) writes 0, not the clear's color
     let red = cx.blend_constant([1.0, 0.0, 0.0, 1.0])?;
     let mut target = cx.target(N, N, TextureFormat::Rgba8Unorm, MemType::Coherent)?;
     let mut r = cx.record();

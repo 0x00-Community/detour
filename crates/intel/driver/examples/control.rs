@@ -1,7 +1,3 @@
-//! Structured control flow in a compute shader (examples/control/loops.mlir): a loop the same for every lane, a loop
-//! whose trip count differs between lanes, an if on a per-lane condition, an if inside a loop, a while loop (Collatz
-//! steps). Each of 64 invocations writes five results, checked against the same computation in Rust.
-
 use detour::base::{Gpu, Native};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

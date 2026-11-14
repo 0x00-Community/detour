@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::peniko::{BlendMode, Mix};
 use crate::vello_cpu::util::Premultiply;
 use vello_common::fearless_simd::*;
@@ -35,7 +32,6 @@ fn mix_inner<S: Simd>(src_c: f32x16<S>, bg: f32x16<S>, blend_mode: BlendMode) ->
     if matches!(blend_mode.mix, Mix::Normal) {
         return src_c;
     }
-    // See https://www.w3.org/TR/compositing-1/#blending
     let simd = src_c.simd;
 
     let (bg_channels, bg_a) = split(simd, bg);
@@ -189,14 +185,11 @@ separable_mix!(ColorDodge, |cs: f32x4<S>, cb: f32x4<S>| {
     let mask_2 = cs.simd.simd_eq_f32x4(cs, f32x4::splat(cs.simd, 1.0));
 
     cs.simd.select_f32x4(
-        // if cb == 0
         mask_1,
         f32x4::splat(cs.simd, 0.0),
-        // else if cs == 1
         cs.simd.select_f32x4(
             mask_2,
             f32x4::splat(cs.simd, 1.0),
-            // else
             f32x4::splat(cs.simd, 1.0).min(cb / (1.0 - cs)),
         ),
     )
@@ -206,14 +199,11 @@ separable_mix!(ColorBurn, |cs: f32x4<S>, cb: f32x4<S>| {
     let mask_2 = cs.simd.simd_eq_f32x4(cs, f32x4::splat(cs.simd, 0.0));
 
     cs.simd.select_f32x4(
-        // if cb == 1
         mask_1,
         f32x4::splat(cs.simd, 1.0),
-        // else if cs == 0
         cs.simd.select_f32x4(
             mask_2,
             f32x4::splat(cs.simd, 0.0),
-            // else
             1.0 - f32x4::splat(cs.simd, 1.0).min((1.0 - cb) / cs),
         ),
     )
@@ -301,14 +291,12 @@ fn set_lum<S: Simd>(r: &mut f32x4<S>, g: &mut f32x4<S>, b: &mut f32x4<S>, l: f32
     clip_color(r, g, b);
 }
 
-// Adapted from tiny-skia
 #[inline(always)]
 fn set_sat<S: Simd>(r: &mut f32x4<S>, g: &mut f32x4<S>, b: &mut f32x4<S>, s: f32x4<S>) {
     let mn = r.min(g.min(*b));
     let mx = r.max(g.max(*b));
     let sat = mx - mn;
 
-    // Map min channel to 0, max channel to s, and scale the middle proportionally.
     *r = scale_sat_channel(*r, mn, sat, s);
     *g = scale_sat_channel(*g, mn, sat, s);
     *b = scale_sat_channel(*b, mn, sat, s);

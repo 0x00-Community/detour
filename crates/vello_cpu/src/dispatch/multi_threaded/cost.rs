@@ -1,23 +1,13 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-/// There is not much science behind this constant. It was instead determined by doing profiling
-/// and finding a constant that seems to strike a reasonable trade-off between not causing too
-/// big batch sizes
 pub(crate) const COST_THRESHOLD: f32 = 250.0;
 
 use crate::vello_cpu::dispatch::multi_threaded::RenderTaskType;
 use crate::vello_cpu::kurbo::{Affine, PathEl, PathSeg, Point, segments};
 
-/// Try to estimate the cost of the render task.
 pub(crate) fn estimate_render_task_cost(task: &RenderTaskType, paths: &[PathEl]) -> f32 {
     const LAYER_COST: f32 = 10.0;
 
     match task {
         RenderTaskType::FillRect { rect, .. } => {
-            // According to our benchmarks, the fast rect path is roughly
-            // 5 times faster than the normal path. While it depends on the exact
-            // size, the speedup seems to scale roughly the same with the size.
             const FAST_PATH_SPEEDUP: f32 = 5.0;
 
             let path_length = (2.0 * (rect.width().abs() + rect.height().abs())) as f32;
@@ -53,22 +43,6 @@ pub(crate) fn estimate_render_task_cost(task: &RenderTaskType, paths: &[PathEl])
     }
 }
 
-/// Try to estimate an (admittedly somewhat abstract) "path cost".
-///
-/// The main point here is that when sending paths to a thread to convert them into sparse strip
-/// representation, we might want to batch them. This is especially the case for small, line-only
-/// geometries, where handling each path separately would lead to a huge overhead.
-///
-/// Because of this, before rendering a path, we try to estimate a very rough cost based on
-/// the following attributes that (usually) have an impact on rendering times:
-///
-/// - Number of line segments (more line segments -> more work during strip rendering).
-/// - Number of curve segments (same as line segments, plus we need to flatten them first).
-/// - Path length (if the path is longer, the covered area is _likely_ to also be larger). However,
-///   the path length usually grows much faster than the render time, so we only apply a very small
-///   fractional value.
-/// - Strokes (if we are stroking a path, there is even more overhead for stroke expansion before doing
-///   flattening and strip rendering).
 pub(crate) fn estimate_path_cost(
     path: impl IntoIterator<Item = PathSeg>,
     transform: Affine,
@@ -76,8 +50,6 @@ pub(crate) fn estimate_path_cost(
 ) -> f32 {
     let cost_data = PathCostData::new(path, transform);
 
-    // Once again, those constants were not determined "scientifically" in any way, but
-    // are instead based on intuition as well as a number of experiments.
     const CURVE_MULTIPLIER: f32 = 2.5;
     const STROKE_MULTIPLIER: f32 = 1.5;
 
@@ -108,7 +80,6 @@ impl PathCostData {
         let mut register_path_length = |mut p0: Point, mut p1: Point| {
             p0 = transform * p0;
             p1 = transform * p1;
-            // We don't sqrt here because it's too expensive, we just want a rough estimate.
             let dx = (p1.x - p0.x).abs();
             let dy = (p1.y - p0.y).abs();
             path_length += dx + dy;

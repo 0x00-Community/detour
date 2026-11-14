@@ -1,7 +1,3 @@
-// detour: a dispatcher that records the scene for the GPU's coarse rasterization instead of stripping it: each draw's
-// geometry (a path with its fill rule and transform, a stroke expanded into one as `flatten::stroke` does, a fast
-// path's rectangle), its paint attributes, the layers. It rasterizes nothing.
-
 use crate::vello_cpu::RasterizerSettings;
 use crate::vello_cpu::detour::{Geometry, Item, LayerAttrs, Recording};
 use crate::vello_cpu::coarse::PaintFillAttrs;
@@ -18,7 +14,6 @@ use vello_common::pixmap::PixmapMut;
 #[derive(Debug)]
 pub(crate) struct RecordingDispatcher {
     recording: Recording,
-    /// the open layers' attributes (their draw ids given at their pops)
     open: Vec<LayerAttrs>,
     next_draw_id: u32,
     stroke_ctx: StrokeCtx,
@@ -62,7 +57,6 @@ impl Dispatcher for RecordingDispatcher {
         if aliasing_threshold.is_some() {
             self.refuse("a stroke without anti-aliasing");
         }
-        // as vello_common's flatten::stroke: expanded at its tolerance, then filled non-zero under the transform
         let c = transform.as_coeffs();
         let tolerance = 0.25 / c[0].abs().max(c[3].abs()).max(1.);
         vello_common::flatten::expand_stroke(path.iter(), stroke, tolerance, &mut self.stroke_ctx);

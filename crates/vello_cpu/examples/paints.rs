@@ -1,8 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! Using gradients and patterns paints using Vello CPU.
-
 use std::sync::Arc;
 use std::{io::Cursor, path::Path};
 use vello_cpu::{
@@ -16,35 +11,22 @@ use vello_cpu::{
 };
 
 fn main() {
-    // Apart from drawing shapes using a single color, you can also draw them
-    // using gradients and image patterns.
-
     let mut ctx = RenderContext::new(500, 500);
     let base_rect = Rect::new(25.0, 25.0, 225.0, 225.0);
 
-    // All you need to is to construct the given gradient/pattern and activate
-    // it by using the `set_paint` method. In this case, we are drawing a
-    // linear gradient.
     ctx.set_paint(linear_gradient(&base_rect));
     ctx.fill_rect(&base_rect);
 
-    // Since we are applying a transform to the render context, the radial
-    // gradient we are about to apply will also be affected to that.
     ctx.set_transform(Affine::translate((250.0, 0.0)));
     ctx.set_paint(radial_gradient(&base_rect));
     ctx.fill_rect(&base_rect);
 
-    // Sweep gradient are also supported.
     ctx.set_transform(Affine::translate((0.0, 250.0)));
     ctx.set_paint(sweep_gradient(&base_rect));
     ctx.fill_rect(&base_rect);
 
-    // Finally, we can use image patterns with different extend modes.
     ctx.set_transform(Affine::translate((250.0, 250.0)));
     ctx.set_paint(pattern());
-    // If you want to apply an additional transform that just applies to the
-    // paint instead of the shape you are drawing, you can do that using the
-    // `set_paint_transform` method.
     ctx.set_paint_transform(Affine::scale(15.0));
     ctx.fill_rect(&base_rect);
 
@@ -112,17 +94,12 @@ fn sweep_gradient(rect: &Rect) -> Gradient {
 }
 
 fn pattern() -> Image {
-    // For patterns, you need to get access to a pixmap. You can either do this
-    // by rendering your own pixmap or converting for example a png image into
-    // one.
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../vello_tests/tests/assets/rgb_image_2x2.png");
     let file = std::fs::read(path).unwrap();
     let pixmap = Pixmap::from_png(Cursor::new(file)).unwrap();
 
     Image {
-        // Note that only ImageSource::Pixmap is currently supported. Don't
-        // use ImageSource::OpaqueId.
         image: ImageSource::Pixmap(Arc::new(pixmap)),
         sampler: ImageSampler {
             x_extend: Extend::Repeat,

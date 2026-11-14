@@ -1,5 +1,3 @@
-//! Prints an detour MLIR file after a pipeline (default: the whole one): `lower FILE [PIPELINE]`.
-
 use detour::xe3_codegen::Codegen;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

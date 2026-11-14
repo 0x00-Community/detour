@@ -1,9 +1,3 @@
-//! ⭐ Pages drawn on the CPU, for machines with neither Xe3 nor a Vulkan device (virtual machines without 3D: VMware,
-//! VirtualBox, a VNC server): the same [`Pass`]es as the fallback's `Raster`, each part's scene rasterized by vello_cpu
-//! ([`CpuScene`]) and composited the way `compose.wgsl` does (its frosted glass, its shadows, its filter), straight
-//! into the dma-buf canvases, mapped. Blurs are three box blurs of the gaussian's σ (the GPU's are dual Kawase): the
-//! same look, not the same bytes.
-
 use std::collections::HashMap;
 use std::os::fd::{AsFd, OwnedFd};
 use std::time::Instant;
@@ -13,7 +7,6 @@ use crate::vello_cpu::kurbo::Affine;
 use crate::vello_cpu::{Pixmap, RasterizerSettings, RenderContext, RenderMode, Resources};
 use crate::xe3::CpuScene;
 
-/// One canvas, mapped: its rows, `stride` bytes apart from `offset`, premultiplied RGBA8.
 struct Mapped {
     ptr: *mut u8,
     len: usize,
@@ -23,7 +16,6 @@ struct Mapped {
     fd: OwnedFd,
 }
 
-/// `struct dma_buf_sync` (linux/dma-buf.h).
 #[repr(C)]
 struct DmaBufSync {
     flags: u64,
@@ -46,33 +38,27 @@ impl Mapped {
         if stride < size.0 as usize * 4 || offset + stride * size.1 as usize > len {
             return Err(format!("cpu pages: a {size:?} canvas does not fit a {len} byte dma-buf (offset {offset}, stride {stride})"));
         }
-        // SAFETY: a new shared mapping of the whole dma-buf, unmapped on drop; nothing else in this process maps it
         let ptr = unsafe { rustix::mm::mmap(std::ptr::null_mut(), len, rustix::mm::ProtFlags::READ | rustix::mm::ProtFlags::WRITE, rustix::mm::MapFlags::SHARED, &fd, 0) }
             .map_err(|e| format!("cpu pages: mapping the dma-buf: {e}"))?;
         Ok(Self { ptr: ptr.cast(), len, offset, stride, size, fd })
     }
 
-    /// `DMA_BUF_IOCTL_SYNC`: the CPU's access begins (`START`) or ends (`END`); drivers that cache flush there.
     fn sync(&self, when: u64) {
         let mut sync = DmaBufSync { flags: DmaBufSync::READ_WRITE | when };
-        // SAFETY: DMA_BUF_IOCTL_SYNC reads the flags
         let _ = unsafe { rustix::ioctl::ioctl(self.fd.as_fd(), rustix::ioctl::Updater::<{ rustix::ioctl::opcode::write::<DmaBufSync>(b'b', 0) }, DmaBufSync>::new(&mut sync)) };
     }
 
     fn bytes(&mut self) -> &mut [u8] {
-        // SAFETY: the mapping is `len` bytes, ours until drop
         unsafe { std::slice::from_raw_parts_mut(self.ptr, self.len) }
     }
 }
 
 impl Drop for Mapped {
     fn drop(&mut self) {
-        // SAFETY: the mapping made in `new`
         let _ = unsafe { rustix::mm::munmap(self.ptr.cast(), self.len) };
     }
 }
 
-/// A premultiplied RGBA8 image in memory.
 struct Layer {
     w: usize,
     h: usize,
@@ -95,7 +81,6 @@ impl Layer {
         self.px[y * self.w + x]
     }
 
-    /// Blurred (σ `sigma`, edges clamped as the GPU's sampler does): three box blurs each way.
     fn blurred(mut self, sigma: f32) -> Self {
         if sigma <= 0.0 || sigma.is_nan() || self.w == 0 || self.h == 0 {
             return self;
@@ -107,7 +92,6 @@ impl Layer {
         self
     }
 
-    /// The radii of three box blurs whose variance is σ² (W. Jarosz, "Fast image convolutions").
     fn boxes(sigma: f32) -> [usize; 3] {
         const N: f32 = 3.0;
         let ideal = (12.0 * sigma * sigma / N + 1.0).sqrt();
@@ -149,7 +133,6 @@ impl Layer {
     }
 }
 
-/// A premultiplied pixel through a colour matrix (4 rows of 5 on straight colour, clamped), premultiplied again.
 fn through(p: [u8; 4], m: &[f32; 20]) -> [u8; 4] {
     let a = f32::from(p[3]) / 255.0;
     let c = match a > 0.0 {
@@ -160,7 +143,6 @@ fn through(p: [u8; 4], m: &[f32; 20]) -> [u8; 4] {
     [o[0] * o[3], o[1] * o[3], o[2] * o[3], o[3]].map(|v| (v * 255.0 + 0.5) as u8)
 }
 
-/// `src` scaled by `k` (0 ..= 1) over `dst`, premultiplied.
 fn over(dst: &mut [u8], src: [u8; 4], k: f32) {
     let s = src.map(|v| f32::from(v) * k);
     let keep = 1.0 - s[3] / 255.0;
@@ -169,14 +151,11 @@ fn over(dst: &mut [u8], src: [u8; 4], k: f32) {
     }
 }
 
-/// The signed distance from `p` to a rounded rectangle of half size `half` and corner radius `r`, centred at 0
-/// (`compose.wgsl`'s `rounded_rect`).
 fn rounded_rect(p: [f32; 2], half: [f32; 2], r: f32) -> f32 {
     let q = [p[0].abs() - half[0] + r, p[1].abs() - half[1] + r];
     q[0].max(0.0).hypot(q[1].max(0.0)) + q[0].max(q[1]).min(0.0) - r
 }
 
-/// One canvas being drawn: its pixels and size.
 struct Target<'m> {
     m: &'m mut Mapped,
     w: i32,
@@ -184,7 +163,6 @@ struct Target<'m> {
 }
 
 impl Target<'_> {
-    /// `rect` clipped to the canvas (and to `clip`): its pixels, row by row.
     fn each(&mut self, rect: Px, clip: Option<Px>, mut f: impl FnMut(i32, i32, &mut [u8])) {
         let Some(r) = rect.intersection(Px { x: 0, y: 0, w: self.w, h: self.h }).and_then(|r| clip.map_or(Some(r), |c| r.intersection(c))) else { return };
         let (offset, stride) = (self.m.offset, self.m.stride);
@@ -208,13 +186,11 @@ impl Target<'_> {
         self.each(r, None, |_, _, p| p.fill(0));
     }
 
-    /// `layer` placed with its top left at `at`, inside `clip`.
     fn place(&mut self, layer: &Layer, at: [i32; 2], clip: Px) {
         let rect = Px { x: at[0], y: at[1], w: layer.w as i32, h: layer.h as i32 };
         self.each(rect, Some(clip), |x, y, p| over(p, layer.at((x - at[0]) as usize, (y - at[1]) as usize), 1.0));
     }
 
-    /// `fs_backdrop`: what is under the rounded rectangle, blurred, through the colour matrix, masked.
     fn backdrop(&mut self, b: &Backdrop) {
         let [x0, y0] = [b.rect[0].max(0.0).floor() as i32, b.rect[1].max(0.0).floor() as i32];
         let [x1, y1] = [((b.rect[0] + b.rect[2]).max(0.0).ceil() as i32).min(self.w), ((b.rect[1] + b.rect[3]).max(0.0).ceil() as i32).min(self.h)];
@@ -235,7 +211,6 @@ impl Target<'_> {
         });
     }
 
-    /// `fs_shadow`: `layer`'s alpha, blurred, in the shadow's colour, shifted, inside `clip`.
     fn shadow(&mut self, layer: &Layer, s: &Shadow, at: [i32; 2], clip: Px) {
         if layer.w < 2 || layer.h < 2 {
             return;
@@ -250,7 +225,6 @@ impl Target<'_> {
         });
     }
 
-    /// `fs_filter`: `layer` blurred, through the colour matrix, placed at `at` inside `clip`.
     fn filtered(&mut self, layer: Layer, e: &Effect, at: [i32; 2], clip: Px) {
         if layer.w < 2 || layer.h < 2 {
             return;
@@ -262,7 +236,6 @@ impl Target<'_> {
     }
 }
 
-/// ⭐ The CPU page rasterizer: each plane's canvases, mapped; vello_cpu's glyph caches.
 #[derive(Default)]
 pub struct CpuRaster {
     canvases: HashMap<usize, Vec<Option<Mapped>>>,
@@ -274,7 +247,6 @@ impl CpuRaster {
         Self::default()
     }
 
-    /// The canvases (linear dma-bufs, all `size`) plane `plane` draws into in turn, mapped.
     pub fn canvases(&mut self, plane: usize, dmabufs: &[Dmabuf<'_>], size: (u32, u32)) -> Vec<Result<(), String>> {
         let mut results = Vec::new();
         let mapped = dmabufs
@@ -297,7 +269,6 @@ impl CpuRaster {
         self.resources = Resources::new();
     }
 
-    /// `scene` under `place` drawn into a new `w × h` layer.
     fn layer(&mut self, scene: Scene, place: Affine, (w, h): (u16, u16)) -> Layer {
         let mut ctx = RenderContext::new(w, h);
         CpuScene::new(&mut ctx, &mut self.resources).append_scene(scene, place);
@@ -306,7 +277,6 @@ impl CpuRaster {
         pixmap.into()
     }
 
-    /// ⭐ A frame's passes, drawn now (nothing to wait for: no sync_file).
     pub fn draw<C: Content>(&mut self, passes: Vec<Pass<C>>) -> Result<Submitted, String> {
         let started = Instant::now();
         for pass in passes {
@@ -330,8 +300,6 @@ impl CpuRaster {
         drawn
     }
 
-    /// The parts drawn into `mapped` in `targets`: the targets cleared, then each part's frosted glass, its content
-    /// rasterized into a layer, the layer's shadows and the layer itself (through its filter) inside the part's bounds.
     fn compose<C: Content>(&mut self, mapped: &mut Mapped, parts: &[crate::base::Part<C>], targets: Vec<Px>, full: Px) -> Result<(), String> {
         let mut canvas = Target { m: mapped, w: full.w, h: full.h };
         targets.iter().for_each(|t| canvas.clear(*t));
@@ -366,7 +334,6 @@ impl CpuRaster {
         }
     }
 
-    /// `scene` drawn into the (linear) dma-buf `dmabuf`, `width × height`.
     pub fn icon(&mut self, dmabuf: Dmabuf<'_>, (width, height): (u32, u32), scene: Scene) -> Result<(), String> {
         let mut mapped = Mapped::new(dmabuf, (width, height))?;
         let dims = (u16::try_from(width).map_err(|_| "an icon past 65535 pixels")?, u16::try_from(height).map_err(|_| "an icon past 65535 pixels")?);

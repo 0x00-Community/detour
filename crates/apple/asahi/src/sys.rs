@@ -1,7 +1,3 @@
-//! Raw uAPI: the structs and ioctl numbers of include/uapi/drm/asahi_drm.h (Linux 7.2, the same as Mesa's
-//! include/drm-uapi copy), laid out as the kernel has them (all `repr(C)`, no implicit padding by the header's rules;
-//! sizes checked by the tests at the end).
-
 #![allow(non_camel_case_types)]
 #![allow(dead_code, reason = "mirrors the uAPI header, used or not")]
 
@@ -34,7 +30,6 @@ pub struct drm_asahi_params_global {
 
 impl Default for drm_asahi_params_global {
     fn default() -> Self {
-        // SAFETY: plain integers, all zero is valid.
         unsafe { std::mem::zeroed() }
     }
 }
@@ -318,7 +313,6 @@ pub const DRM_IOCTL_ASAHI_SUBMIT: c_ulong = Ioctl::w::<drm_asahi_submit>(BASE + 
 mod tests {
     use super::*;
 
-    /// gcc on include/uapi/drm/asahi_drm.h: `sizeof`, the `DRM_IOCTL_ASAHI_*` values, two offsets in the render command.
     #[test]
     fn sizes_match_the_kernel() {
         let sizes = [

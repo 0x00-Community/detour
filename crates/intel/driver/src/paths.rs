@@ -1,11 +1,3 @@
-//! ⭐ A scene's paths rasterized into fine's rows on the GPU (roadmap R8): flattened, tiled, sorted, stripped, coarse
-//! rasterized with its layers, binned, each stage bit for bit vello_common's / vello_cpu's (the examples `flatten`,
-//! `tiles`, `stripgen`, `rowcoarse`, `layercoarse`, `pipeline` check them). The kernels are in `paths/`.
-//!
-//! [`PathRaster::bin`] takes a scene recorded by `RenderContext::new_recording` ([`Recording`]: its draws' geometry, not
-//! stripped); [`Tiles::recorded`](crate::xe3::Tiles::recorded) packs what it paints with; [`TilesAt::with_gpu`](crate::xe3::TilesAt::with_gpu)
-//! puts the [`Binned`] rows, commands and alphas in, and [`Fine`](crate::xe3::Fine) draws them.
-
 mod scan;
 
 pub use scan::*;
@@ -31,30 +23,22 @@ const LAYERS: &str = include_str!("paths/layers.mlir");
 const PAIRS: &str = include_str!("paths/pairs.mlir");
 const BINS: &str = include_str!("paths/bins.mlir");
 
-/// The width of a bucket fine bins a strip row's commands by (fine.rs's BUCKET).
 const BUCKET: usize = 128;
 
-/// ⭐ The path rasterization's kernels.
 pub struct PathRaster {
     flatten: Kernel,
     scan: Kernel,
     tiles: Kernel,
-    /// tiles.mlir's tiles into cells: @paths, @bbox, @cells, @count, @place, @rank
     cells: [Kernel; 6],
     runs: Kernel,
     strips: Kernel,
-    /// glue.mlir: @ranges, @stripin, @split, @pairs, @cpaths, @zero, @fill
     glue: [Kernel; 7],
-    /// events.mlir: @lclip, @lbox, @evbuild
     events: [Kernel; 3],
     coarse: Kernel,
-    /// pairs.mlir: @pfill, @pplace, @prank, @pgather
     pairs: [Kernel; 4],
     bins: Kernel,
 }
 
-/// ⭐ A scene's rows of commands binned for fine on the GPU, and its alphas: their addresses (fine's rows, cmds, depth
-/// and alphas arrays) and the buffers they are in (kept until fine has drawn them).
 pub struct Binned<'d, G: Gpu<Cmd = u64> + 'd> {
     pub rows: u64,
     pub cmds: u64,
@@ -64,7 +48,6 @@ pub struct Binned<'d, G: Gpu<Cmd = u64> + 'd> {
     _plans: Vec<ScanPlan<'d, G>>,
 }
 
-/// A frame of the path rasterization: its buffers (by address), its scans, the stages submitted in turn.
 struct Frame<'c, 'd, G: Gpu<Cmd = u64> + 'd, H: Host> {
     cx: &'c mut Context<'d, G, H>,
     bufs: Vec<Buffer<'d, G>>,
@@ -72,7 +55,6 @@ struct Frame<'c, 'd, G: Gpu<Cmd = u64> + 'd, H: Host> {
 }
 
 impl<'c, 'd, G: Gpu<Cmd = u64> + 'd, H: Host> Frame<'c, 'd, G, H> {
-    /// a buffer of `b` (16 bytes at least: the rest zeros), kept; its address
     fn bytes(&mut self, b: &[u8]) -> Result<u64, Error> {
         let mut v = b.to_vec();
         v.resize(v.len().max(16), 0);
@@ -86,7 +68,6 @@ impl<'c, 'd, G: Gpu<Cmd = u64> + 'd, H: Host> Frame<'c, 'd, G, H> {
         self.bytes(&v.iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<_>>())
     }
 
-    /// n bytes of zeros (16 at least; whole 16 bytes, as @zero / @fill write them)
     fn zeros(&mut self, n: usize) -> Result<u64, Error> {
         self.bytes(&vec![0; n.next_multiple_of(16).max(16)])
     }
@@ -101,7 +82,6 @@ impl<'c, 'd, G: Gpu<Cmd = u64> + 'd, H: Host> Frame<'c, 'd, G, H> {
         Ok(self.plans[plan].total()? as usize)
     }
 
-    /// The dispatches `f` records (with the scans' plans), submitted and waited for.
     fn run(&mut self, f: impl FnOnce(&mut Recorder<'_, 'd, G, H>, &[ScanPlan<'d, G>]) -> Result<(), Error>) -> Result<(), Error> {
         let mut r = self.cx.record();
         f(&mut r, &self.plans)?;
@@ -110,9 +90,6 @@ impl<'c, 'd, G: Gpu<Cmd = u64> + 'd, H: Host> Frame<'c, 'd, G, H> {
     }
 }
 
-/// A path's GPU elements (examples/flatten's): kind (0 line, 1 quadratic, 2 cubic, 3 close), p0 (the point before
-/// it), p1, p2, p3; a close (p0 the last point, p1 the subpath's start) at each move but the first, each close and the
-/// end, as `flatten_simd::flatten` closes; its moves.
 struct Elements {
     els: Vec<(u32, [Point; 4])>,
     moves: Vec<Point>,
@@ -156,22 +133,14 @@ impl From<&BezPath> for Elements {
     }
 }
 
-/// A scene's paths and events as the GPU takes them.
 #[derive(Default)]
 struct Scene {
-    /// 128 bytes an element: kind, then its points and the path's transform (f64)
     elements: Vec<u8>,
-    /// a path's first element and count
     pel: Vec<u32>,
-    /// a path's moves NaN
     nan: Vec<u32>,
-    /// a path's fill rule (1 even-odd)
     rules: Vec<u32>,
-    /// four i32 an item: kind (0 fill, 1 pop), path, layer (-1 none), opaque (a fill's) or the pop's ordinal
     items: Vec<u32>,
-    /// a fill's paint attrs (its place among the fills)
     attrs: Vec<u32>,
-    /// eight i32 a layer: parent, its box (made on the GPU), its clip path at word 5 (-1 none)
     layers: Vec<u32>,
     fills: u32,
 }
@@ -197,9 +166,6 @@ impl Scene {
         self.pel.len() / 2
     }
 
-    /// `rec` as the GPU takes it: each fill's path and each clip's, in order (a clip's at its push: vello_cpu makes
-    /// its strips there); a fill opaque as vello_cpu's depth wants it (its own blend, no mask, a paint without
-    /// transparency; outside any layer, which the GPU checks).
     fn of(rec: &Recording, encoded: &[EncodedPaint]) -> Result<Self, Error> {
         if let Some(what) = rec.refused {
             return Err(Error::msg(format!("paths: {what} (not yet)")));
@@ -256,10 +222,6 @@ impl PathRaster {
         })
     }
 
-    /// ⭐ `rec`'s rows binned for fine (its paints `encoded`, its size a multiple of 4 each): its paths flattened,
-    /// tiled, stripped, its events coarse rasterized with its layers, binned, each stage a submission (the totals the
-    /// next one's buffers are sized by read back). Its paint attrs are each fill's place among the fills and each
-    /// layer's among the pops ([`Tiles::recorded`](crate::xe3::Tiles::recorded)'s).
     pub fn bin<'d, G: Gpu<Cmd = u64> + 'd, H: Host>(&self, cx: &mut Context<'d, G, H>, rec: &Recording, encoded: &[EncodedPaint]) -> Result<Binned<'d, G>, Error> {
         let sc = Scene::of(rec, encoded)?;
         let (width, height) = (rec.width, rec.height);
@@ -279,11 +241,9 @@ impl PathRaster {
         let [paths_k, bbox_k, ncells_k, ccount_k, place_k, crank_k] = &self.cells;
         let [lclip_k, lbox_k, evbuild_k] = &self.events;
         let [pfill_k, pplace_k, prank_k, pgather_k] = &self.pairs;
-        // @zero's / @fill's workgroups and dwords for n dwords
         let dwords = |n: usize| n.next_multiple_of(4) * 4;
         let zp = |n: usize| ([dwords(n).div_ceil(256).max(1) as u32, 1], (dwords(n) / 4) as u32);
 
-        // flatten: each element's lines counted, their offsets, written; each path's lines
         let mut elements = sc.elements.clone();
         elements.resize(elements.len().max(128), 0);
         let elems = f.bytes(&elements)?;
@@ -292,7 +252,6 @@ impl PathRaster {
         let (ecounts, eoffsets) = (f.zeros(n * 4)?, f.zeros(n * 4)?);
         let eplan = f.plan(ecounts, eoffsets, n)?;
         let (fscratch, nans) = (f.zeros(n * 640)?, f.zeros(n * 4)?);
-        // the lanes' elements sorted by kind (a lane's work is its kind's)
         let mut perm: Vec<u32> = (0..n as u32).collect();
         perm.sort_by_key(|&e| elements[e as usize * 128]);
         let perm = f.words(&perm)?;
@@ -312,8 +271,6 @@ impl PathRaster {
             r.dispatch(ranges_k, pg, &[pel as u32, nan as u32, eoffsets as u32, nans as u32, ltotal as u32, ranges as u32, npaths as u32, n as u32])
         })?;
 
-        // tiles: counted (and the paths with lines left of the viewport flagged: their own windings), written
-        // unsorted, sorted by counting into cells
         let (wflags, wpre) = (f.zeros(npaths * 4)?, f.zeros(npaths * 4)?);
         let wplan = f.plan(wflags, wpre, npaths)?;
         let tconsts = f.words(&[cols, rows, wstride, wflags as u32, wpre as u32])?;
@@ -356,7 +313,6 @@ impl PathRaster {
             r.dispatch(stripin_k, pg, &[ranges as u32, toffsets as u32, tcounts as u32, rules as u32, spaths as u32, npaths as u32])
         })?;
 
-        // strips: each path's row runs counted, their offsets; each run's strips and alphas counted, scanned, written
         let sconsts = f.words(&[rows, vw, wstride, wflags as u32, wpre as u32])?;
         let (rcounts, roffsets) = (f.zeros(npaths * 4)?, f.zeros(npaths * 4)?);
         let rplan = f.plan(rcounts, roffsets, npaths)?;
@@ -390,8 +346,6 @@ impl PathRaster {
         let sp1 = f.words(&sparams(strips, alphas))?;
         f.run(|r, _| r.dispatch(&self.strips, sg, &[sp1 as u32, nslots as u32, 1]))?;
 
-        // coarse: the paths' strip table; the layers' boxes and the events from them; each (row, layer)'s first fill
-        // marked; the events' (row, event) pairs in (row, event) order; their commands counted, scanned, written
         let nl = nlayers.max(1);
         let cpaths = f.zeros(npaths * 32)?;
         let (pflags, pattrs, popaque) = (f.zeros(npaths * 4)?, f.zeros(npaths * 4)?, f.zeros(npaths * 4)?);
@@ -448,7 +402,6 @@ impl PathRaster {
         let cq1 = f.words(&cparams(cmds, depth))?;
         f.run(|r, _| r.dispatch(&self.coarse, ig, &[cq1 as u32, nitems as u32, 1]))?;
 
-        // binned by bucket, a (row, bucket) a lane: counted, scanned, written
         let nb = usize::from(width).div_ceil(BUCKET);
         let nbl = nrows * nb;
         let (bcc, bdc, bco, bdo) = (f.zeros(nbl * 4)?, f.zeros(nbl * 4)?, f.zeros(nbl * 4)?, f.zeros(nbl * 4)?);

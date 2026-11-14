@@ -1,8 +1,3 @@
-//! Mipmaps: a 256x256 texture of 9 levels, each one solid color, sampled (nearest filter, nearest mip) over squares of
-//! 256, 128, 64 and 16 pixels in a 512x256 target cleared blue. The level comes from the derivatives: 256 texels over
-//! N pixels is level log2(256 / N), so the squares are levels 0, 1, 2 and 4, each its level's color, checked pixel by
-//! pixel (and the rest stays blue).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -12,12 +7,10 @@ const H: u32 = 256;
 const T: u32 = 256;
 const BLUE: [u8; 4] = [0, 0, 255, 255];
 
-/// Level l's color: distinct for each level, never the clear blue.
 fn color(l: u32) -> [u8; 4] {
     [(30 * l + 20) as u8, (255 - 25 * l) as u8, (60 + 20 * l) as u8, 255]
 }
 
-/// A square at pixel (x, y) of `n` pixels, texture coordinates 0 .. 1 across: a triangle strip, x y u v per corner.
 fn square(x: u32, y: u32, n: u32) -> Vec<f32> {
     let clip = |px: u32, py: u32| [px as f32 / W as f32 * 2.0 - 1.0, py as f32 / H as f32 * 2.0 - 1.0];
     let (a, b) = (clip(x, y), clip(x + n, y + n));

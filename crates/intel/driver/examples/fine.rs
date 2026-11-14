@@ -1,15 +1,3 @@
-//! vello_cpu's fine rasterization on Xe3 (R4, `Fine`) against vello_cpu itself (its lowp kernel, `OptimizeSpeed`),
-//! byte for byte: solid fills — anti-aliased circles and a star (nonzero), translucent overlapping rectangles, a big
-//! opaque rectangle (whole depth buckets: depth commands) with a shape drawn before it (hidden where it covers) and
-//! after it — and layers: a clip to a rounded rectangle, an opacity layer, an opacity layer clipped to a circle
-//! inside a clip — and linear gradients (pad, repeat rotated with translucent stops, reflect in an opacity layer, an
-//! opaque one over whole depth buckets), radial ones (plain; two-point with the focus inside, repeated, reflected) and
-//! sweep ones (a full turn, a part repeated), and images, nearest-neighbor, bilinear and bicubic (padded, rotated and
-//! repeated, reflected); blend modes (every mix, compose operators, a blended layer); masks (on fills, plain and
-//! blended, and a mask layer); tinted images (alpha mask, multiply); filter layers (a blur, a drop shadow); box
-//! shadows (soft, rotated, inverted). Then radial gradients undefined somewhere (strip, focus on / outside the end
-//! circle, swapped).
-
 use detour::base::{Gpu, Native};
 use detour::xe3::{Codegen, Context, Fine};
 use detour::xe::Xe;
@@ -25,7 +13,6 @@ const H: u16 = 256;
 fn scene() -> RenderContext {
     let mut ctx = RenderContext::new(W, H);
     let rgba = |r, g, b, a| AlphaColor::<Srgb>::from_rgba8(r, g, b, a);
-    // under the opaque rectangle: hidden where it covers
     ctx.set_paint(rgba(0, 200, 80, 255));
     ctx.fill_path(&Circle::new((300.0, 120.0), 90.3).to_path(0.1));
     ctx.set_paint(rgba(40, 40, 40, 255));
@@ -47,19 +34,16 @@ fn scene() -> RenderContext {
         let x = 150.0 + 45.3 * i as f64;
         ctx.fill_rect(&Rect::new(x, 90.5 + 10.0 * i as f64, x + 80.0, 230.7));
     }
-    // a clip layer
     ctx.push_clip_layer(&RoundedRect::new(10.3, 140.0, 120.0, 250.0, 17.0).to_path(0.1));
     ctx.set_paint(rgba(250, 230, 20, 255));
     ctx.fill_path(&Circle::new((70.0, 200.0), 60.0).to_path(0.1));
     ctx.pop_layer();
-    // an opacity layer over what is there
     ctx.push_opacity_layer(0.6);
     ctx.set_paint(rgba(0, 220, 255, 255));
     ctx.fill_rect(&Rect::new(380.0, 10.5, 500.0, 100.0));
     ctx.set_paint(rgba(255, 0, 60, 180));
     ctx.fill_path(&Circle::new((470.0, 60.0), 35.0).to_path(0.1));
     ctx.pop_layer();
-    // nested: an opacity layer clipped to a circle, inside a clip
     ctx.push_clip_layer(&Rect::new(200.0, 0.0, 330.0, 80.0).to_path(0.1));
     ctx.push_clip_layer(&Circle::new((260.0, 40.0), 45.5).to_path(0.1));
     ctx.push_opacity_layer(0.3);
@@ -68,8 +52,6 @@ fn scene() -> RenderContext {
     ctx.pop_layer();
     ctx.pop_layer();
     ctx.pop_layer();
-    // linear gradients: padded over a rectangle, repeated (rotated, translucent stops) in a circle, reflected under an
-    // opacity layer, and an opaque one over whole depth buckets
     let stops = |a: [u8; 4], b: [u8; 4]| [AlphaColor::<Srgb>::from_rgba8(a[0], a[1], a[2], a[3]), AlphaColor::<Srgb>::from_rgba8(b[0], b[1], b[2], b[3])];
     ctx.set_paint(Gradient::new_linear(Point::new(10.0, 0.0), Point::new(120.0, 0.0)).with_stops(stops([255, 0, 0, 255], [0, 0, 255, 255]).as_slice()));
     ctx.fill_rect(&Rect::new(0.0, 100.0, 130.0, 130.0));
@@ -83,20 +65,16 @@ fn scene() -> RenderContext {
     ctx.pop_layer();
     ctx.set_paint(Gradient::new_linear(Point::new(0.0, 0.0), Point::new(512.0, 0.0)).with_stops(stops([10, 20, 30, 255], [200, 100, 50, 255]).as_slice()));
     ctx.fill_rect(&Rect::new(0.0, 240.0, 512.0, 256.0));
-    // radial gradients: plain (padded), two-point with the focus inside (repeated, reflected)
     ctx.set_paint(Gradient::new_radial(Point::new(200.0, 60.0), 45.0).with_stops(stops([255, 255, 255, 255], [255, 0, 128, 90]).as_slice()));
     ctx.fill_rect(&Rect::new(150.0, 10.0, 250.0, 110.0));
     ctx.set_paint(Gradient::new_two_point_radial(Point::new(455.0, 200.0), 5.0, Point::new(440.0, 190.0), 40.0).with_extend(Extend::Repeat).with_stops(stops([0, 0, 255, 255], [255, 200, 0, 255]).as_slice()));
     ctx.fill_path(&Circle::new((440.0, 190.0), 50.0).to_path(0.1));
     ctx.set_paint(Gradient::new_two_point_radial(Point::new(90.0, 40.0), 0.0, Point::new(70.0, 50.0), 30.0).with_extend(Extend::Reflect).with_stops(stops([0, 128, 0, 255], [240, 240, 240, 255]).as_slice()));
     ctx.fill_rect(&Rect::new(20.0, 10.0, 140.0, 95.0));
-    // sweep gradients: a full turn (its center on a pixel corner: 0/0 there), a part of one repeated
     ctx.set_paint(Gradient::new_sweep(Point::new(300.0, 140.0), 0.0, std::f32::consts::TAU).with_stops(stops([255, 0, 0, 255], [0, 0, 255, 255]).as_slice()));
     ctx.fill_path(&Circle::new((300.0, 140.0), 38.0).to_path(0.1));
     ctx.set_paint(Gradient::new_sweep(Point::new(230.5, 200.25), 0.3, 1.9).with_extend(Extend::Repeat).with_stops(stops([255, 255, 0, 220], [0, 255, 255, 120]).as_slice()));
     ctx.fill_rect(&Rect::new(190.0, 160.0, 270.0, 240.0));
-    // nearest-neighbor images: a 7x5 pixmap (premultiplied, translucent texels too) scaled up and padded, rotated and
-    // repeated, reflected under an offset
     let mut pixmap = Pixmap::new(7, 5);
     for (i, px) in pixmap.data_as_u8_slice_mut().as_chunks_mut::<4>().0.iter_mut().enumerate() {
         let a = [255u8, 200, 128, 60][i % 4];
@@ -114,7 +92,6 @@ fn scene() -> RenderContext {
     ctx.set_paint_transform(Affine::translate((420.3, 20.7)) * Affine::scale(4.0));
     ctx.set_paint(image(Extend::Reflect, Extend::Repeat));
     ctx.fill_rect(&Rect::new(400.0, 10.0, 500.0, 90.0));
-    // bilinear images (lowp's medium quality): the same pixmap scaled up and padded, rotated and repeated, reflected
     let smooth = |x, y| Image { image: ImageSource::Pixmap(pixmap.clone()), sampler: ImageSampler { x_extend: x, y_extend: y, quality: ImageQuality::Medium, ..Default::default() } };
     ctx.set_paint_transform(Affine::translate((262.0, 100.0)) * Affine::scale(11.3));
     ctx.set_paint(smooth(Extend::Pad, Extend::Pad));
@@ -125,7 +102,6 @@ fn scene() -> RenderContext {
     ctx.set_paint_transform(Affine::translate((370.0, 150.0)) * Affine::scale(3.7));
     ctx.set_paint(smooth(Extend::Reflect, Extend::Reflect));
     ctx.fill_rect(&Rect::new(360.0, 140.0, 450.0, 230.0));
-    // bicubic images: scaled up and padded, rotated and repeated
     let cubic = |x, y| Image { image: ImageSource::Pixmap(pixmap.clone()), sampler: ImageSampler { x_extend: x, y_extend: y, quality: ImageQuality::High, ..Default::default() } };
     ctx.set_paint_transform(Affine::translate((5.0, 5.0)) * Affine::scale(8.6));
     ctx.set_paint(cubic(Extend::Pad, Extend::Pad));
@@ -134,8 +110,6 @@ fn scene() -> RenderContext {
     ctx.set_paint(cubic(Extend::Repeat, Extend::Repeat));
     ctx.fill_path(&Circle::new((475.0, 120.0), 34.0).to_path(0.1));
     ctx.reset_paint_transform();
-    // blend modes: each mix lowp computes in u8 over what is there (a translucent color, anti-aliased edges), then
-    // compose operators, then a layer blended as a whole
     let mixes = [Mix::Multiply, Mix::Screen, Mix::Overlay, Mix::Darken, Mix::Lighten, Mix::HardLight, Mix::Difference, Mix::Exclusion];
     for (i, mix) in mixes.into_iter().enumerate() {
         ctx.set_blend_mode(BlendMode::new(mix, Compose::SrcOver));
@@ -143,7 +117,6 @@ fn scene() -> RenderContext {
         let x = 8.0 + 62.5 * i as f64;
         ctx.fill_path(&Circle::new((x + 25.0, 120.0), 28.3).to_path(0.1));
     }
-    // the mixes lowp computes in f32, over a gradient and the shapes around
     let fmixes = [Mix::ColorDodge, Mix::ColorBurn, Mix::SoftLight, Mix::Hue, Mix::Saturation, Mix::Color, Mix::Luminosity];
     for (i, mix) in fmixes.into_iter().enumerate() {
         ctx.set_blend_mode(BlendMode::new(mix, Compose::SrcOver));
@@ -165,7 +138,6 @@ fn scene() -> RenderContext {
     ctx.set_paint(rgba(40, 120, 255, 200));
     ctx.fill_rect(&Rect::new(240.0, 20.0, 300.0, 70.0));
     ctx.pop_layer();
-    // masks: a 300x200 one (a ramp with stripes, smaller than the scene) on fills — plain, blended — and as a layer
     let bytes: Vec<u8> = (0..200u32).flat_map(|y| (0..300u32).map(move |x| if (x / 9 + y / 7) % 3 == 0 { 0 } else { ((x * 255 / 299 + y) % 256) as u8 })).collect();
     let mask = Mask::from_parts(bytes, 300, 200);
     ctx.set_mask(mask.clone());
@@ -176,7 +148,6 @@ fn scene() -> RenderContext {
     ctx.fill_rect(&Rect::new(10.0, 60.0, 120.0, 120.0));
     ctx.set_blend_mode(BlendMode::default());
     ctx.reset_mask();
-    // tinted images: alpha mask (a translucent tint) and multiply
     ctx.set_paint_transform(Affine::translate((180.0, 205.0)) * Affine::scale(6.0));
     ctx.set_paint(image(Extend::Repeat, Extend::Repeat));
     ctx.set_tint(Some(Tint { color: AlphaColor::<Srgb>::from_rgba8(255, 120, 0, 200), mode: TintMode::AlphaMask }));
@@ -186,7 +157,6 @@ fn scene() -> RenderContext {
     ctx.fill_rect(&Rect::new(260.0, 200.0, 340.0, 250.0));
     ctx.set_tint(None);
     ctx.reset_paint_transform();
-    // filter layers (filtered on the CPU, composited on the GPU): a blur, a drop shadow
     ctx.push_filter_layer(Filter::from_primitive(FilterPrimitive::GaussianBlur { std_deviation: 3.5, edge_mode: EdgeMode::None }));
     ctx.set_paint(rgba(255, 60, 160, 255));
     ctx.fill_path(&Circle::new((400.0, 220.0), 22.0).to_path(0.1));
@@ -195,7 +165,6 @@ fn scene() -> RenderContext {
     ctx.set_paint(rgba(250, 250, 120, 255));
     ctx.fill_rect(&Rect::new(440.0, 200.0, 490.0, 240.0));
     ctx.pop_layer();
-    // box shadows (blurred rounded rectangles): a soft one, a tight one under a rotation, an inverted one
     ctx.set_paint(rgba(0, 0, 0, 170));
     ctx.fill_blurred_rounded_rect(&Rect::new(130.0, 200.0, 230.0, 245.0), 12.0, 6.5, false);
     ctx.set_transform(Affine::rotate_about(0.3, Point::new(300.0, 50.0)));
@@ -211,9 +180,6 @@ fn scene() -> RenderContext {
     ctx
 }
 
-/// Radial gradients undefined somewhere (the f32 painter, transparent where t is undefined): a strip (equal radii), a
-/// focus on the end circle, a focus outside it, swapped radii, a start circle around the end one; pad, repeat,
-/// reflect, translucent stops.
 fn undefined() -> RenderContext {
     let mut ctx = RenderContext::new(256, 128);
     let stops = |a: [u8; 4], b: [u8; 4]| [AlphaColor::<Srgb>::from_rgba8(a[0], a[1], a[2], a[3]), AlphaColor::<Srgb>::from_rgba8(b[0], b[1], b[2], b[3])];

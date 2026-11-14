@@ -1,15 +1,10 @@
-//! `detour-from-gpu`: shaders written in the `gpu` dialect. Every `gpu.func` of a `gpu.module` becomes a `func.func`
-//! of the module (its `detour.stage` kept; a kernel without one is a compute shader), `gpu.return` a `func.return`.
-
 use mlirformat::Error;
 use mlirpass::{Body, OpData, OpId, Quiet, Rewriter, pass};
 
 use crate::base::Stage;
 
-/// What a `gpu.func` keeps as a `func.func`.
 const KEPT: &[&str] = &["sym_name", "function_type", "arg_attrs", "res_attrs", "sym_visibility", Stage::ATTR];
 
-/// `detour-from-gpu`.
 #[pass("detour-from-gpu", on = "builtin.module")]
 pub fn detour_from_gpu<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     let top = body.top_block(op);
@@ -29,7 +24,6 @@ pub fn detour_from_gpu<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
             if rw.body[f].get(Stage::ATTR).is_none() && rw.body[f].get("gpu.kernel").is_some() {
                 data.set(Stage::ATTR, Stage::Compute.into());
             }
-            // the body moves over whole
             rw.set_before(m);
             let new = rw.create_with(data, &[], |b, new| {
                 let regions = core::mem::take(&mut b[f].regions);

@@ -1,9 +1,3 @@
-//! detour against OpenGL (Mesa's iris) on the same Xe3: `cargo bench --features xe3 --bench against_opengl -- [N]`.
-//! The workloads, the timing and the checks are in `common`; this is the GL side, written the way a GL application
-//! would do the same frames: a 4.6 core context on EGL's surfaceless platform (no window, no swap), a framebuffer with
-//! an RGBA8 texture, `glClear` for the clear, the shaders of `common` compiled by the driver, a fence a frame and at
-//! most `RING` frames in flight. GL has no recording apart from submitting, so its `record` is left out.
-
 mod common;
 
 use std::time::{Duration, Instant};
@@ -12,9 +6,8 @@ use common::{Api, Report, Scene};
 use glow::HasContext;
 use khronos_egl as egl;
 
-/// EGL_MESA_platform_surfaceless
 const PLATFORM_SURFACELESS_MESA: egl::Enum = 0x31DD;
-/// how long one `glClientWaitSync` blocks before it is asked again (ns)
+
 const WAIT_NS: i32 = 1_000_000_000;
 
 struct Gl {
@@ -90,7 +83,6 @@ impl Gl {
             let full = buffer(glow::ARRAY_BUFFER, &common::instances())?;
             let out = buffer(glow::SHADER_STORAGE_BUFFER, &vec![0; *common::LANES.iter().max().unwrap() as usize * 4])?;
 
-            // vertex arrays: (buffer, location, components, stride, offset, per instance)
             let vao = |attrs: &[(glow::Buffer, u32, i32, i32, i32, bool)]| -> Result<glow::VertexArray, String> {
                 let v = gl.create_vertex_array()?;
                 gl.bind_vertex_array(Some(v));
@@ -150,7 +142,6 @@ impl Gl {
         }
     }
 
-    /// Ends what was issued with a fence and flushes it to the GPU.
     unsafe fn fence(&mut self) -> glow::Fence {
         unsafe {
             let f = self.gl.fence_sync(glow::SYNC_GPU_COMMANDS_COMPLETE, 0).expect("fence");
@@ -168,7 +159,6 @@ impl Gl {
 }
 
 impl Api for Gl {
-    /// the ring slot whose fence ends the frame
     type Done = usize;
 
     fn name(&self) -> String {
@@ -223,7 +213,6 @@ impl Api for Gl {
             self.gl.use_program(Some(self.compute));
             for _ in 0..count {
                 self.gl.dispatch_compute(lanes / 16, 1, 1);
-                // detour flushes each dispatch's writes before the next command
                 self.gl.memory_barrier(glow::SHADER_STORAGE_BARRIER_BIT | glow::BUFFER_UPDATE_BARRIER_BIT);
             }
             let f = self.fence();

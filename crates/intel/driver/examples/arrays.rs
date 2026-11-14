@@ -1,7 +1,3 @@
-//! 2D array textures (`texture_2d_array`, `Context::texture_array`) on Xe3, pixel by pixel: three 4 x 4 layers of
-//! distinct texels, a 96 x 16 target in six strips, each sampling (nearest) one layer index: 0, 1, 2, then 1.4 and 1.6
-//! (rounded: 1, 2), and -1 / 7 (clamped to the first and last layer).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -39,7 +35,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (extra, cases) in [("", STRIPS.to_vec()), ("past the last", vec![(7.0, 2)])] {
         let n = cases.len() as u32;
         let strip = W / 6;
-        // strip k: x over its 16 pixels (u 0 .. 1), the whole height (v 0 .. 1), its layer index
         let mut v = Vec::new();
         for (k, &(layer, _)) in cases.iter().enumerate() {
             let x0 = (k as u32 * strip) as f32 / W as f32 * 2.0 - 1.0;

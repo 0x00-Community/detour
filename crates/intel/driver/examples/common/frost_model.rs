@@ -1,6 +1,3 @@
-//! The definition of `detour_intel::Frost`'s effects (its module docs) as plain Rust, byte for byte: the reference of
-//! the `frost` and `compose` examples. Images are RGBA8, premultiplied unless said otherwise.
-
 #![allow(dead_code, reason = "each example uses part of it")]
 
 use detour::base::{Backdrop, Effect, Shadow};
@@ -8,7 +5,6 @@ use detour::xe3::Canvas;
 
 pub const INV: f32 = 1.0 / 255.0;
 
-/// An RGBA8 image, rows packed.
 #[derive(Clone)]
 pub struct Image {
     pub w: usize,
@@ -24,13 +20,11 @@ pub fn lerp(a: [f32; 4], b: [f32; 4], t: f32) -> [f32; 4] {
     std::array::from_fn(|c| t.mul_add(b[c] - a[c], a[c]))
 }
 
-/// `s` over `d`.
 pub fn over(s: [f32; 4], d: [f32; 4]) -> [u8; 4] {
     let k = (255.0 - s[3]) * INV;
     std::array::from_fn(|c| pack(s[c] + d[c] * k))
 }
 
-/// `backdrop-filter: blur(blur) saturate(saturate) brightness(brightness)` as an effect.
 pub fn frosted(blur: f32, saturate: f32, brightness: f32) -> Effect {
     let mut effect = Effect { blur, matrix: None };
     effect.matrix(detour::base::ColorMatrix::saturate(saturate).0);
@@ -47,13 +41,11 @@ pub const DOWN: [(i32, i32, f32); 5] = [(0, 0, 4.0), (-1, -1, 1.0), (1, 1, 1.0),
 pub const UP: [(i32, i32, f32); 8] = [(-2, 0, 1.0), (-1, 1, 2.0), (0, 2, 1.0), (1, 1, 2.0), (2, 0, 1.0), (1, -1, 2.0), (0, -2, 1.0), (-1, -1, 2.0)];
 
 impl Image {
-    /// The texel at (x, y) clamped to the image.
     pub fn texel(&self, x: i32, y: i32) -> [f32; 4] {
         let (x, y) = (x.clamp(0, self.w as i32 - 1), y.clamp(0, self.h as i32 - 1));
         self.px[y as usize * self.w + x as usize].map(f32::from)
     }
 
-    /// Tap (dx, dy) around (x0, y0) with the fractions (fx, fy).
     pub fn tap(&self, (x0, fx): (i32, f32), (y0, fy): (i32, f32), dx: i32, dy: i32) -> [f32; 4] {
         let (x, y) = (x0 + dx, y0 + dy);
         lerp(lerp(self.texel(x, y), self.texel(x + 1, y), fx), lerp(self.texel(x, y + 1), self.texel(x + 1, y + 1), fx), fy)
@@ -68,7 +60,6 @@ impl Image {
         self.tap(Self::split(x), Self::split(y), 0, 0)
     }
 
-    /// One Kawase pass into `w` x `h`: taps (dx, dy, weight) summed in order, then normalized.
     pub fn pass(&self, w: usize, h: usize, taps: &[(i32, i32, f32)], norm: impl Fn(f32) -> f32) -> Image {
         let (kx, ky) = (self.w as f32 / w as f32, self.h as f32 / h as f32);
         let mut px = Vec::with_capacity(w * h);
@@ -92,7 +83,6 @@ impl Image {
         Image { w, h, px }
     }
 
-    /// Blurred through `n` levels.
     pub fn blur(&self, n: usize) -> Image {
         let mut levels = vec![self.clone()];
         for i in 1..=n {
@@ -112,7 +102,6 @@ impl Image {
         Canvas { addr: 0, size: [self.w as u32, self.h as u32], stride: self.w as u32 }
     }
 
-    /// `f` over every pixel of `[x, y, w, h]`.
     pub fn blend(&mut self, [x0, y0, w, h]: [u32; 4], f: impl Fn(usize, usize) -> [f32; 4]) {
         for y in y0 as usize..(y0 + h) as usize {
             for x in x0 as usize..(x0 + w) as usize {
@@ -153,7 +142,6 @@ impl Image {
         }
     }
 
-    /// The layer's w x h premultiplied.
     pub fn flat(layer: &Image, premultiplied: bool, w: usize, h: usize) -> Image {
         let mut flat = layer.crop([0, 0, w, h]);
         if !premultiplied {
@@ -173,7 +161,6 @@ impl Image {
         self.blend(pixels, |cx, cy| Self::matrixed(&m, src.texel(cx as i32 - x as i32, cy as i32 - y as i32)));
     }
 
-    /// A premultiplied texel (0 ..= 255) made straight, through the colour matrix `m`, clamped, premultiplied again.
     fn matrixed(m: &[f32; 20], p: [f32; 4]) -> [f32; 4] {
         let c = if p[3] == 0.0 {
             [0.0; 4]
@@ -185,13 +172,11 @@ impl Image {
         premultiply([row(0), row(1), row(2), row(3)])
     }
 
-    /// `layer` with its top left at `origin`, over the canvas inside `clip`.
     pub fn place(&mut self, layer: &Image, [ox, oy]: [u32; 2], clip: [u32; 4]) {
         let Some(pixels) = clip_to(clip, [self.w as u32, self.h as u32]) else { return };
         self.blend(pixels, |x, y| layer.texel(x as i32 - ox as i32, y as i32 - oy as i32));
     }
 
-    /// `rect` transparent.
     pub fn clear(&mut self, rect: [u32; 4]) {
         let Some([x0, y0, w, h]) = clip_to(rect, [self.w as u32, self.h as u32]) else { return };
         for y in y0..y0 + h {
@@ -222,9 +207,7 @@ pub fn intersect(a: [u32; 4], b: [u32; 4]) -> [u32; 4] {
     [x0, y0, x1.saturating_sub(x0), y1.saturating_sub(y0)]
 }
 
-/// `r` ∩ the canvas, if not empty.
 pub fn clip_to(r: [u32; 4], [w, h]: [u32; 2]) -> Option<[u32; 4]> {
     let r = intersect(r, [0, 0, w, h]);
     (r[2] > 0 && r[3] > 0).then_some(r)
 }
-

@@ -1,7 +1,3 @@
-//! Workgroups of more than one thread on Xe3: shared memory (SLM) and barriers (`detour.workgroup`, `detour.shared`,
-//! `detour.barrier`; `workgroups/workgroups.mlir`): each workgroup's 64 values reversed through shared memory, and
-//! counters in shared memory added into atomically, checked on the CPU.
-
 use detour::base::{Gpu, Native};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -24,7 +20,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     cx.wait(s)?;
     let read = |b: &[u8]| b.chunks(4).map(|c| u32::from_le_bytes(c.try_into().unwrap())).collect::<Vec<u32>>();
     let got = read(&dst.bytes()?[..N * 4]);
-    // invocation l of workgroup g gets the value of invocation 63 - l (past the end: the last value)
     let want: Vec<u32> = (0..N).map(|i| src[(i / 64 * 64 + 63 - i % 64).min(N - 1)]).collect();
     let bad = got.iter().zip(&want).filter(|(g, w)| g != w).count();
     let cs = read(&counts.bytes()?[..groups * 16]);

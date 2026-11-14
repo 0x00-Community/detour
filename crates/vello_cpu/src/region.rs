@@ -1,15 +1,9 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! Splitting a single mutable buffer into regions that can be accessed concurrently.
-
 use crate::vello_cpu::fine::COLOR_COMPONENTS;
 use alloc::vec::Vec;
 use vello_common::geometry::RectU16;
 use vello_common::pixmap::PixmapMut;
 use vello_common::tile::Tile;
 
-/// A view into a part of a single strip row of a pixmap.
 #[derive(Default, Debug)]
 pub struct Region<'a> {
     pub(crate) row_idx: usize,
@@ -53,7 +47,6 @@ impl<'a> Region<'a> {
         self.width
     }
 
-    /// Return a horizontal sub-span of the region.
     pub(crate) fn sub_span(&mut self, x: u16, width: u16) -> Region<'_> {
         let x_offset = usize::from(x) * COLOR_COMPONENTS;
         let row_width_bytes = usize::from(width) * COLOR_COMPONENTS;
@@ -110,7 +103,6 @@ impl<'a> Region<'a> {
     }
 }
 
-/// Split a pixmap into an array of regions.
 pub(crate) struct Regions<'a> {
     regions: Vec<Region<'a>>,
 }

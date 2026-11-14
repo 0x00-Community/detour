@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::fine::common::gradient::SimdGradientKind;
 use vello_common::encode::{FocalData, RadialKind};
 use vello_common::fearless_simd::{Simd, SimdBase, SimdFloat, f32x8};
@@ -90,7 +87,6 @@ impl<S: Simd> SimdGradientKind<S> for SimdRadialKind<S> {
                 };
 
                 if !focal_data.is_well_behaved() {
-                    // Radii < 0 should be masked out, too.
                     let is_degenerate = simd.simd_le_f32x8(t, f32x8::splat(simd, 0.0));
 
                     t = simd.select_f32x8(is_degenerate, f32x8::splat(simd, f32::NAN), t);

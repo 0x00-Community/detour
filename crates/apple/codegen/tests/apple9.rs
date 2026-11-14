@@ -1,9 +1,3 @@
-//! detour's compute/ints shader through the Apple9 backend (mlirpass's Apple9 target): its machine code is
-//! tests/apple9/ints.expected (`APPLE9_WRITE=<dir>` writes it there). With `APPLE9_METAL` (mlirpass's
-//! scripts/apple9_metal.swift built: `swiftc -O scripts/apple9_metal.swift -o target/apple9-metal`) and `APPLE9_DONOR`
-//! (its scripts/apple9_donor.metal) it also runs on this Mac's GPU, an Apple9 (M3 / M4), and every result is checked:
-//! 144 invocations (nine workgroups of 16, the last hardware workgroup half full).
-
 use detour::agx_codegen::apple9::Apple9;
 
 fn code() -> (String, Vec<u8>, u32) {
@@ -25,7 +19,6 @@ fn ints_as_the_m4_runs_it() {
     assert_eq!(text, include_str!("apple9/ints.expected"));
 }
 
-/// The twenty results of (a, b): the semantics of examples/compute/ints.mlir.
 fn want(a: u32, b: u32) -> [u32; 20] {
     let (sa, sb, s) = (a as i32, b as i32, b & 31);
     let fk = (sa as f32) * 0.37f32;

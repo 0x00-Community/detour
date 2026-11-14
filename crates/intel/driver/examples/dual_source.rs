@@ -1,9 +1,3 @@
-//! Dual-source blending (WebGPU `dual-source-blending`: a fragment function with `detour.dual_source` returns two colors
-//! for its one target; blend factors `src1`, `one-minus-src1`, `src1-alpha`, `one-minus-src1-alpha`) on Xe3: one SIMD16
-//! dual-source render target write of both colors (Xe2+ keeps them SIMD16). A whole-target triangle, color 0 (1, 0.5, 0.25, 1) and color 1
-//! (0.5, 0.5, 1, 0.5), over (0.25, 0.75, 0.5, 1): src · src1 + 0 ⇒ (128, 64, 64, 128); src · 1 + dst · (1 − src1 α)
-//! ⇒ (255, 223, 128, 255) (red and alpha clamped). Pixel by pixel, 1920x1080.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

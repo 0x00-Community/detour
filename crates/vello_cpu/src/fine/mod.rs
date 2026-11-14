@@ -1,12 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! Fine rasterization stage of the rendering pipeline.
-//!
-//! This module implements the fine rasterization phase, which processes tiles at the pixel level.
-//! It supports both high-precision (f32) and low-precision (u8) rendering paths, along with
-//! various paint types including solid colors, gradients, images, and blurred rounded rectangles.
-
 mod common;
 mod highp;
 mod lowp;
@@ -55,26 +46,15 @@ pub use crate::vello_cpu::span::TileAlignedSpan;
 pub use highp::F32Kernel;
 pub use lowp::U8Kernel;
 
-/// Offset to shift from pixel corner to pixel center for sampling.
 const PIXEL_CENTER_OFFSET: f64 = 0.5;
 
-/// Number of color components per pixel (RGBA).
 pub(crate) const COLOR_COMPONENTS: usize = 4;
 
-/// Number of color components in a single column of a tile (height * components).
 pub(crate) const TILE_HEIGHT_COMPONENTS: usize = Tile::HEIGHT as usize * COLOR_COMPONENTS;
 
-/// Trait for numeric types used in fine rasterization.
-///
-/// This trait abstracts over `f32` and `u8` to allow the same rendering logic
-/// to work with both high-precision (floating-point) and low-precision (integer)
-/// representations. This enables performance optimizations while maintaining accuracy
-/// where needed.
 pub trait Numeric: Copy + Default + Clone + Debug + PartialEq + Send + Sync + 'static {
-    /// The zero value for this numeric type (0.0 for f32, 0 for u8).
     const ZERO: Self;
 
-    /// The maximum opacity value for this numeric type (1.0 for f32, 255 for u8).
     const ONE: Self;
 }
 
@@ -88,15 +68,9 @@ impl Numeric for u8 {
     const ONE: Self = 255;
 }
 
-/// Trait for SIMD vector types that can convert between f32 and u8 representations.
-///
-/// This trait enables efficient batch conversions between different numeric representations
-/// during rendering operations, supporting both high-precision and low-precision rendering paths.
 pub trait NumericVec<S: Simd>: Copy + Clone + Send + Sync {
-    /// Convert from a SIMD vector of f32 values to this type.
     fn from_f32(simd: S, val: f32x16<S>) -> Self;
 
-    /// Convert from a SIMD vector of u8 values to this type.
     fn from_u8(simd: S, val: u8x16<S>) -> Self;
 }
 
@@ -129,10 +103,6 @@ impl<S: Simd> NumericVec<S> for u8x16<S> {
     }
 }
 
-/// Convert a SIMD vector of u8 values to f32 values.
-///
-/// This function efficiently converts 16 u8 values to their f32 equivalents using SIMD operations,
-/// preserving the values without normalization (i.e., 255 becomes 255.0, not 1.0).
 #[inline(always)]
 pub(crate) fn u8_to_f32<S: Simd>(val: u8x16<S>) -> f32x16<S> {
     let simd = val.simd;
@@ -172,19 +142,11 @@ pub(crate) fn u8_to_f32<S: Simd>(val: u8x16<S>) -> f32x16<S> {
     simd.combine_f32x8(simd.combine_f32x4(p1, p2), simd.combine_f32x4(p3, p4))
 }
 
-/// Trait for SIMD vector types used in compositing and blending operations.
-///
-/// This trait abstracts over different SIMD vector widths (f32x16 for high-precision,
-/// u8x32 for low-precision) to enable efficient batch processing of pixel data during
-/// blending and compositing.
 pub trait CompositeType<N: Numeric, S: Simd>: Copy + Clone + Send + Sync {
-    /// The number of numeric values this composite type can hold.
     const LENGTH: usize;
 
-    /// Load values from a slice into this composite type.
     fn from_slice(simd: S, slice: &[N]) -> Self;
 
-    /// Create a composite type by repeating a single RGBA color across all elements.
     fn from_color(simd: S, color: [N; 4]) -> Self;
 }
 
@@ -216,46 +178,19 @@ impl<S: Simd> CompositeType<u8, S> for u8x32<S> {
     }
 }
 
-/// A kernel for performing fine rasterization.
-///
-/// This trait defines the interface for tile-level rendering operations, abstracting over
-/// different numeric precisions (f32 vs u8). Implementations provide the low-level pixel
-/// manipulation, blending, and painting operations needed to render tiles.
-///
-/// The two main implementations are:
-/// - [`F32Kernel`]: High-precision rendering using 32-bit floating-point values
-/// - [`U8Kernel`]: Low-precision rendering using 8-bit integer values
 pub trait FineKernel<S: Simd>: Send + Sync + 'static {
-    /// The basic underlying numerical type of the kernel (f32 or u8).
     type Numeric: Numeric;
 
-    /// The SIMD composite type used for efficient batch blending and compositing operations.
     type Composite: CompositeType<Self::Numeric, S>;
 
-    /// The SIMD vector type used for conversions between u8 and f32 representations.
     type NumericVec: NumericVec<S>;
 
-    /// Extract and convert a premultiplied color to the kernel's numeric type.
-    ///
-    /// Converts RGBA components from the standard premultiplied color format to
-    /// the kernel's internal representation (e.g., 0.0-1.0 for f32, 0-255 for u8).
     fn extract_color(color: PremulColor) -> [Self::Numeric; 4];
 
-    /// Pack row scratch data into a row-major output buffer.
     fn pack(simd: S, scratch: &[Self::Numeric], width: usize, region: &mut Region<'_>);
 
-    /// Unpack row-major input data into row scratch.
     fn unpack(simd: S, region: &mut Region<'_>, width: usize, scratch: &mut [Self::Numeric]);
 
-    /// Apply a filter to a layer.
-    ///
-    /// This is used for applying filters to whole layers, which is necessary for
-    /// spatial filters (like blur) that need to access neighboring pixels. The filter
-    /// is applied in-place to the provided pixmap.
-    ///
-    /// The transform parameter is used to scale filter parameters based on the current
-    /// transformation matrix (e.g., zoom level), ensuring filters look consistent
-    /// regardless of scale.
     #[expect(
         private_interfaces,
         reason = "`FineKernel` is public but this specific method is not needed."
@@ -267,14 +202,7 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
         transform: Affine,
     );
 
-    /// Fill the target buffer with a solid color.
-    ///
-    /// Efficiently replicates the given RGBA color across all pixels in the target buffer.
     fn copy_solid(simd: S, target: &mut [Self::Numeric], color: [Self::Numeric; 4]);
-    /// Create a painter for rendering gradients.
-    ///
-    /// Returns a painter that can render linear, radial, or sweep gradients based on
-    /// pre-computed t values (gradient interpolation parameters).
     fn gradient_painter<'a>(
         simd: S,
         gradient: &'a EncodedGradient,
@@ -286,13 +214,6 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
         )
     }
 
-    /// Create a painter for rendering gradients with undefined region support.
-    ///
-    /// Similar to `gradient_painter`, but with support for masking undefined locations
-    /// (used for radial gradients that may have mathematically undefined regions).
-    ///
-    /// This is intentionally a duplicate of the default [`FineKernel::gradient_painter`]
-    /// implementation--the `U8Kernel` overrides that method, but not this one.
     fn gradient_painter_with_undefined<'a>(
         simd: S,
         gradient: &'a EncodedGradient,
@@ -303,10 +224,6 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
             || GradientPainter::new(simd, gradient, t_vals),
         )
     }
-    /// Create a painter for rendering axis-aligned nearest-neighbor images.
-    ///
-    /// Optimized painter for images with `Low` quality and no skewing component in their
-    /// transform. This is the fastest image rendering path.
     fn plain_nn_image_painter<'a>(
         simd: S,
         image: &'a EncodedImage,
@@ -320,10 +237,6 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
         )
     }
 
-    /// Create a painter for rendering nearest-neighbor images with transforms.
-    ///
-    /// Similar to `plain_nn_image_painter`, but supports arbitrary affine transforms
-    /// including skewing and rotation.
     fn nn_image_painter<'a>(
         simd: S,
         image: &'a EncodedImage,
@@ -337,9 +250,6 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
         )
     }
 
-    /// Create a painter for rendering images with `Medium` quality filtering.
-    ///
-    /// Uses bilinear filtering for smoother appearance than nearest-neighbor.
     fn medium_quality_image_painter<'a>(
         simd: S,
         image: &'a EncodedImage,
@@ -353,9 +263,6 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
         )
     }
 
-    /// Create a painter for rendering axis-aligned images with `Medium` quality filtering.
-    ///
-    /// Optimized painter for images with bilinear filtering and no skewing component.
     fn plain_medium_quality_image_painter<'a>(
         simd: S,
         image: &'a EncodedImage,
@@ -369,9 +276,6 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
         )
     }
 
-    /// Create a painter for rendering images with `High` quality filtering.
-    ///
-    /// Uses high-quality filtering for the best visual appearance.
     fn high_quality_image_painter<'a>(
         simd: S,
         image: &'a EncodedImage,
@@ -385,10 +289,6 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
         )
     }
 
-    /// Create a painter for rendering blurred rounded rectangles.
-    ///
-    /// Efficiently renders rounded rectangles with gaussian blur applied,
-    /// computing the blur analytically rather than as a post-process.
     fn blurred_rounded_rectangle_painter(
         simd: S,
         rect: &EncodedBlurredRoundedRectangle,
@@ -400,28 +300,12 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
             || BlurredRoundedRectFiller::new(simd, rect, start_x, start_y),
         )
     }
-    /// Apply a mask to the destination buffer.
-    ///
-    /// Multiplies each pixel in the destination by the corresponding mask value,
-    /// effectively masking out or reducing the opacity of pixels.
     fn apply_mask(simd: S, dest: &mut [Self::Numeric], src: impl Iterator<Item = Self::NumericVec>);
 
-    /// Apply a painter to render content into the destination buffer.
-    ///
-    /// Invokes the painter to generate pixel values and writes them to the destination.
     fn apply_painter<'a>(simd: S, dest: &mut [Self::Numeric], painter: impl Painter + 'a);
 
-    /// Apply an image tint to an already-painted buffer.
-    ///
-    /// This is called as a post-pass after `apply_painter`, only when a tint is
-    /// present. Keeping tint application out of the per-pixel iterator avoids
-    /// regressing the non-tinted fast path.
     fn apply_tint(simd: S, dest: &mut [Self::Numeric], tint: &Tint);
 
-    /// Perform alpha compositing with a solid color over the target buffer.
-    ///
-    /// Blends a solid RGBA color over the existing contents using standard alpha compositing
-    /// (Porter-Duff source-over). Optionally applies additional per-pixel alpha values.
     fn alpha_composite_solid(
         simd: S,
         target: &mut [Self::Numeric],
@@ -429,10 +313,6 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
         alphas: Option<&[u8]>,
     );
 
-    /// Perform alpha compositing with a source buffer over the destination buffer.
-    ///
-    /// Blends the source buffer contents over the destination using standard alpha compositing.
-    /// Optionally applies additional per-pixel alpha values.
     fn alpha_composite_buffer(
         simd: S,
         dest: &mut [Self::Numeric],
@@ -440,10 +320,6 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
         alphas: Option<&[u8]>,
     );
 
-    /// Blend the source into the destination with a specified blend mode.
-    ///
-    /// Applies advanced blending operations (e.g., multiply, screen, overlay) as specified
-    /// by the blend mode. Optionally applies additional per-pixel alpha values.
     fn blend(
         simd: S,
         dest: &mut [Self::Numeric],
@@ -455,7 +331,6 @@ pub trait FineKernel<S: Simd>: Send + Sync + 'static {
         mask: Option<&Mask>,
     );
 
-    /// Fill a row scratch span with a solid color, optionally modulated by per-pixel alphas.
     fn fill_solid(simd: S, dest: &mut [Self::Numeric], color: PremulColor, alphas: Option<&[u8]>) {
         let color = Self::extract_color(color);
 
@@ -497,7 +372,6 @@ pub(crate) fn rasterize_region<S: Simd, T: FineKernel<S>>(
         target_init = TargetInit::Clear(PremulColor::from_alpha_color(AlphaColor::TRANSPARENT));
     }
 
-    // Render depth-buffer commands front-to-back, with depth-buffer read and write.
     for &cmd in row.depth_cmds.iter().rev() {
         let attrs = &bucketer.paint_fill_attrs[cmd.attrs_idx as usize];
 
@@ -507,10 +381,8 @@ pub(crate) fn rasterize_region<S: Simd, T: FineKernel<S>>(
         });
     }
 
-    // Initialize any regions in the fine buffer that haven't been filled with an opaque fill.
     fine.init_uncovered_range(span, region, target_init, depth);
 
-    // Render the main commands back-to-front, with depth-buffer read.
     for cmd in &row.render_cmds {
         fine.run_cmd(*cmd, bucketer, row, scene_y, resources, depth);
     }
@@ -520,40 +392,23 @@ pub(crate) fn rasterize_region<S: Simd, T: FineKernel<S>>(
         fine.pop_buf();
     }
 
-    // Pack the composited result back into the pixmap.
     fine.pack(region);
 }
 
-/// Fine rasterizer for processing strip rows at the pixel level.
 #[derive(Debug)]
 #[doc(hidden)]
 pub struct Fine<S: Simd, T: FineKernel<S>> {
-    /// The SIMD context used for vectorized operations.
     simd: S,
-    // TODO: If we make sure that strips never exceed the viewport, we can delete this.
-    /// Pixel span covered by the blend buffers.
     buffer_span: TileAlignedSpan,
-    /// Stack of blend buffers for managing layers and composition.
-    ///
-    /// Each layer pushes a new buffer onto this stack, and layers are composited
-    /// by popping and blending with the buffer below.
     blend_buffers: Vec<Vec<T::Numeric>>,
-    /// Pool for reusing layer buffer allocations.
     buffer_pool: VecPool<T::Numeric>,
-    /// Intermediate buffer used by painters to store generated pixel data before compositing.
     paint_buf: Vec<T::Numeric>,
-    /// Buffer for storing gradient interpolation parameters (t values).
     f32_buf: Vec<f32>,
-    /// The current strip row y-coordinate in scene/filter coordinates.
     row_y: u16,
-    /// The origin of the current target we are rendering into.
     origin: (u16, u16),
 }
 
 impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
-    /// Create a new fine rasterizer with the given SIMD context.
-    ///
-    /// Initializes all scratch buffers and sets up the initial blend buffer.
     #[doc(hidden)]
     pub fn new(simd: S, buffer_width: u16) -> Self {
         let scratch_len = usize::from(buffer_width) * TILE_HEIGHT_COMPONENTS;
@@ -583,14 +438,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
         start..start + len
     }
 
-    // The reason that we have this optimization is that, as was determined by profiling
-    // just always clearing the whole fine buffer can be expensive, especially for larger
-    // viewports. This is what a previous version of Vello CPU did.
-    // With the current version, we can utilize the fact that we have a depth buffer where
-    // a certain range of pixels is already filled with an opaque paint. Therefore, we only
-    // need to clear (or unpack) the parts that are not covered by such a paint.
-    /// Initialize every range in the buffer that has not been filled yet
-    /// with a paint.
     fn init_uncovered_range(
         &mut self,
         scratch_span: TileAlignedSpan,
@@ -606,9 +453,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
                     |span| {
                         if let Some(span) = span
                             .as_span()
-                            // The pixmap we load from does not necessarily have a width that is
-                            // a multiple of the tile width! We therefore clamp and leave any
-                            // tail in the blend buffer uninitialized.
                             .intersect(Span::new(0, region.width()))
                         {
                             let mut region = region.sub_span(span.pixel_x(), span.pixel_width());
@@ -617,8 +461,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
                     },
                 );
             }
-            // We can hint the compiler to lower this into a memory-zeroing operation,
-            // hence why we handle this case explicitly.
             TargetInit::Clear(color) if color.is_transparent() => {
                 depth.for_each_unset_run(
                     scratch_span,
@@ -649,12 +491,8 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
 
     fn push_buf(&mut self, span: Option<TileAlignedSpan>) {
         let mut buf = self.buffer_pool.take();
-        // Reused vectors will retain their length, so in most cases this
-        // will be a no-op.
         buf.resize(self.blend_buffers[0].len(), T::Numeric::ZERO);
 
-        // Instead of always zeroing out the whole buffer, only zero the
-        // row-local span that will be read when compositing this layer.
         if let Some(span) = span.and_then(|span| span.intersect(self.buffer_span)) {
             buf[Self::scratch_range(span)].fill(T::Numeric::ZERO);
         }
@@ -666,7 +504,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
         self.buffer_pool.submit(popped);
     }
 
-    /// Writes the current buffer contents to the output row.
     #[doc(hidden)]
     pub fn pack(&self, region: &mut Region<'_>) {
         let width = usize::from(region.width());
@@ -675,9 +512,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
         T::pack(self.simd, scratch, width, region);
     }
 
-    /// Reads the pixels of the target back into the buffer.
-    ///
-    /// This does the opposite of [`Fine::pack`].
     #[doc(hidden)]
     pub fn unpack(&mut self, scratch_x_start: u16, region: &mut Region<'_>) {
         let scratch_x = usize::from(scratch_x_start);
@@ -692,10 +526,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
         );
     }
 
-    /// Execute a bucketed rendering command on the current strip row.
-    ///
-    /// This is the main dispatch method for fine rasterization. It processes paint fills,
-    /// layer buffers, filter layer composites, masks, opacity, and layer blending.
     fn run_cmd(
         &mut self,
         cmd: RenderCmd,
@@ -725,9 +555,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
                     fine.paint_fill(span, attrs, resources, alphas);
                 };
 
-                // Avoid using depth buffer if it's trivially skippable,
-                // since it's generally cheaper to not use it at all than consult it just to be
-                // returned the same span.
                 if !row.can_skip_depth(span, attrs.draw_id) {
                     depth.for_each_visible_run(span, attrs.draw_id, |span| {
                         paint_fill(self, span);
@@ -764,7 +591,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
                     );
                 };
 
-                // Same as for paint fills.
                 if !row.can_skip_depth(span, attrs.draw_id) {
                     depth.for_each_visible_run(span, attrs.draw_id, |span| {
                         layer_fill(self, span);
@@ -964,8 +790,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
         let sampler_y = f64::from(sample_y) + PIXEL_CENTER_OFFSET;
         let default_blend = attrs.blend_mode == BlendMode::default();
 
-        // We need to have this as a macro because closures cannot take generic arguments, and
-        // we would have to repeatedly provide all arguments if we made it a function.
         macro_rules! fill_complex_paint {
             ($may_have_transparency:expr, $filler:expr) => {
                 fill_complex_paint!($may_have_transparency, $filler, None::<&Tint>)
@@ -998,8 +822,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
                         );
                     }
                 } else {
-                    // Similarly to solid colors we can just override the previous values
-                    // if all colors in the gradient are fully opaque.
                     T::apply_painter(simd, dest, $filler);
                     if let Some(tint) = $tint {
                         T::apply_tint(simd, dest, tint);
@@ -1016,11 +838,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
                 );
             }
             EncodedPaint::Gradient(gradient) => {
-                // Note that we are calculating the t values first, store them in a separate
-                // buffer and then pass that buffer to the iterator instead of calculating
-                // the t values on the fly in the iterator. The latter would be faster, but
-                // it would probably increase code size a lot, because the functions for
-                // position calculation need to be inlined for good performance.
                 let t_vals = &mut self.f32_buf[..width * Tile::HEIGHT as usize];
 
                 match &gradient.kind {
@@ -1091,7 +908,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
 
                 match (image.has_skew(), image.nearest_neighbor()) {
                     (false, false) => {
-                        // Axis-aligned with filtering - use optimized plain painters
                         if image.sampler.quality == ImageQuality::Medium {
                             fill_complex_paint!(
                                 image.may_have_transparency,
@@ -1111,7 +927,6 @@ impl<S: Simd, T: FineKernel<S>> Fine<S, T> {
                         }
                     }
                     (true, false) => {
-                        // Skewed with filtering - use generic filtered painters
                         if image.sampler.quality == ImageQuality::Medium {
                             fill_complex_paint!(
                                 image.may_have_transparency,
@@ -1169,41 +984,19 @@ impl Debug for FineResources<'_> {
     }
 }
 
-/// Placement and compositing settings for fine rasterization into a target pixmap.
 #[derive(Clone, Copy)]
 pub(crate) struct FineRenderParams {
-    /// Scene/filter dimensions before clipping to the destination pixmap.
     pub(crate) scene_size: (u16, u16),
-    /// Destination offset in the target pixmap.
     pub(crate) target_offset: (u16, u16),
 }
 
-/// A trait for objects that can render pixel data into buffers.
-///
-/// Painters abstract over different content sources (gradients, images, etc.) and can
-/// generate pixel data in either u8 or f32 format. Implementations should provide at least
-/// one of these methods; the other can delegate through conversion.
-///
-/// Note: Some painters may only efficiently support one numeric type. The implementation
-/// may convert between types as needed.
 pub trait Painter: Sized {
-    /// Paint pixel data into a u8 buffer (values in 0-255 range).
     fn paint_u8(self, buf: &mut [u8]);
 
-    /// Paint pixel data into an f32 buffer (values in 0.0-1.0 range).
     fn paint_f32(self, buf: &mut [f32]);
 }
 
-/// Extension trait for creating position vectors for gradient and image sampling.
-///
-/// This trait provides a method to generate SIMD vectors of positions that advance
-/// correctly across a tile. It's used by painters to compute per-pixel coordinates
-/// for sampling operations.
 pub trait PosExt<S: Simd> {
-    /// Create a position vector that advances appropriately across a tile.
-    ///
-    /// Given a starting position and per-pixel advances in x and y directions,
-    /// generates a SIMD vector with the correct position for each element.
     fn splat_pos(simd: S, pos: f32, x_advance: f32, y_advance: f32) -> Self;
 }
 
@@ -1227,25 +1020,14 @@ impl<S: Simd> PosExt<S> for f32x8<S> {
     }
 }
 
-/// Intermediate shader result with color channels stored separately for efficient processing.
-///
-/// This structure holds 8 pixels worth of data in planar format (separate R, G, B, A vectors).
-/// The planar layout is more efficient for certain SIMD operations before final interleaving.
 pub(crate) struct ShaderResultF32<S: Simd> {
-    /// Red channel values for 8 pixels.
     pub(crate) r: f32x8<S>,
-    /// Green channel values for 8 pixels.
     pub(crate) g: f32x8<S>,
-    /// Blue channel values for 8 pixels.
     pub(crate) b: f32x8<S>,
-    /// Alpha channel values for 8 pixels.
     pub(crate) a: f32x8<S>,
 }
 
 impl<S: Simd> ShaderResultF32<S> {
-    /// Convert from planar format to interleaved RGBA format.
-    ///
-    /// Returns two sets of four f32x4 vectors containing 8 pixels (4 RGBA components each),
     #[inline(always)]
     pub(crate) fn get(&self) -> [[f32x4<S>; 4]; 2] {
         let (r_1, r_2) = self.r.simd.split_f32x8(self.r);
@@ -1258,10 +1040,6 @@ impl<S: Simd> ShaderResultF32<S> {
 }
 
 mod macros {
-    /// Implements the `Painter` trait for an iterator that produces f32x16 SIMD vectors.
-    ///
-    /// This macro generates both `paint_u8` and `paint_f32` methods, converting between
-    /// formats as needed. Used for painters that work natively with high-precision f32 data.
     macro_rules! f32x16_painter {
         ($($type_path:tt)+) => {
             impl<S: Simd> crate::vello_cpu::fine::Painter for $($type_path)+ {
@@ -1290,10 +1068,6 @@ mod macros {
         };
     }
 
-    /// Implements the `Painter` trait for an iterator that produces u8x16 SIMD vectors.
-    ///
-    /// This macro generates both `paint_u8` and `paint_f32` methods, converting between
-    /// formats as needed. Used for painters that work natively with low-precision u8 data.
     macro_rules! u8x16_painter {
         ($($type_path:tt)+) => {
             impl<S: Simd> crate::vello_cpu::fine::Painter for $($type_path)+ {

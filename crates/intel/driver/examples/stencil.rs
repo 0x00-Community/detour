@@ -1,10 +1,3 @@
-//! The stencil test on a depth32float-stencil8 attachment: cleared to 0, the left half replaced by the reference 1,
-//! then the top half incremented (clamped) ⇒ 2 top left, 1 top right and bottom left, 0 bottom right. Then three
-//! whole-target draws, each where the stencil equals its reference (0, 1, 2), each its own color: every quadrant's
-//! color says its stencil value. Then double sided (`stencil.back`): cleared to 0, the left half drawn clockwise on
-//! the target (a back face: inverted ⇒ 255), the right half counter-clockwise (front: replaced by 1), the equal tests
-//! for 1 and 255 coloring them. Checked pixel by pixel.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -23,7 +16,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let clear = cx.clear_depth_stencil_pipeline(&codegen, [0.0, 0.0, 1.0, 1.0])?;
     let far = cx.clear_depth_vertices(1.0)?;
     let all = cx.clear_vertices()?;
-    // strips of vec4 corners: the left half, the top half (y down)
     let left = cx.floats(&[-1.0, -1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 1.0, -1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0])?;
     let top = cx.floats(&[-1.0, -1.0, 0.0, 1.0, 1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0])?;
     let ds = cx.depth_stencil_buffer(W, H)?;
@@ -58,7 +50,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{} pixels, {} wrong", W * H, bad.len());
     assert!(bad.is_empty(), "wrong pixels (x, y, stencil, got) {:?}", &bad[..bad.len().min(8)]);
 
-    // the right half's corners mirrored: its strip winds the other way
     let right = cx.floats(&[1.0, -1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0])?;
     let mut r = cx.record();
     r.target(&target);

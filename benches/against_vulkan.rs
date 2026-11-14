@@ -1,10 +1,3 @@
-//! detour against Vulkan (Mesa's anv) on the same Xe3: `cargo bench --features xe3 --bench against_vulkan -- [N]`.
-//! The workloads, the timing and the checks are in `common`; this is the Vulkan side, written the way a Vulkan
-//! application would do the same frames, once with the target tiled as anv likes it and once linear like detour's:
-//! dynamic rendering, the clear as the attachment's load op, a command buffer
-//! recorded afresh every frame (detour records every frame too), `RING` command buffers and fences in flight, and
-//! the shaders of `common` through naga to SPIR-V.
-
 mod common;
 
 use std::time::{Duration, Instant};
@@ -15,7 +8,6 @@ use common::{Api, Report, Scene};
 const FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 const INTEL: u32 = 0x8086;
 
-/// A host-visible, coherent buffer, mapped for its whole life.
 struct Mem {
     buf: vk::Buffer,
     mem: vk::DeviceMemory,
@@ -50,7 +42,6 @@ struct Vk {
     bufs: Vec<Mem>,
 }
 
-/// `Vk::bufs`: what each one holds
 #[derive(Clone, Copy)]
 enum Buf {
     Triangle,
@@ -61,7 +52,6 @@ enum Buf {
 }
 
 impl Vk {
-    /// `tiling`: OPTIMAL is what anv picks (tiled, compressed); LINEAR is detour's targets' layout.
     fn new(tiling: vk::ImageTiling) -> Result<Self, Box<dyn std::error::Error>> {
         unsafe {
             let entry = ash::Entry::load()?;
@@ -246,7 +236,6 @@ impl Vk {
             .parse(&naga::front::glsl::Options::from(stage), src)
             .map_err(|e| format!("{stage:?}: {e:?}"))?;
         let info = naga::valid::Validator::new(naga::valid::ValidationFlags::all(), naga::valid::Capabilities::all()).validate(&module)?;
-        // naga flips y for wgpu by default; these shaders are written in Vulkan's own clip space
         let mut options = naga::back::spv::Options::default();
         options.flags.remove(naga::back::spv::WriterFlags::ADJUST_COORDINATE_SPACE);
         let words = naga::back::spv::write_vec(
@@ -258,7 +247,6 @@ impl Vk {
         Ok(unsafe { self.dev.create_shader_module(&vk::ShaderModuleCreateInfo::default().code(&words), None)? })
     }
 
-    /// `tri` (one vertex buffer, a list, opaque) or `fill` (corners + instances, a strip, premultiplied blending).
     unsafe fn graphics(&self, vs: &str, fs: &str, fill: bool) -> Result<vk::Pipeline, Box<dyn std::error::Error>> {
         unsafe {
             let (vs, fs) = (self.shader(vs, naga::ShaderStage::Vertex)?, self.shader(fs, naga::ShaderStage::Fragment)?);
@@ -328,7 +316,6 @@ impl Vk {
         }
     }
 
-    /// The next ring slot's command buffer, reset and begun, once the frame that used it is done.
     unsafe fn begin(&mut self) -> usize {
         unsafe {
             let i = self.next % common::RING;
@@ -381,7 +368,6 @@ impl Api for Vk {
             let cmd = self.cmds[i];
             let attach = vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT;
             let write = vk::AccessFlags::COLOR_ATTACHMENT_WRITE;
-            // the previous frame's writes before this one's clear; the old contents are not kept
             self.barrier(cmd, (vk::ImageLayout::UNDEFINED, attach, write), (vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL, attach, write));
             let clear = if scene == Scene::Tri { common::BLUE } else { common::FILL_CLEAR };
             let color = [vk::RenderingAttachmentInfo::default()
@@ -456,7 +442,6 @@ impl Api for Vk {
             let shader = vk::PipelineStageFlags::COMPUTE_SHADER;
             for _ in 0..count {
                 self.dev.cmd_dispatch(cmd, lanes / 16, 1, 1);
-                // detour flushes each dispatch's writes before the next command
                 let m = vk::MemoryBarrier::default().src_access_mask(vk::AccessFlags::SHADER_WRITE).dst_access_mask(vk::AccessFlags::SHADER_WRITE | vk::AccessFlags::HOST_READ);
                 self.dev.cmd_pipeline_barrier(cmd, shader, shader | vk::PipelineStageFlags::HOST, vk::DependencyFlags::empty(), &[m], &[], &[]);
             }

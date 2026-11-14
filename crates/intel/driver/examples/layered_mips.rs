@@ -1,7 +1,3 @@
-//! Layered textures with mip levels (`Context::texture_layers`) on Xe3, pixel by pixel: a 2D array of 3 layers x 7
-//! levels of solid colors, each layer drawn as squares of 64, 32, 16 and 8 pixels (levels 0, 1, 2, 3 from the
-//! derivatives); and a cube of 6 faces x 7 levels sampled at each face's center with lod_min_clamp 2 (level 2).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -31,7 +27,6 @@ fn color(layer: u32, level: u32) -> [u8; 4] {
     [(layer * 40 + 20) as u8, (level * 35 + 10) as u8, (200 - layer * 20 - level * 10) as u8, 255]
 }
 
-/// The levels of `layer`: level l solid `color(layer, l)`.
 fn levels(layer: u32) -> Vec<Vec<u8>> {
     (0..LEVELS).map(|l| color(layer, l).repeat(((T >> l).max(1) * (T >> l).max(1)) as usize)).collect()
 }
@@ -42,7 +37,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cx = Context::<Xe, Native>::new(&xe)?;
     let mut ok = true;
 
-    // a 2D array: layer k's squares in row k of a 120 x 192 target
     let (w, h) = (120u32, 192u32);
     let data: Vec<Vec<Vec<u8>>> = (0..3).map(levels).collect();
     let refs: Vec<Vec<&[u8]>> = data.iter().map(|l| l.iter().map(Vec::as_slice).collect()).collect();
@@ -76,7 +70,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // a cube with levels: each face's center at level 2 (lod_min_clamp)
     let data: Vec<Vec<Vec<u8>>> = (0..6).map(levels).collect();
     let refs: Vec<Vec<&[u8]>> = data.iter().map(|l| l.iter().map(Vec::as_slice).collect()).collect();
     let faces: Vec<&[&[u8]]> = refs.iter().map(Vec::as_slice).collect();

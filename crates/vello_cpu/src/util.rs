@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::peniko::ImageQuality;
 use vello_common::encode::EncodedImage;
 use vello_common::fearless_simd::{f32x4, prelude::*, u8x32};
@@ -8,26 +5,6 @@ use vello_common::math::FloatExt;
 use vello_common::util::{narrow, normalized_mul_u8};
 
 pub(crate) mod scalar {
-    /// Perform an approximate division by 255.
-    ///
-    /// There are three reasons for having this method.
-    /// 1) Divisions are slower than shifting + adding, and the compiler does not seem to replace
-    ///    divisions by 255 with an equivalent (this was verified by benchmarking; doing / 255 was
-    ///    significantly slower).
-    /// 2) Integer divisions are usually not available in SIMD, so this provides a good baseline
-    ///    implementation.
-    /// 3) There are two options for performing the division: One is to perform the division
-    ///    in a way that completely preserves the rounding semantics of a integer division by
-    ///    255. This could be achieved using the implementation `(val + 1 + (val >> 8)) >> 8`.
-    ///    The second approach (used here) has slightly different rounding behavior to a
-    ///    normal division by 255, but is much faster (see <https://github.com/linebender/vello/issues/904>)
-    ///    and therefore preferable for the high-performance pipeline.
-    ///
-    /// Four properties worth mentioning:
-    /// - This actually calculates the ceiling of `val / 256`.
-    /// - Within the allowed range for `val`, rounding errors do not appear for values divisible by 255, i.e. any call `div_255(val * 255)` will always yield `val`.
-    /// - If there is a discrepancy, this division will always yield a value 1 higher than the original.
-    /// - This holds for values of `val` up to and including `65279`. You should not call this function with higher values.
     #[inline(always)]
     pub(crate) const fn div_255(val: u16) -> u16 {
         debug_assert!(

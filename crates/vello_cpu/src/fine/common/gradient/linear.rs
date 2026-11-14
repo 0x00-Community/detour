@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::fine::common::gradient::SimdGradientKind;
 use core::marker::PhantomData;
 use vello_common::encode::LinearKind;
@@ -8,7 +5,6 @@ use vello_common::fearless_simd::{Simd, f32x8};
 
 #[derive(Debug)]
 pub(crate) struct SimdLinearKind<S: Simd> {
-    // For consistency with the other gradient types.
     phantom_data: PhantomData<S>,
 }
 

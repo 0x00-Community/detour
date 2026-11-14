@@ -1,19 +1,3 @@
-//! ⭐ `convert-detour-to-xe3`: an detour module ⇒ what the GPU runs: memories, state, kernels, one batch.
-//!
-//! ```text
-//!   image.memory @code      {streaming}  the batch (context setup, then each draw's state and 3DPRIMITIVE), the
-//!                                      dynamic state (viewports, blend, color calc), the kernels
-//!   image.memory @surfaces  {streaming}  the binding table pool: render surface states and binding tables
-//!   image.memory @<buffer>  {streaming, or coherent with `readback`}  its contents
-//!   image.memory @<texture> {coherent}   its texels (linear)
-//! ```
-//!
-//! Every state base address is 0: a pointer is the GPU address itself (`@x`), except a binding table's, which is
-//! its offset in the pool (`@surfaces::@x`). The commands are the ones Mesa's iris sends for the same draw on this
-//! GPU (its first batch, then per draw), every draw sending all of its state. A render pass with `statistics = @q`
-//! stores the pipeline statistics (IA vertices, IA primitives, VS invocations, clipper invocations, clipper
-//! primitives, PS invocations; 64 bits each) into buffer q before (bytes 0 ..= 47) and after it (48 ..= 95).
-
 use mlirformat::{Attribute, Const, Error, Op};
 use mlirpass::{BlockId, Body, OpData, OpId, Quiet, Rewriter};
 
@@ -33,7 +17,6 @@ use crate::xe3_dialect::{
 };
 use crate::xe3_dialect::{STENCILOP_DECR, STENCILOP_DECRSAT, STENCILOP_INCR, STENCILOP_INCRSAT, STENCILOP_INVERT, STENCILOP_KEEP, STENCILOP_REPLACE, STENCILOP_ZERO};
 
-/// Surface formats (Mesa isl's `ISL_FORMAT_*`).
 struct SurfaceFormat;
 
 impl SurfaceFormat {
@@ -54,11 +37,9 @@ impl SurfaceFormat {
     const R8G8_UNORM: u32 = 0x106;
     const R16_FLOAT: u32 = 0x10e;
     const R8_UNORM: u32 = 0x140;
-    /// untyped buffers (byte addressed)
     const RAW: u32 = 0x1ff;
 }
 
-/// The surface format of a vertex attribute / a render target.
 pub trait Isl {
     fn isl(self) -> u32;
 }
@@ -112,7 +93,6 @@ impl Isl for BlendFactor {
             BlendFactor::SrcAlphaSaturated => BLENDFACTOR_SRC_ALPHA_SATURATE,
             BlendFactor::Constant => BLENDFACTOR_CONST_COLOR,
             BlendFactor::OneMinusConstant => BLENDFACTOR_INV_CONST_COLOR,
-            // genxml's 3D_Color_Buffer_Blend_Factor
             BlendFactor::Src1 => 9,
             BlendFactor::Src1Alpha => 10,
             BlendFactor::OneMinusSrc1 => 25,
@@ -184,18 +164,12 @@ impl Isl for Topology {
     }
 }
 
-/// The pipeline statistics registers, in the order they are stored.
 const STATISTICS: [u32; 6] = [0x2310, 0x2318, 0x2320, 0x2338, 0x2340, 0x2348];
 
-/// The binding table pool's size (render surface states and binding tables live in it); the runtime's pool buffer is
-/// this big: a table past it wraps around to the pool's start.
 pub const POOL: u32 = 0x10_0000;
-/// Compute threads at once (CFE_STATE): this Xe3 has 4 DSS of 8 EUs, 10 threads each (iris: max_cs_threads ×
-/// subslice_total).
+
 const CS_THREADS: u32 = 320;
 
-/// ⭐ A compute kernel as a dispatch starts it: where its code is, its threads a workgroup (SIMD16 each), its shared
-/// memory's bytes.
 #[derive(Clone, Debug)]
 pub struct KernelAt {
     pub addr: A,
@@ -204,18 +178,13 @@ pub struct KernelAt {
 }
 
 impl KernelAt {
-    /// Xe2+'s Shared Local Memory Size encoding of `bytes` (Mesa `intel_compute_slm_encode_size`: the table's first
-    /// size holding them).
     const SLM_KB: [(u32, u32); 16] = [(0, 0), (1, 1), (2, 2), (4, 3), (8, 4), (16, 5), (24, 8), (32, 6), (48, 9), (64, 7), (96, 10), (128, 11), (192, 12), (256, 13), (384, 14), (u32::MAX, 14)];
-    /// Xe2+'s Preferred SLM Allocation Size encoding (`xe2_preferred_slm_allocation_size_table`).
     const PREFERRED_KB: [(u32, u32); 11] = [(0, 0), (16, 1), (32, 2), (64, 3), (96, 4), (128, 5), (160, 6), (192, 7), (224, 8), (256, 9), (384, 10)];
 
     fn slm(bytes: u32) -> u32 {
         Self::SLM_KB.iter().find(|(kb, _)| kb.saturating_mul(1024) >= bytes).map_or(14, |(_, e)| *e)
     }
 
-    /// A subslice's: the workgroups that fit on it at once (8 EUs of 10 threads of 16 invocations, Xe3's) times each
-    /// one's, at most 192 KB (Mesa `intel_compute_preferred_slm_calc_encode_size`).
     fn preferred_slm(bytes: u32, threads: u32) -> u32 {
         if bytes == 0 {
             return 0;
@@ -226,45 +195,29 @@ impl KernelAt {
     }
 }
 
-/// A texture, as the lowering needs it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Texture {
     pub width: u32,
     pub height: u32,
     pub format: TextureFormat,
-    /// mip levels (1: none)
     pub levels: u32,
-    /// samples (1: not multisampled; 4: Tile64, one level, 32-bit texels)
     pub samples: u32,
-    /// array layers (1: not an array; more: a 2D array, layers `array_pitch` rows apart), a cube's faces, a volume's
-    /// slices
     pub layers: u32,
     pub kind: TextureKind,
 }
 
-/// What a texture's layers are.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum TextureKind {
-    /// a 2D texture, or a 2D array of `layers`
     #[default]
     Flat,
-    /// a cube: its 6 layers the faces +x, −x, +y, −y, +z, −z (WebGPU's order), sampled by direction
     Cube,
-    /// a 3D texture: its layers the depth slices (laid out as an array's, Gen9+), sampled at (u, v, w) normalized
     Volume,
 }
 
 impl Texture {
-    /// Linear surfaces on Xe2+ align images to 128 bytes across, 4 rows down (isl_gfx20 / isl_gfx12
-    /// choose_image_alignment_el: "Linear Surfaces surfaces must use HALIGN=128").
     const ALIGN_BYTES: u32 = 128;
     const ALIGN_ROWS: u32 = 4;
 
-    /// The mip levels laid out as isl's GFX4 2D layout (isl_calc_phys_slice0_extent_sa_gfx4_2d,
-    /// get_image_offset_sa_gfx4_2d): level 0 at the top, level 1 below it, level 2 right of level 1, each next one
-    /// below the previous; every image padded to the alignment. The row pitch in bytes, the rows, and each level's
-    /// (x, y) in texels.
-    /// One level stays tightly packed (`width * bpp` a row): what render targets and the compositor's dma-bufs use.
     pub fn layout(&self) -> (u32, u32, Vec<(u32, u32)>) {
         let bpp = self.format.bytes();
         if self.samples > 1 {
@@ -294,29 +247,21 @@ impl Texture {
         (w * bpp, h, offsets)
     }
 
-    /// A single-sampled, one-level texture.
     pub fn plain(width: u32, height: u32, format: TextureFormat) -> Texture {
         Texture { width, height, format, levels: 1, samples: 1, layers: 1, kind: TextureKind::Flat }
     }
 
-    /// Its bytes in memory ([`Texture::layout`], every layer).
     pub fn size(&self) -> u64 {
         let (pitch, rows, _) = self.layout();
         let rows = if self.layers > 1 { self.array_pitch() * self.layers } else { rows };
         u64::from(pitch) * u64::from(rows)
     }
 
-    /// The rows from one array layer to the next: a layer's ([`Texture::layout`]) padded to the vertical alignment
-    /// (isl_calc_array_pitch_el_rows_gfx4_2d; the surface's QPitch is it / 4).
     pub fn array_pitch(&self) -> u32 {
         self.layout().1.next_multiple_of(Self::ALIGN_ROWS)
     }
 
-    /// A Tile64 tile of a multisampled surface (Xe2: the sample number is in the tile's address, isl_tiling_get_info
-    /// with `xe2_tile64_2d_*msaa_swiz`): its size in pixels, and its physical rows (64 KB / the 256-byte rows a tile
-    /// of 32-bit texels is wide).
     fn tile64(&self) -> ((u32, u32), u32) {
-        // (isl's xe2_tile64_2d_32_16bpp_{2,4}msaa / 128_64_32bpp_8msaa swizzles: 8 U bits, 7 / 6 / 5 V bits)
         let px = match self.samples {
             2 => (64, 128),
             4 => (64, 64),
@@ -327,7 +272,6 @@ impl Texture {
     }
 }
 
-/// A vertex attribute of a pipeline.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VertexAttr {
     pub location: u32,
@@ -336,78 +280,51 @@ pub struct VertexAttr {
     pub buffer: u32,
 }
 
-/// An `detour.pipeline`: its kernels (by name), its primitives, its vertex layout.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pipeline {
     pub vertex: String,
     pub fragment: String,
     pub topology: Topology,
-    /// a strip's restart index's format (`stripIndexFormat`): indexed draws cut at all ones of it
     pub strip_index_format: Option<IndexFormat>,
     pub front_face: FrontFace,
     pub cull_mode: CullMode,
     pub strides: Vec<u32>,
-    /// per vertex buffer: stepped per instance (WebGPU `stepMode: "instance"`), else per vertex
     pub instanced: Vec<bool>,
     pub attrs: Vec<VertexAttr>,
-    /// what the vertex shader passes the fragment shader (its results after the position; the kernel's `varyings`)
     pub varyings: u32,
-    /// the textures the fragment shader samples (its kernel's `bindings`)
     pub bindings: u32,
-    /// the buffers its shaders load from / store to (the larger of the two kernels' `buffers`): binding table entries
-    /// `BUFFER_BTI ..`
     pub buffers: u32,
-    /// the push constants' bytes its shaders read (the larger of the two kernels' `push`): binding table entry
-    /// `PUSH_BTI`
     pub push: u32,
-    /// its samplers' state (filters, mip filter: none level 0 only, address modes, LOD clamps, anisotropy)
     pub sampler: SamplerState,
-    /// target 0's alpha picks the samples covered (`alphaToCoverageEnabled`)
     pub alpha_to_coverage: bool,
-    /// the fragment shader per sample, interpolating at the samples (`sample_shading`)
     pub sample_shading: bool,
-    /// the fragment shader writes the sample mask (its kernel's `omask`)
     pub omask: bool,
-    /// the fragment shader reads its input coverage mask (its kernel's `imask`)
     pub imask: bool,
-    /// the fragment shader's inputs (interpolated: with any, the payload has barycentrics)
     pub fragment_inputs: u32,
-    /// each color target's blending and channels written (MRT: one a target)
     pub colors: Vec<ColorTarget>,
-    /// its depth test on a depth32float attachment
     pub depth: Option<DepthState>,
-    /// the targets' samples (1: not multisampled)
     pub samples: u32,
-    /// its color targets (MRT: binding table entries 0 .. targets)
     pub targets: u32,
 }
 
-/// One color target of a pipeline (`GPUColorTargetState`): its blending, its channels written (`GPUColorWrite`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ColorTarget {
-    /// its blending (none: the output replaces the target)
     pub blend: Option<BlendState>,
     pub write_mask: u8,
 }
 
 impl ColorTarget {
-    /// Every channel (`GPUColorWrite.ALL`).
     pub const ALL: u32 = 0xf;
 }
 
-/// A depth32float attachment, Tile4 (Xe2+ depth surfaces are tiled; isl_gfx125_filter_tiling): its address, a row's
-/// bytes, its size (numbers, or symbols to fill later).
 pub struct DepthTarget {
     pub addr: A,
     pub pitch: A,
     pub width: A,
     pub height: A,
-    /// its stencil8 (Tile4 too, its own surface: the address and a row's bytes) and the draw's reference value, when
-    /// the pipeline tests stencil
     pub stencil: Option<StencilTarget>,
 }
 
-/// A depth attachment's separate stencil8 surface and the draw's stencil reference.
 pub struct StencilTarget {
     pub addr: A,
     pub pitch: A,
@@ -415,19 +332,15 @@ pub struct StencilTarget {
 }
 
 impl DepthTarget {
-    /// Tile4 is 128 bytes × 32 rows: the row pitch and the rows a `width` × `height` D32 surface takes.
     pub fn layout(width: u32, height: u32) -> (u32, u32) {
         ((width * 4).next_multiple_of(128), height.next_multiple_of(32))
     }
 
-    /// The row pitch and rows of its `width` × `height` stencil8 (R8_UINT, Tile4).
     pub fn stencil_layout(width: u32, height: u32) -> (u32, u32) {
         (width.next_multiple_of(128), height.next_multiple_of(32))
     }
 }
 
-/// An indexed draw's index buffer: its format (`INDEX_WORD` / `INDEX_DWORD`, see [`IndexFormat`]), GPU address, bytes,
-/// and the base vertex added to every index (numbers, or symbols to fill later).
 pub struct IndexArgs {
     pub format: A,
     pub addr: A,
@@ -435,12 +348,7 @@ pub struct IndexArgs {
     pub base_vertex: A,
 }
 
-/// What one draw takes besides its pipeline: per vertex buffer its address and size, then the vertex count (the index
-/// count when indexed), the instance count and the first vertex (the first index when indexed), as numbers or symbols to
-/// fill later; its binding table (an offset in the pool: entry 0 the target, then the textures) and, when the pipeline
-/// samples, its sampler states; its index buffer when indexed.
 pub struct DrawArgs {
-    /// the pipeline's blend state (`Cmds::blend`)
     pub blend: A,
     pub bt: A,
     pub samplers: Option<A>,
@@ -449,22 +357,14 @@ pub struct DrawArgs {
     pub instances: A,
     pub first: A,
     pub index: Option<IndexArgs>,
-    /// the pass's depth attachment, when the pipeline has a depth test
     pub depth: Option<DepthTarget>,
-    /// an indirect draw (`drawIndirect` / `drawIndexedIndirect`): the address of each dword of its arguments (WebGPU's
-    /// order: count, instances, first, then first instance, or base vertex and first instance when indexed); the
-    /// vertex count, instances and first then unused
     pub indirect: Option<Vec<A>>,
-    /// whether it tests MI_PREDICATE (`Cmds::condition`): a hole the runtime fills, 0 in a module's own passes
     pub predicate: A,
 }
 
-/// PIPE_CONTROL's post-sync operations.
 const WRITE_PS_DEPTH_COUNT: u32 = 2;
 const WRITE_TIMESTAMP: u32 = 3;
 
-/// The pipeline statistics registers (64 bits each; Mesa genxml): vertices and primitives the input assembler read,
-/// vertex shader invocations, primitives clipping saw and passed, fragment shader invocations, compute invocations.
 pub const IA_VERTICES_COUNT: u32 = 0x2310;
 pub const IA_PRIMITIVES_COUNT: u32 = 0x2318;
 pub const VS_INVOCATION_COUNT: u32 = 0x2320;
@@ -473,47 +373,37 @@ pub const CL_PRIMITIVES_COUNT: u32 = 0x2340;
 pub const PS_INVOCATION_COUNT: u32 = 0x2348;
 pub const CS_INVOCATION_COUNT: u32 = 0x2290;
 
-/// The register of an indirect dispatch's x workgroup count (y, z the next two).
 const GPGPU_DISPATCHDIMX: u32 = 0x2500;
-/// MI_PREDICATE's operands (64 bits each)
+
 const MI_PREDICATE_SRC0: u32 = 0x2400;
 const MI_PREDICATE_SRC1: u32 = 0x2408;
-/// MI_PREDICATE's operations (genxml)
+
 const LOAD_LOAD: u32 = 2;
 const LOAD_LOADINV: u32 = 3;
 const COMBINE_SET: u32 = 0;
 const COMBINE_XOR: u32 = 3;
 const COMPARE_SRCS_EQUAL: u32 = 2;
 
-/// The 3DPRIM registers an indirect draw loads (Mesa `load_indirect_parameters`).
 const PRIM_START_VERTEX: u32 = 0x2430;
 const PRIM_VERTEX_COUNT: u32 = 0x2434;
 const PRIM_INSTANCE_COUNT: u32 = 0x2438;
 const PRIM_START_INSTANCE: u32 = 0x243C;
 const PRIM_BASE_VERTEX: u32 = 0x2440;
 
-/// Where a state op goes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Heap {
-    /// the dynamic state (viewports, blend, color calc), with the kernels
     Code,
-    /// the binding table pool (render surface states, binding tables)
     Surfaces,
 }
 
-/// ⭐ The commands and state of the 3D pipeline as xe3 ops, made without a module: the module lowering (`Render`)
-/// places them in memories, the runtime packs them into templates once and fills them each frame.
 #[derive(Default)]
 pub struct Cmds<'a> {
     pub batch: Vec<OpData<'a>>,
     pub code: Vec<OpData<'a>>,
     pub surfaces: Vec<OpData<'a>>,
-    /// state names made so far
     n: usize,
 }
 
-/// The lowering's view of a typed `detour.pipeline`: its shaders by name, its vertex attributes in location order
-/// with their buffers, the rest as the op has it.
 impl TryFrom<&crate::base::Pipeline<'_>> for Pipeline {
     type Error = Error;
 
@@ -575,13 +465,10 @@ impl TryFrom<&crate::base::Pipeline<'_>> for Pipeline {
 }
 
 impl Pipeline {
-    /// The pipeline of `op`, an `detour.pipeline` in `body`.
     pub fn of(body: &Body<'_>, op: OpId) -> Result<Pipeline, Error> {
         Pipeline::try_from(&body.head::<crate::base::Pipeline>(op)?)
     }
 
-    /// What its kernels say, among `kernels` (`image.kernel` ops of a lowered module): the vertex kernel's varyings, the
-    /// fragment kernel's bindings.
     pub fn with_kernels(mut self, body: &Body<'_>, kernels: &[OpId]) -> Result<Pipeline, Error> {
         let get = |name: &str| -> Result<Kernel<'static>, Error> {
             let mut heads = kernels.iter().map(|k| body.head::<Kernel>(*k));
@@ -601,7 +488,6 @@ impl Pipeline {
         Ok(self)
     }
 
-    /// Its binding table's entries: the targets, the textures, then (with buffers) up to `BUFFER_BTI` and the buffers.
     pub fn table_entries(&self) -> u32 {
         match (self.buffers, self.push) {
             (0, 0) => self.targets + self.bindings,
@@ -609,7 +495,6 @@ impl Pipeline {
         }
     }
 
-    /// Whether its shaders read the draw's binding table past the textures (buffers, push constants).
     pub fn reads_memory(&self) -> bool {
         self.buffers > 0 || self.push > 0
     }
@@ -620,7 +505,6 @@ impl<'a> Cmds<'a> {
         self.batch.push(data);
     }
 
-    /// An op in `heap` as it is.
     pub fn put(&mut self, heap: Heap, data: OpData<'a>) {
         match heap {
             Heap::Code => self.code.push(data),
@@ -628,7 +512,6 @@ impl<'a> Cmds<'a> {
         }
     }
 
-    /// A state op in `heap`, aligned to `align`, under a new name (`prefix` + a number), which it returns.
     pub fn state(&mut self, heap: Heap, prefix: &str, align: u32, data: OpData<'a>) -> String {
         self.n += 1;
         let name = format!("{prefix}{}", self.n);
@@ -636,8 +519,6 @@ impl<'a> Cmds<'a> {
         name
     }
 
-    /// The null surface, and the binding table of the stages that bind nothing (`@bt_null`: its entry 0 the null
-    /// surface).
     pub fn null_surface(&mut self) -> String {
         let null = self.state(Heap::Surfaces, "null_surface", 64, xe3!(StateRenderSurfaceState, surface_type = SURFTYPE_NULL, surface_format = SurfaceFormat::R32_UINT, mocs = MOCS));
         self.put(Heap::Surfaces, xe3!(StateBindingTableState, surface_state_pointer = A::sym(null.clone())).with_attrs(vec![("sym_name", A::str("bt_null")), ("align", A::from(64u32))]));
@@ -654,10 +535,6 @@ impl<'a> Cmds<'a> {
         ));
     }
 
-    /// The context: iris's first batch, every state base address 0.
-    /// ⭐ What starts every frame on the compute engine (CCS; anv's init_compute_queue_state): the same state base
-    /// addresses, cache invalidation, fence and STATE_COMPUTE_MODE as [`context`](Self::context), nothing of the 3D
-    /// pipeline (the engine has none).
     pub fn compute_context(&mut self) {
         self.cmd(xe3!(CmdPipeControl, hdc_pipeline_flush_enable = true, untyped_data_port_cache_flush_enable = true, command_streamer_stall_enable = true));
         self.base_addresses();
@@ -673,9 +550,6 @@ impl<'a> Cmds<'a> {
         self.cmd(xe3!(CmdStateComputeMode, enable_variable_register_size_allocation = true, mask1 = 1u32 << 10, enable_variable_register_size_allocation_mask = 1u32));
     }
 
-    /// ⭐ A rectangle copy on the copy engine (BCS; blorp's `blorp_xy_block_copy_blt`): `size` texels of `bpp` bytes
-    /// from (`sx`, `sy`) of the linear 2D image at `src` (`src_pitch` bytes a row, `src_extent` texels) to (`dx`, `dy`)
-    /// of the one at `dst`; both in system memory.
     #[allow(clippy::too_many_arguments, reason = "XY_BLOCK_COPY_BLT's two surfaces")]
     pub fn block_copy(&mut self, bpp: u32, (src, src_pitch, src_extent): (A, u32, [u32; 2]), [sx, sy]: [u32; 2], (dst, dst_pitch, dst_extent): (A, u32, [u32; 2]), [dx, dy]: [u32; 2], [w, h]: [u32; 2]) -> Result<(), Error> {
         let depth = match bpp {
@@ -714,9 +588,6 @@ impl<'a> Cmds<'a> {
         Ok(())
     }
 
-    /// ⭐ An event set (Vulkan `vkCmdSetEvent`, anv's CmdSetEvent2): the dword at `at` becomes `value` once the work
-    /// before it is done and its writes flushed: a stalling PIPE_CONTROL's post-sync write, or on the copy engine
-    /// (`copy`) MI_FLUSH_DW's.
     pub fn set_event(&mut self, at: A, value: u32, copy: bool) {
         if copy {
             self.cmd(xe3!(CmdMiFlushDw, post_sync_operation = 1u32, address = at, immediate_data = value));
@@ -735,9 +606,6 @@ impl<'a> Cmds<'a> {
         }
     }
 
-    /// ⭐ An event wait (`vkCmdWaitEvents`): the command streamer polls until the dword at `at` is `value`
-    /// (MI_SEMAPHORE_WAIT, SAD_EQUAL_SDD), then (not on the copy engine) the caches the reads after it go through are
-    /// invalidated, so they see what another engine wrote before setting it.
     pub fn wait_event(&mut self, at: A, value: u32, copy: bool) {
         self.cmd(xe3!(CmdMiSemaphoreWait, compare_operation = 4u32, wait_mode = 1u32, semaphore_data_dword = value, semaphore_address = at));
         if !copy {
@@ -751,7 +619,6 @@ impl<'a> Cmds<'a> {
         }
     }
 
-    /// What ends a copy engine frame: MI_FLUSH_DW (it has no PIPE_CONTROL), then the batch's end.
     pub fn copy_tail(&mut self) {
         self.cmd(xe3!(CmdMiFlushDw));
         self.cmd(xe3!(CmdMiBatchBufferEnd));
@@ -798,14 +665,11 @@ impl<'a> Cmds<'a> {
             command_streamer_stall_enable = true,
         ));
         self.cmd(xe3!(CmdStateSystemMemFenceAddress, system_memory_fence_address = A::sym("fence")));
-        // CS_DEBUG_MODE2: CONSTANT_BUFFER address offset disable (and its mask)
         self.cmd(xe3!(CmdMiLoadRegisterImm, register_offset = 0x20d8u32, data_dword = 0x0010_0010u32));
-        // CHICKEN_RASTER_2: the "disable any MCTR response fix" mask bit only
         self.cmd(xe3!(CmdMiLoadRegisterImm, register_offset = 0x6208u32, data_dword = 0x0020_0000u32));
         self.cmd(xe3!(Cmd3dstate3dMode, dx10_ogl_border_mode_for_ycrcb = true, dx10_ogl_border_mode_for_ycrcb_mask = true));
         self.cmd(xe3!(CmdStateComputeMode, enable_variable_register_size_allocation = true, mask1 = 1u32 << 10, enable_variable_register_size_allocation_mask = 1u32));
         self.cmd(xe3!(Cmd3dstateDrawingRectangleFast, clipped_drawing_rectangle_x_max = 0xffffu32, clipped_drawing_rectangle_y_max = 0xffffu32));
-        // the sample positions (iris: Mesa's intel_sample_positions_1x / _2x / _4x / _8x, Vulkan's standard ones)
         self.cmd(xe3!(
             Cmd3dstateSamplePattern,
             _1x_sample0_x_offset = 0.5f32,
@@ -842,15 +706,12 @@ impl<'a> Cmds<'a> {
         for c in [xe3!(Cmd3dstateAaLineParameters), xe3!(Cmd3dstateWmChromakey), xe3!(Cmd3dstateWmHzOp), xe3!(Cmd3dstatePolyStippleOffset), xe3!(Cmd3dstateMeshControl), xe3!(Cmd3dstateTaskControl)] {
             self.cmd(c);
         }
-        // push constant space for VS, HS, DS, GS (KB): one command, the sub-opcode picks the stage. No PS one since
-        // Xe-HP: its sub-opcode (22) is not a command any more (iris emits four)
         for (stage, offset) in [0u32, 8, 16, 24].into_iter().enumerate() {
             self.cmd(xe3!(Cmd3dstatePushConstantAllocDs, _3d_command_sub_opcode = 18 + stage as u32, constant_buffer_offset = offset, constant_buffer_size = 8u32));
         }
         self.pc_flush();
     }
 
-    /// The pipeline statistics into `[@q, at]` (each 64 bits, as two dwords).
     pub fn statistics(&mut self, q: &str, at: u32) {
         self.cmd(xe3!(CmdPipeControl, command_streamer_stall_enable = true, stall_at_pixel_scoreboard = true));
         for (i, reg) in STATISTICS.iter().enumerate() {
@@ -861,7 +722,6 @@ impl<'a> Cmds<'a> {
         }
     }
 
-    /// A 2D linear surface of `t` at `base` (a render target or a sampled texture), in the pool; its name.
     pub fn surface(&mut self, prefix: &str, base: A, t: &Texture) -> String {
         let cube = t.kind == TextureKind::Cube;
         self.state(
@@ -870,7 +730,6 @@ impl<'a> Cmds<'a> {
             64,
             xe3!(
                 StateRenderSurfaceState,
-                // a cube (isl_gfx9: SURFTYPE_CUBE, Depth = cubes − 1, every face enabled), else 2D
                 surface_type = match t.kind { TextureKind::Flat => SURFTYPE_2D, TextureKind::Cube => SURFTYPE_CUBE, TextureKind::Volume => SURFTYPE_3D },
                 cube_face_enable_positive_x = cube,
                 cube_face_enable_negative_x = cube,
@@ -879,22 +738,17 @@ impl<'a> Cmds<'a> {
                 cube_face_enable_positive_z = cube,
                 cube_face_enable_negative_z = cube,
                 surface_format = t.format.isl(),
-                // multisampled: Tile64 (the only tiling MSAA takes on Xe2+) and the sample count (MSS)
                 tile_mode = if t.samples > 1 { 1u32 } else { 0u32 },
                 number_of_multisamples = t.samples.trailing_zeros(),
-                // HALIGN_128, VALIGN_4: the linear alignment `Texture::layout` pads to
                 surface_horizontal_alignment = 3u32,
                 surface_vertical_alignment = 1u32,
                 width = t.width - 1,
                 height = t.height - 1,
                 surface_pitch = t.layout().0 - 1,
                 mip_count_lod = t.levels - 1,
-                // a 2D array: its layers − 1 as the depth, QPitch (in 4-row units) between them
-                // a 3D texture's slices are its depth, not an array (isl_gfx9: Surface Array off; QPitch still apart)
                 surface_array = t.layers > 1 && t.kind != TextureKind::Volume,
                 depth = if cube { t.layers / 6 - 1 } else { t.layers - 1 },
                 surface_qpitch = if t.layers > 1 { t.array_pitch() / 4 } else { 0 },
-                // no mip tail: a linear surface has none (isl_choose_miptail_start_level gives 15)
                 mip_tail_start_lod = 15u32,
                 mocs = MOCS,
                 l1_cache_control = L1CC_WB,
@@ -907,8 +761,6 @@ impl<'a> Cmds<'a> {
         )
     }
 
-    /// A depth32float depth attachment (Tile4, `DepthTarget::layout`) as a texture to sample (`texture_depth_2d`): R32_FLOAT,
-    /// a depth / stencil resource (isl). Its name.
     pub fn depth_surface(&mut self, prefix: &str, base: A, width: u32, height: u32) -> String {
         let (pitch, _) = DepthTarget::layout(width, height);
         self.state(
@@ -938,28 +790,20 @@ impl<'a> Cmds<'a> {
         )
     }
 
-    /// The depth just written made readable by the sampler: the depth cache flushed (with a depth stall) and the
-    /// texture cache invalidated (anv's ANV_PIPE_DEPTH_CACHE_FLUSH | TEXTURE_CACHE_INVALIDATE for a depth attachment
-    /// sampled next).
     pub fn depth_barrier(&mut self) {
         self.cmd(xe3!(CmdPipeControl, depth_cache_flush_enable = true, depth_stall_enable = true, command_streamer_stall_enable = true));
         self.cmd(xe3!(CmdPipeControl, texture_cache_invalidation_enable = true, command_streamer_stall_enable = true));
     }
 
-    /// A buffer surface of `size` bytes at `base` (RAW, a byte an element), as isl_buffer_fill_state_s: the element count
-    /// − 1 split over width (7 bits), height (14) and depth (11).
     pub fn buffer_surface(&mut self, prefix: &str, base: A, size: u32) -> String {
         self.buffer_surface_of(prefix, base, Self::buffer_size(size).map(A::from))
     }
 
-    /// A RAW buffer surface's size fields (width, height, depth) for `size` bytes: size − 1 (in 4-byte steps) split
-    /// 7 / 14 / 11 bits.
     pub fn buffer_size(size: u32) -> [u32; 3] {
         let n = size.max(1).next_multiple_of(4) - 1;
         [n & 0x7f, (n >> 7) & 0x3fff, (n >> 21) & 0x7ff]
     }
 
-    /// [`buffer_surface`](Self::buffer_surface) with its size fields given (symbols: a template filled per binding).
     pub fn buffer_surface_of(&mut self, prefix: &str, base: A, [width, height, depth]: [A; 3]) -> String {
         self.state(
             Heap::Surfaces,
@@ -982,7 +826,6 @@ impl<'a> Cmds<'a> {
         )
     }
 
-    /// A binding table of `entries` (surface state addresses), in the pool; its name.
     pub fn binding_table(&mut self, entries: Vec<A>) -> String {
         let mut entries = entries.into_iter();
         let first = entries.next().expect("a binding table has an entry");
@@ -993,22 +836,17 @@ impl<'a> Cmds<'a> {
         name
     }
 
-    /// `n` sampler states (`linear` or nearest filtering, clamped to the edge, as iris `iris_create_sampler_state`)
-    /// after their border color, in the dynamic state; the first one's name.
     pub fn samplers(&mut self, n: u32, s: &SamplerState) -> String {
         let border = self.state(Heap::Code, "border_color", 64, xe3!(StateSamplerBorderColorState));
         assert!(n > 0, "at least one sampler");
-        // MAPFILTER_NEAREST / LINEAR, ANISOTROPIC when the sampler is (anv: linear filters and more than 1)
         let aniso = s.max_anisotropy > 1 && s.mag_filter == FilterMode::Linear && s.min_filter == FilterMode::Linear;
         let map = |f: FilterMode| if aniso { 2u32 } else { u32::from(f == FilterMode::Linear) };
         let (min_linear, mag_linear) = (s.min_filter == FilterMode::Linear, s.mag_filter == FilterMode::Linear);
-        // TEXCOORDMODE_WRAP / MIRROR / CLAMP
         let address = s.address.map(|m| match m {
             AddressMode::Repeat => 0u32,
             AddressMode::MirrorRepeat => 1,
             AddressMode::ClampToEdge => 2,
         });
-        // LODs (u4.8, 0 ..= 14) between the clamps; level 0 only without a mip filter
         let lod = |v: f32| v.clamp(0.0, 14.0);
         let (min_lod, max_lod) = match s.mipmap_filter {
             Some(_) => (lod(s.lod_min_clamp), lod(s.lod_max_clamp)),
@@ -1019,12 +857,9 @@ impl<'a> Cmds<'a> {
                 StateSamplerState,
                 min_mode_filter = map(s.min_filter),
                 mag_mode_filter = map(s.mag_filter),
-                // the mip filter (WebGPU mipmapFilter: nearest / linear), as iris (CLAMP_MODE_OGL)
                 mip_mode_filter = match s.mipmap_filter { None => MIPFILTER_NONE, Some(MipmapFilter::Nearest) => MIPFILTER_NEAREST, Some(MipmapFilter::Linear) => MIPFILTER_LINEAR },
                 lod_preclamp_mode = 2u32,
-                // cube surfaces wrap across faces whatever the address modes (anv / iris: CUBECTRLMODE_OVERRIDE)
                 cube_surface_control_mode = 1u32,
-                // a comparison sampler: anv's vk_to_intel_shadow_compare_op (the prefilter op is the failing test)
                 shadow_function = match s.compare {
                     None | Some(CompareFunction::Never) => PREFILTEROP_ALWAYS,
                     Some(CompareFunction::Less) => PREFILTEROP_LEQUAL,
@@ -1057,14 +892,9 @@ impl<'a> Cmds<'a> {
         first
     }
 
-    /// A pipeline's blending: BLEND_STATE and its one entry, back to back, in the dynamic state; its name. Premultiplied
-    /// alpha is `src + dst * (1 - src.a)` (ONE, INV_SRC_ALPHA, ADD for color and alpha), without dithering; otherwise
-    /// no blending (dither as iris with GL's default).
-    /// BLEND_STATE and an entry a target (MRT), each with its target's blending and the channels it leaves alone.
     pub fn blend(&mut self, colors: &[ColorTarget], alpha_to_coverage: bool) -> String {
         let dither = colors.iter().all(|c| c.blend.is_none());
         let independent = colors.iter().any(|c| c.blend.is_some_and(|b| b.color != b.alpha));
-        // alpha to coverage without its dither (deterministic: the samples by the alpha alone)
         let name = self.state(
             Heap::Code,
             "blend",
@@ -1078,7 +908,6 @@ impl<'a> Cmds<'a> {
                 pre_blend_color_clamp_enable = true,
                 color_clamp_range = COLORCLAMP_RTFORMAT,
                 simple_float_blend_enable = true,
-                // GPUColorWrite: red 1, green 2, blue 4, alpha 8
                 write_disable_red = c.write_mask & 1 == 0,
                 write_disable_green = c.write_mask & 2 == 0,
                 write_disable_blue = c.write_mask & 4 == 0,
@@ -1096,9 +925,6 @@ impl<'a> Cmds<'a> {
         name
     }
 
-    /// The state a render pass to `target` shares between its draws: viewports, color calc, the target's surface, the
-    /// scissor (the whole target). Their names: (CC viewport, SF / clip viewport, color calc, render target surface,
-    /// scissor rectangle).
     pub fn pass_state(&mut self, target: &str, t: &Texture) -> [String; 5] {
         let (w, h) = (t.width as f32, t.height as f32);
         let [cc, sf] = self.viewport([0.0, 0.0, w, h], [0.0, 1.0], [t.width, t.height]);
@@ -1108,9 +934,6 @@ impl<'a> Cmds<'a> {
         [cc, sf, ccs, rss, sc]
     }
 
-    /// ⭐ A viewport (`setViewport`): `[x, y, w, h]` of a target `size` (pixels), depth from `min` to `max`. As anv's
-    /// viewport state: m00 = w / 2, m30 = x + w / 2 (y alike), m22 = max − min, m32 = min (NDC z in [0, 1]); the
-    /// viewport's pixels (clamped to the target) its clip rectangle. Its names: (CC viewport, SF / clip viewport).
     pub fn viewport(&mut self, [x, y, w, h]: [f32; 4], [min, max]: [f32; 2], [tw, th]: [u32; 2]) -> [String; 2] {
         let code = Heap::Code;
         let cc = self.state(code, "cc_viewport", 32, xe3!(StateCcViewport, minimum_depth = min.min(max), maximum_depth = min.max(max)));
@@ -1141,7 +964,6 @@ impl<'a> Cmds<'a> {
         [cc, sf]
     }
 
-    /// ⭐ The color calc state with blend constant `rgba` (`setBlendConstant`: the `constant` blend factors'). Its name.
     pub fn color_calc(&mut self, [r, g, b, a]: [f32; 4]) -> String {
         self.state(
             Heap::Code,
@@ -1151,11 +973,8 @@ impl<'a> Cmds<'a> {
         )
     }
 
-    /// ⭐ A scissor rectangle (`setScissorRect`): `[x, y, w, h]` pixels; an empty one draws nothing (min past max, as
-    /// anv's). Its name.
     pub fn scissor(&mut self, [x, y, w, h]: [u32; 4]) -> String {
         let (x0, y0, x1, y1) = if w == 0 || h == 0 { (1u32, 1u32, 0u32, 0u32) } else { (x, y, x + w - 1, y + h - 1) };
-        // Wa_1409725701 (anv): SCISSOR_RECT 64-byte aligned
         self.state(
             Heap::Code,
             "scissor",
@@ -1164,24 +983,15 @@ impl<'a> Cmds<'a> {
         )
     }
 
-    /// ⭐ One compute dispatch: a grid of `groups` (x, y) workgroups of `kernel.threads` SIMD16 threads (16 invocations
-    /// each; the hardware makes the local ids x, r1), the kernel at `kernel.addr`, `params` its inline data (r2, up to 8
-    /// dwords). As iris (`iris_emit_compute_walker`, Xe2+: no PIPELINE_SELECT), then what it wrote flushed.
     pub fn compute(&mut self, kernel: &KernelAt, [x, y]: [A; 2], params: Vec<A>) {
         self.walker(kernel, [x, y, A::from(1u32)], false, params, None);
     }
 
-    /// [`compute`](Self::compute) with a binding table (its offset in the binding table pool): the storage textures
-    /// the kernel reads and writes (`detour.texture_store` / `texture_load`, binding k at entry k).
-    /// `pool` is the binding table pool's address: set here, as a draw sets it (a frame of only compute has none).
     pub fn compute_bound(&mut self, kernel: &KernelAt, [x, y]: [A; 2], params: Vec<A>, table: A, pool: A) {
         self.cmd(xe3!(Cmd3dstateBindingTablePoolAlloc, binding_table_pool_base_address = pool, binding_table_pool_buffer_size = POOL / 4096, mocs = MOCS));
         self.walker(kernel, [x, y, A::from(1u32)], false, params, Some(table));
     }
 
-    /// ⭐ The predicate the draws with Predicate Enable test (conditional rendering, anv's
-    /// `cmd_emit_conditional_render_predicate`): true where the 32-bit value at `at` is not 0 (`inverted`: where it is),
-    /// read when the GPU gets here.
     pub fn condition(&mut self, at: A, inverted: bool) {
         self.cmd(xe3!(CmdMiLoadRegisterMem, register_address = MI_PREDICATE_SRC0, memory_address = at));
         for (reg, v) in [(MI_PREDICATE_SRC0 + 4, 0u32), (MI_PREDICATE_SRC1, 0), (MI_PREDICATE_SRC1 + 4, 0)] {
@@ -1191,9 +1001,6 @@ impl<'a> Cmds<'a> {
         self.cmd(xe3!(CmdMiPredicate, load_operation = load, combine_operation = COMBINE_SET, compare_operation = COMPARE_SRCS_EQUAL));
     }
 
-    /// The predicate of draw `index` of a multi-draw whose count is the dword at `count` (anv's
-    /// `emit_draw_count_predicate`): draw 0 loads the count and sets the predicate to count ≠ 0; each next draw XORs in
-    /// index == count, so it turns false at draw `count` and stays so.
     pub fn draw_count_predicate(&mut self, count: A, index: u32) {
         if index == 0 {
             self.cmd(xe3!(CmdMiLoadRegisterMem, register_address = MI_PREDICATE_SRC0, memory_address = count));
@@ -1205,26 +1012,18 @@ impl<'a> Cmds<'a> {
         self.cmd(xe3!(CmdMiPredicate, load_operation = load, combine_operation = combine, compare_operation = COMPARE_SRCS_EQUAL));
     }
 
-    /// A barrier after typed writes (storage textures) before they are sampled: the data port flushed, the texture
-    /// cache invalidated, the command streamer stalled.
     pub fn texture_barrier(&mut self) {
         self.cmd(xe3!(CmdPipeControl, untyped_data_port_cache_flush_enable = true, hdc_pipeline_flush_enable = true, texture_cache_invalidation_enable = true, command_streamer_stall_enable = true));
     }
 
-    /// ⭐ The GPU's timestamp (64 bits, the GT's reference clock) written at `at` once the work before it is done: a
-    /// bottom-of-pipe PIPE_CONTROL post-sync write (anv's `emit_timestamp` at the end of the pipe).
     pub fn timestamp(&mut self, at: A) {
         self.cmd(xe3!(CmdPipeControl, command_streamer_stall_enable = true, post_sync_operation = WRITE_TIMESTAMP, address = at));
     }
 
-    /// The pixel pipe's depth count (samples that passed the depth and stencil tests so far, 64 bits) written at
-    /// `at` once the draws before it are done: an occlusion query's begin or end (anv's `emit_ps_depth_count`).
     pub fn depth_count(&mut self, at: A) {
         self.cmd(xe3!(CmdPipeControl, depth_stall_enable = true, post_sync_operation = WRITE_PS_DEPTH_COUNT, address = at));
     }
 
-    /// The 64-bit statistics register `reg` (IA_VERTICES_COUNT ...) stored at `at` once the work before it is done
-    /// (a stall, then MI_STORE_REGISTER_MEM of both halves, as anv's pipeline statistics queries).
     pub fn statistic(&mut self, reg: u32, at: [A; 2]) {
         self.cmd(xe3!(CmdPipeControl, command_streamer_stall_enable = true, stall_at_pixel_scoreboard = true));
         for (half, to) in at.into_iter().enumerate() {
@@ -1232,8 +1031,6 @@ impl<'a> Cmds<'a> {
         }
     }
 
-    /// ⭐ An indirect dispatch (`dispatchWorkgroupsIndirect`): the grid's x, y, z workgroup counts read from the dwords
-    /// at `at` when the GPU runs it (into GPGPU_DISPATCHDIMX / Y / Z, as anv's `compute_load_indirect_params`).
     pub fn compute_indirect(&mut self, kernel: &KernelAt, at: [A; 3], params: Vec<A>) {
         for (reg, from) in [GPGPU_DISPATCHDIMX, GPGPU_DISPATCHDIMX + 4, GPGPU_DISPATCHDIMX + 8].into_iter().zip(at) {
             self.cmd(xe3!(CmdMiLoadRegisterMem, register_address = reg, memory_address = from));
@@ -1244,8 +1041,6 @@ impl<'a> Cmds<'a> {
     fn walker(&mut self, kernel: &KernelAt, [x, y, z]: [A; 3], indirect: bool, params: Vec<A>, table: Option<A>) {
         self.cmd(xe3!(CmdCfeState, maximum_number_of_threads = CS_THREADS));
         let threads = kernel.threads.max(1);
-        // (iris_emit_compute_walker: the dispatch size by threads, the shared memory's size and the preferred one a
-        // subslice, a barrier when the workgroup has more than one thread)
         let mut idd = crate::xe3_value!(
             StateInterfaceDescriptorDataFields,
             kernel_start_pointer = kernel.addr.clone(),
@@ -1283,7 +1078,6 @@ impl<'a> Cmds<'a> {
         self.cmd(xe3!(CmdPipeControl, untyped_data_port_cache_flush_enable = true, hdc_pipeline_flush_enable = true, command_streamer_stall_enable = true));
     }
 
-    /// One draw of pipeline `p`: its state, then 3DPRIMITIVE. `shared` is the render pass's state (`pass_state`).
     pub fn draw(&mut self, p: &Pipeline, args: DrawArgs, shared: &[String; 5]) -> Result<(), Error> {
         if args.buffers.len() != p.strides.len() {
             return Err(Error(format!("draw: {} vertex buffers for a pipeline of {}", args.buffers.len(), p.strides.len())));
@@ -1294,9 +1088,6 @@ impl<'a> Cmds<'a> {
         self.cmd(xe3!(Cmd3dstateViewportStatePointersCc, cc_viewport_pointer = A::sym(cc)));
         self.cmd(xe3!(Cmd3dstateViewportStatePointersSfClip, sf_clip_viewport_pointer = A::sym(sf)));
         self.cmd(xe3!(Cmd3dstateScissorStatePointers, scissor_rect_pointer = A::sym(sc)));
-        // a VS URB entry holds the vertex the VF fetched (a vec4 an input) and then the VUE the VS writes (header,
-        // position, varyings), in 64-byte units: the same URB split in fewer entries when it takes more (a multiple
-        // of 8 of them)
         let units = inputs.max(2 + p.varyings).div_ceil(4).max(1);
         let entries = 5888 / units / 8 * 8;
         self.cmd(xe3!(
@@ -1314,7 +1105,6 @@ impl<'a> Cmds<'a> {
         self.cmd(xe3!(Cmd3dstateCcStatePointers, color_calc_state_pointer_valid = true, color_calc_state_pointer = A::sym(ccs)));
         self.cmd(xe3!(Cmd3dstateConstantAll, shader_update_enable = 0x1fu32, mocs = MOCS));
         self.cmd(xe3!(Cmd3dstateBindingTablePoolAlloc, binding_table_pool_base_address = A::sym("surfaces"), binding_table_pool_buffer_size = POOL / 4096, mocs = MOCS));
-        // a vertex shader with buffers reads them through the draw's binding table (the same as the fragment shader's)
         let vs_bt = if p.reads_memory() { args.bt.clone() } else { A::within("surfaces", "bt_null") };
         self.cmd(xe3!(Cmd3dstateBindingTablePointersVs, pointer_to_vs_binding_table = vs_bt));
         let null = || A::within("surfaces", "bt_null");
@@ -1326,7 +1116,6 @@ impl<'a> Cmds<'a> {
             self.cmd(xe3!(Cmd3dstateSamplerStatePointersPs, pointer_to_ps_sampler_state = samplers));
         }
         self.cmd(xe3!(CmdPipeControl, stall_at_pixel_scoreboard = true, render_target_cache_flush_enable = true));
-        // iris: 3DSTATE_MULTISAMPLE's count (pixel centers at the center), every sample in the mask
         self.cmd(xe3!(Cmd3dstateMultisample, number_of_multisamples = p.samples.trailing_zeros()));
         self.cmd(xe3!(Cmd3dstateSampleMask, sample_mask = (1u32 << p.samples) - 1));
         self.cmd(xe3!(
@@ -1352,16 +1141,10 @@ impl<'a> Cmds<'a> {
             binding_table_entry_count = p.table_entries(),
             sampler_count = p.bindings.div_ceil(4),
             maximum_number_of_threads_per_psd = 127u32,
-            // the payload: r0, then with varyings the barycentrics (r1, r2) before the planes (Interpolate)
             dispatch_grf_start_register_for_constant_setup_data_0 = u32::from(if p.fragment_inputs > 0 { crate::xe3_codegen::Interpolate::setup(p.imask) } else { 1 + u8::from(p.imask) }),
             kernel_0_poly_packing_policy = POLY_PACK16_FIXED,
-            // sampling takes derivatives over 2x2 quads: the quads' helper pixels must run too, and on this Xe3 they do
-            // only with the vector mask (with the dispatch mask the helpers of a quad split by a triangle edge stay
-            // unexecuted and the level comes out wrong; mipmap example). The render target write still writes only the
-            // covered pixels (checked: two triangles sharing an edge, nothing overwritten).
             vector_mask_enable = p.bindings > 0,
         ));
-        // per-sample dispatch (anv: PixelShaderIsPerSample when the shader is persample)
         self.cmd(xe3!(Cmd3dstatePsExtra, pixel_shader_valid = true, pixel_shader_is_per_sample = p.sample_shading, omask_present_to_render_target = p.omask, input_coverage_mask_state = u32::from(p.imask)));
         self.cmd(xe3!(Cmd3dstateStreamout));
         self.cmd(xe3!(
@@ -1385,14 +1168,12 @@ impl<'a> Cmds<'a> {
             Cmd3dstateRaster,
             viewport_z_near_clip_test_enable = true,
             scissor_rectangle_enable = true,
-            // depth bias (anv: the constant, slope and clamp as Vulkan's, solid, wireframe and point alike)
             global_depth_offset_enable_solid = bias.is_some(),
             global_depth_offset_enable_wireframe = bias.is_some(),
             global_depth_offset_enable_point = bias.is_some(),
             global_depth_offset_constant = bias.map_or(0.0, |d| d.bias as f32),
             global_depth_offset_scale = bias.map_or(0.0, |d| d.bias_slope_scale),
             global_depth_offset_clamp = bias.map_or(0.0, |d| d.bias_clamp),
-            // the winding in screen space (y down, as framebuffer coordinates): anv's vk_to_intel_front_face
             front_winding = u32::from(p.front_face == FrontFace::Ccw),
             cull_mode = match p.cull_mode {
                 CullMode::None => CULLMODE_NONE,
@@ -1400,7 +1181,6 @@ impl<'a> Cmds<'a> {
                 CullMode::Back => CULLMODE_BACK,
             },
             viewport_z_far_clip_test_enable = true,
-            // iris: DX multisample rasterization when multisampled
             dx_multisample_rasterization_enable = p.samples > 1,
         ));
         self.cmd(xe3!(
@@ -1415,13 +1195,8 @@ impl<'a> Cmds<'a> {
             line_strip_list_provoking_vertex_select = 1u32,
             triangle_strip_list_provoking_vertex_select = 2u32,
         ));
-        // perspective pixel barycentrics (bit 0, the first in the payload) when there is something to interpolate;
-        // with sample shading the perspective sample ones (bit 2) instead, which take the same place in the payload
-        // (only the enabled modes are there, in order)
         let bary = if p.fragment_inputs == 0 { 0 } else if p.sample_shading { 4 } else { 1 };
         self.cmd(xe3!(Cmd3dstateWm, point_rasterization_rule = 1u32, line_antialiasing_region_width = 1u32, statistics_enable = true, barycentric_interpolation_mode = bary));
-        // the varyings from VUE slot 2 on (read offset 1: 256 bits, past the header and the position), as iris
-        // (iris_emit_sbe); attribute i is source attribute i
         self.cmd(xe3!(
             Cmd3dstateSbe,
             number_of_sf_output_attributes = p.varyings,
@@ -1438,7 +1213,6 @@ impl<'a> Cmds<'a> {
             .collect();
         self.cmd(xe3!(Cmd3dstateSbeSwiz, attribute = swiz));
         let mut ps_blend = crate::xe3_value!(Cmd3dstatePsBlend, has_writeable_rt = true, alpha_to_coverage_enable = p.alpha_to_coverage);
-        // 3DSTATE_PS_BLEND: target 0's
         if let Some(b) = p.colors.first().and_then(|c| c.blend) {
             let f = |v: u32| Some(Fill::from(v));
             ps_blend.color_buffer_blend_enable = Some(true.into());
@@ -1449,12 +1223,8 @@ impl<'a> Cmds<'a> {
         self.cmd(crate::xe3_codegen::xe3_op(&ps_blend));
         match (p.depth, &args.depth) {
             (Some(d), Some(t)) => {
-                // anv's WM_DEPTH_STENCIL from the pipeline; the buffer as isl_emit_depth_stencil_hiz_s (write enable is on
-                // whenever there is a depth surface)
                 let mut wm = crate::xe3_value!(Cmd3dstateWmDepthStencil, depth_test_enable = true, depth_test_function = d.compare.isl(), depth_buffer_write_enable = d.write);
                 match (d.stencil, &t.stencil) {
-                    // the front face's test; with `back` double sided (anv's backface fields: the same masks and
-                    // reference), else back faces use the front's
                     (Some(s), Some(st)) => {
                         let f = |v: u32| Some(Fill::from(v));
                         wm.stencil_test_enable = Some(true.into());
@@ -1500,7 +1270,6 @@ impl<'a> Cmds<'a> {
             (Some(_), None) => return Err(Error("draw: the pipeline tests depth but the pass has no depth attachment".into())),
             (None, Some(_)) => return Err(Error("draw: the pass has a depth attachment the pipeline does not describe".into())),
         }
-        // the stencil8 as isl_emit_depth_stencil_hiz_s (write enable on whenever there is a stencil surface)
         match args.depth.as_ref().and_then(|t| t.stencil.as_ref().map(|s| (t, s))) {
             Some((t, s)) => self.cmd(xe3!(
                 Cmd3dstateStencilBuffer,
@@ -1559,7 +1328,6 @@ impl<'a> Cmds<'a> {
             })
             .collect();
         self.cmd(xe3!(Cmd3dstateVertexElements, elements = elements));
-        // every element's instancing (it stays from draw to draw), as iris
         for (i, v) in p.attrs.iter().enumerate() {
             let on = p.instanced[v.buffer as usize];
             self.cmd(xe3!(Cmd3dstateVfInstancing, vertex_element_index = i as u32, instancing_enable = on, instance_data_step_rate = u32::from(on)));
@@ -1567,7 +1335,6 @@ impl<'a> Cmds<'a> {
         self.cmd(xe3!(Cmd3dstateVfSgvs));
         self.cmd(xe3!(Cmd3dstateVfSgvs2));
         self.cmd(xe3!(Cmd3dstateVfStatistics, statistics_enable = true));
-        // primitive restart (anv: IndexedDrawCutIndexEnable, the cut index all ones of the index format)
         let cut = p.strip_index_format.map(|f| match f {
             IndexFormat::Uint16 => 0xffffu32,
             IndexFormat::Uint32 => u32::MAX,
@@ -1583,8 +1350,6 @@ impl<'a> Cmds<'a> {
             patch_batch_size_multiplier = 31u32,
         ));
         self.cmd(xe3!(Cmd3dstatePrimitiveReplication));
-        // iris_upload_render_state / iris_draw_vbo: the index buffer (L3 bypass off on Gfx12+), then RANDOM access with
-        // the base vertex
         let indexed = args.index.is_some();
         let (access, base) = match args.index {
             Some(ix) => {
@@ -1601,8 +1366,6 @@ impl<'a> Cmds<'a> {
             None => (SEQUENTIAL, A::from(0u32)),
         };
         if let Some(at) = &args.indirect {
-            // genX(cmd_draw_indirect): the arguments into the 3DPRIM registers (a sequential draw's base vertex 0), then
-            // the primitive with Indirect Parameter Enable
             let regs: &[u32] = if indexed {
                 &[PRIM_VERTEX_COUNT, PRIM_INSTANCE_COUNT, PRIM_START_VERTEX, PRIM_BASE_VERTEX, PRIM_START_INSTANCE]
             } else {
@@ -1633,23 +1396,16 @@ impl<'a> Cmds<'a> {
     }
 }
 
-/// ⭐ The module being lowered.
 pub struct Render<'r, 'a> {
-    /// every change to the module through it
     rw: Rewriter<'r, 'a>,
     module: OpId,
     cmds: Cmds<'a>,
-    /// textures by name: their size and format, and (once sampled) their surface state
     textures: Vec<(String, Texture, Option<String>)>,
-    /// sampler states by pipeline
     samplers: Vec<(String, String)>,
-    /// the two blend states (none, premultiplied), made when first used
-    /// the blend states made, by the targets they are for
     blends: Vec<(Vec<ColorTarget>, String)>,
 }
 
 impl<'a> Render<'_, 'a> {
-    /// An op of one region of one block (a memory, a stream) at the end of `block`; its block.
     fn container(&mut self, block: BlockId, data: OpData<'a>) -> BlockId {
         self.rw.set_end(block);
         let op = self.rw.create_with(data, &[], |b, op| {
@@ -1659,51 +1415,42 @@ impl<'a> Render<'_, 'a> {
         self.rw.body.top_block(op)
     }
 
-    /// Memory `m` at the end of the module, its block.
     fn memory(&mut self, m: &Memory<'_>) -> Result<BlockId, Error> {
         let top = self.rw.body.top_block(self.module);
         Ok(self.container(top, OpData::head(m)?))
     }
 
-    /// Typed op `op` (no regions) at the end of `block`.
     fn emit(&mut self, block: BlockId, op: &impl mlirpass::TypedOp) -> OpId {
         self.rw.set_end(block);
         self.rw.emit(op)
     }
 
-    /// An op at the end of `block`.
     fn put(&mut self, block: BlockId, data: OpData<'a>) -> OpId {
         self.rw.set_end(block);
         self.rw.create(data, &[])
     }
 
-    /// The `O` op of the module named `@name`.
     fn named<O: Op>(&self, name: &str) -> Result<OpId, Error> {
         let top = self.rw.body.top_block(self.module);
         let body = &*self.rw.body;
         body.ops(top).find(|o| body[*o].name == O::NAME && body[*o].get(Symbol::ATTR).is_some_and(|s| Symbol::defined(s).is_ok_and(|s| s == name))).ok_or_else(|| Error(format!("no {} @{name}", O::NAME)))
     }
 
-    /// Op `op` as the typed `O`.
     fn typed<O: Op>(&self, op: OpId) -> Result<O, Error> {
         self.rw.body.head(op)
     }
 
-    /// The `detour.buffer` `a` names (a symbol): its name and size.
     fn buffer(&self, a: &Attribute<'_>) -> Result<(String, u32), Error> {
         let name = Symbol::name(a)?.to_owned();
         let size = BufferSize::try_from(&self.typed::<crate::base::Buffer>(self.named::<crate::base::Buffer>(&name)?)?)?.size;
         Ok((name, size))
     }
 
-    /// An `detour.draw`: its pipeline, its buffers' addresses and sizes, its counts.
     fn draw(&mut self, d: &crate::base::Draw<'_>, shared: &[String; 5]) -> Result<(), Error> {
         let pipe = self.named::<crate::base::Pipeline>(Symbol::name(&d.pipeline)?)?;
-        // in the module's block, or already placed in the code memory
         let kernels = Kernel::all(self.rw.body, self.module);
         let p = Pipeline::of(self.rw.body, pipe)?.with_kernels(self.rw.body, &kernels)?;
         let buffers = d.vertex_buffers.iter().map(|b| self.buffer(b).map(|(name, size)| (A::sym(name), A::from(size)))).collect::<Result<Vec<_>, _>>()?;
-        // binding table: the target, then the draw's textures (each one's surface state made once)
         let mut entries = vec![A::sym(shared[3].clone())];
         for t in d.textures.iter().flatten() {
             let name = Symbol::name(t)?.to_owned();
@@ -1735,7 +1482,6 @@ impl<'a> Render<'_, 'a> {
                 b
             }
         };
-        // indexed (drawIndexed): its index buffer, format, base vertex; the index count and the first index
         let index = match (&d.index_buffer, d.index_format) {
             (None, _) => None,
             (Some(ib), Some(format)) => {
@@ -1764,7 +1510,6 @@ impl<'a> Render<'_, 'a> {
         self.cmds.draw(&p, args, shared)
     }
 
-    /// ⭐ Lowers the module (its shaders already kernels).
     pub fn lower(body: &mut Body<'a>, module: OpId) -> Result<(), Error> {
         let top = body.top_block(module);
         let ops = body.block_ops(top);
@@ -1774,7 +1519,6 @@ impl<'a> Render<'_, 'a> {
         let batch = me.container(code, OpData::head(&Stream::named("batch"))?);
         let surfaces = me.memory(&Memory { size: Some(u64::from(POOL)), align: Some(u64::from(POOL)), ..Memory::named("surfaces", MemType::Streaming) })?;
         me.cmds.null_surface();
-        // where the command streamer writes its memory fence
         me.emit(code, &Data { align: Some(4096), ..Data::zeros("fence", 64) });
 
         for &op in &ops {
@@ -1796,7 +1540,6 @@ impl<'a> Render<'_, 'a> {
                 me.textures.push((name, tex, None));
             }
         }
-        // the kernels go in the code memory
         for op in &ops {
             if me.rw.body[*op].name == Kernel::NAME {
                 me.rw.move_before(*op, code, None);
@@ -1836,7 +1579,6 @@ impl<'a> Render<'_, 'a> {
                 me.put(block, data);
             }
         }
-        // what is lowered goes, and the functions that were not shaders with it
         for op in ops {
             let name = &*me.rw.body[op].name;
             if name.starts_with("detour.") || (name == "func.func" && Stage::of(me.rw.body, op).is_none()) {
@@ -1847,7 +1589,6 @@ impl<'a> Render<'_, 'a> {
     }
 }
 
-/// An detour buffer's size (`size`, else its `data`'s) and whether the CPU reads it back.
 struct BufferSize {
     size: u32,
     readback: bool,

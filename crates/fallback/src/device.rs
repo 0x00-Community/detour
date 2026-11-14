@@ -27,13 +27,10 @@ pub struct Device {
 }
 
 impl Device {
-    /// A Vulkan device: a GPU's first, a CPU one (lavapipe) only when there is no GPU.
     pub fn open() -> Result<Self, String> {
         Self::open_where(true)
     }
 
-    /// A GPU's Vulkan device, never a CPU one: where there is none, pages are drawn on the CPU directly
-    /// ([`CpuRaster`](crate::CpuRaster)), not through lavapipe.
     pub fn open_hardware() -> Result<Self, String> {
         Self::open_where(false)
     }
@@ -222,8 +219,6 @@ impl Device {
     }
 }
 
-/// ⭐ A texture's memory exported as a dma-buf (linear RGBA8, [`Exported::texture`]): another device (Xe3's driver)
-/// imports it to read what wgpu drew.
 pub struct Exported {
     pub fd: OwnedFd,
     pub offset: u32,
@@ -231,21 +226,16 @@ pub struct Exported {
 }
 
 impl Exported {
-    /// The dma-buf as a [`Dmabuf`].
     pub fn dmabuf(&self) -> Dmabuf<'_> {
         Dmabuf { fd: self.fd.as_fd(), offset: self.offset, stride: self.stride, modifier: Dmabuf::LINEAR }
     }
 
-    /// The usages [`texture`](Self::texture) makes a GPU image's with.
     const IMAGE: wgpu::TextureUsages = wgpu::TextureUsages::STORAGE_BINDING.union(wgpu::TextureUsages::TEXTURE_BINDING).union(wgpu::TextureUsages::COPY_DST).union(wgpu::TextureUsages::COPY_SRC);
 
-    /// ⭐ A `width` × `height` Rgba8Unorm texture on `device` (opened by [`Device::open`]: it has the dma-buf
-    /// extensions) whose memory is exportable, linear, and that memory as a dma-buf.
     pub fn texture(device: &wgpu::Device, size: (u32, u32)) -> Result<(wgpu::Texture, Exported), String> {
         Self::with_usage(device, size, Self::IMAGE)
     }
 
-    /// [`texture`](Self::texture) for `usage` (a WebGPU canvas's: it is rendered to).
     pub fn with_usage(device: &wgpu::Device, (width, height): (u32, u32), usage: wgpu::TextureUsages) -> Result<(wgpu::Texture, Exported), String> {
         use wgpu::{TextureUsages as U, TextureUses as H};
         const USES: [(U, vk::ImageUsageFlags, H); 5] = [

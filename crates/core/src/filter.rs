@@ -1,17 +1,9 @@
-//! CSS `filter` / `backdrop-filter`: a list of effects applied in order (Filter Effects Module Level 1).
-//!
-//! Only the CSS filter functions: blur, drop-shadow, and the color matrices of opacity / invert / brightness / contrast /
-//! hue-rotate / saturate / sepia / grayscale. The matrices are anyrender 0.14's (MIT OR Apache-2.0), which follow the
-//! spec's equivalents. No SVG filter graphs: acde does not render `url()` filters.
-
 use kurbo::{Affine, Rect};
 use peniko::color::{AlphaColor, Srgb};
 
-/// ⭐ Effects applied one after another, with the room they need around what they filter.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Filter {
     effects: Vec<FilterEffect>,
-    /// The union of the effects' expansions, in user space, centered on the origin.
     expansion: Rect,
 }
 
@@ -28,17 +20,14 @@ impl Filter {
         &self.effects
     }
 
-    /// How far past what it filters the filter reaches, in user space (x0 / y0 negative).
     pub fn expansion(&self) -> Rect {
         self.expansion
     }
 
-    /// [`expansion`](Self::expansion) in device space under `transform`.
     pub fn bounds_expansion(&self, transform: &Affine) -> Rect {
         transform.transform_rect_bbox(self.expansion)
     }
 
-    /// [`bounds_expansion`](Self::bounds_expansion) under the linear part of `transform` (no translation).
     pub fn linear_bounds_expansion(&self, transform: &Affine) -> Rect {
         let [a, b, c, d, _, _] = transform.as_coeffs();
         self.bounds_expansion(&Affine::new([a, b, c, d, 0.0, 0.0]))
@@ -52,13 +41,11 @@ pub enum FilterEffect {
     ColorMatrix(ColorMatrix),
 }
 
-/// `blur()`: a gaussian of standard deviation σ; it reaches about 3σ.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GaussianBlur {
     pub std_deviation: f32,
 }
 
-/// `drop-shadow()`: the content's alpha, blurred, offset and colored, under the content.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DropShadow {
     pub dx: f32,
@@ -67,7 +54,6 @@ pub struct DropShadow {
     pub color: AlphaColor<Srgb>,
 }
 
-/// A 4×5 color matrix: rows R, G, B, A; columns R, G, B, A, offset.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ColorMatrix(pub [f32; 20]);
 
@@ -90,7 +76,6 @@ impl From<ColorMatrix> for FilterEffect {
 }
 
 impl FilterEffect {
-    /// How far past its input the effect reaches, in user space, centered on the origin.
     pub fn expansion(&self) -> Rect {
         match self {
             Self::GaussianBlur(b) => {
@@ -111,7 +96,6 @@ const LUMA: [f32; 3] = [0.213, 0.715, 0.072];
 impl ColorMatrix {
     pub const IDENTITY: Self = Self::diagonal(1.0, 1.0, [0.0; 3]);
 
-    /// R, G, B scaled by `scale`, alpha by `alpha`, `offset` added to R, G, B.
     const fn diagonal(scale: f32, alpha: f32, [r, g, b]: [f32; 3]) -> Self {
         #[rustfmt::skip]
         let m = [
@@ -123,7 +107,6 @@ impl ColorMatrix {
         Self(m)
     }
 
-    /// A 3×3 RGB matrix, alpha kept.
     #[rustfmt::skip]
     const fn rgb([r, g, b]: [[f32; 3]; 3]) -> Self {
         Self([
@@ -134,27 +117,22 @@ impl ColorMatrix {
         ])
     }
 
-    /// <https://drafts.fxtf.org/filter-effects/#opacityEquivalent>
     pub fn opacity(amount: f32) -> Self {
         Self::diagonal(1.0, amount, [0.0; 3])
     }
 
-    /// <https://drafts.fxtf.org/filter-effects/#invertEquivalent>
     pub fn invert(amount: f32) -> Self {
         Self::diagonal(1.0 - 2.0 * amount, 1.0, [amount; 3])
     }
 
-    /// <https://drafts.fxtf.org/filter-effects/#brightnessEquivalent>
     pub fn brightness(amount: f32) -> Self {
         Self::diagonal(amount, 1.0, [0.0; 3])
     }
 
-    /// <https://drafts.fxtf.org/filter-effects/#contrastEquivalent>
     pub fn contrast(amount: f32) -> Self {
         Self::diagonal(amount, 1.0, [0.5 - 0.5 * amount; 3])
     }
 
-    /// <https://drafts.fxtf.org/filter-effects/#feColorMatrixElement> (hueRotate)
     pub fn hue_rotate(radians: f32) -> Self {
         let (sin, cos) = radians.sin_cos();
         let [lr, lg, lb] = LUMA;
@@ -165,7 +143,6 @@ impl ColorMatrix {
         ])
     }
 
-    /// <https://drafts.fxtf.org/filter-effects/#feColorMatrixElement> (saturate)
     pub fn saturate(amount: f32) -> Self {
         let [lr, lg, lb] = LUMA;
         Self::rgb([
@@ -175,7 +152,6 @@ impl ColorMatrix {
         ])
     }
 
-    /// <https://www.w3.org/TR/filter-effects-1/#sepiaEquivalent>
     pub fn sepia(amount: f32) -> Self {
         let k = 1.0 - amount;
         Self::rgb([
@@ -185,7 +161,6 @@ impl ColorMatrix {
         ])
     }
 
-    /// <https://www.w3.org/TR/filter-effects-1/#grayscaleEquivalent>
     pub fn grayscale(amount: f32) -> Self {
         let k = 1.0 - amount;
         Self::rgb([

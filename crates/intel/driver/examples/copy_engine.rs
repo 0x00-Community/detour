@@ -1,8 +1,3 @@
-//! The copy engine (BCS: `Context::open_copy`, `record_copy`, `Recorder::blit`, XY_BLOCK_COPY_BLT) on Xe3, byte for
-//! byte: a 64 x 40 rectangle of a 100 x 60 rgba8unorm texture of noise blitted to (20, 30) of a 128 x 80 one of zeros
-//! (the rest left zero); the same with 16-byte texels (rgba32float); and a buffer a render queue dispatch fills, blitted
-//! (as a 128 x 64 image of u32s) into another by a copy frame that waits for the dispatch on the GPU.
-
 use detour::base::{Gpu, Native, TextureFormat};
 use detour::xe3::{Codegen, Context, Linear};
 use detour::xe::Xe;
@@ -36,8 +31,6 @@ fn noise(n: usize, seed: u64) -> Vec<u8> {
         .collect()
 }
 
-/// The bytes of a `dw` x `dh` image of `bpp`-byte texels after copying `size` texels from (sx, sy) of `src` (`sw` wide)
-/// to (dx, dy) of zeros.
 fn expected(src: &[u8], sw: u32, (dw, dh): (u32, u32), bpp: u32, [sx, sy]: [u32; 2], [dx, dy]: [u32; 2], [w, h]: [u32; 2]) -> Vec<u8> {
     let mut out = vec![0u8; (dw * dh * bpp) as usize];
     for row in 0..h {

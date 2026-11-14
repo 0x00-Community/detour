@@ -1,8 +1,3 @@
-//! A compute shader through the RDNA2 backend into an image with its dispatch: `rdna2-compute FILE [GROUPS] [--hex]
-//! [--image OUT]`. Prints the module after the whole pipeline and where the kernel is (`--hex`: only the kernel's
-//! instruction bytes, as llvm-mc --disassemble reads them; `--image`: the image, `Built::dump`).
-//! The shader's parameters are the addresses of two 64 KiB buffers, @src and @dst.
-
 use detour::rdna2_codegen::Codegen;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

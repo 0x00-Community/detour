@@ -1,8 +1,3 @@
-//! A scene recorded for the GPU (`RenderContext::new_recording`) rasterized on Xe3 by the library's path pipeline
-//! (`PathRaster::bin`, `Tiles::recorded`, `Fine`) against vello_cpu's own rasterization of the same scene, pixel for
-//! pixel: fills under transforms (rotated, scaled), strokes, solid colours and gradients, nested clip and opacity
-//! layers.
-
 use detour::base::{Gpu, Native};
 use detour::xe3::{Codegen, Context, Fine, PathRaster, Tiles};
 use detour::xe::Xe;
@@ -13,7 +8,6 @@ use detour::vello_cpu::{Pixmap, RasterizerSettings, RenderContext, RenderMode, R
 const WIDTH: u16 = 1024;
 const HEIGHT: u16 = 768;
 
-/// xorshift64*
 struct Rng(u64);
 
 impl Rng {
@@ -51,7 +45,6 @@ impl Rng {
     }
 }
 
-/// The scene, drawn into `ctx` (the same calls whichever it is).
 fn scene(ctx: &mut RenderContext) {
     let mut rng = Rng(0x1234_5678_9abc_def1);
     let mut depth = 0;
@@ -99,7 +92,6 @@ fn scene(ctx: &mut RenderContext) {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // vello_cpu's pixels
     let mut reference = RenderContext::new(WIDTH, HEIGHT);
     scene(&mut reference);
     let mut want = Pixmap::new(WIDTH, HEIGHT);
@@ -107,7 +99,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     reference.render_with(&mut want, &mut Resources::new(), RasterizerSettings { render_mode: RenderMode::OptimizeSpeed, ..Default::default() });
     let cpu_ms = t.elapsed().as_secs_f64() * 1e3;
 
-    // the GPU's
     let mut rec = RenderContext::new_recording(WIDTH, HEIGHT);
     scene(&mut rec);
     let (recording, encoded) = rec.recording().ok_or("not a recording")?;

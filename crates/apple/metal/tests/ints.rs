@@ -1,12 +1,8 @@
-//! detour's compute/ints shader, compiled by detour-apple-codegen's `apple9` and run by this runtime on this Mac's
-//! GPU (an Apple9: M3 / M4), every result checked: nine workgroups of 16 (the last hardware workgroup half full), then
-//! 64, on the one pipeline.
 #![cfg(target_os = "macos")]
 
 use detour::agx_codegen::apple9::Apple9;
 use detour_apple_metal::M4;
 
-/// The twenty results of (a, b): the semantics of examples/compute/ints.mlir.
 fn want(a: u32, b: u32) -> [u32; 20] {
     let (sa, sb, s) = (a as i32, b as i32, b & 31);
     let fk = (sa as f32) * 0.37f32;

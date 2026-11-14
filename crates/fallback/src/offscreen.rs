@@ -1,32 +1,24 @@
-//! GPU images and drawing off screen (moved from acde's crates/render): a scene can paint with a texture (a 2D canvas's
-//! pixels, a WebGPU canvas) as an image; [`Offscreen`] draws scenes into such textures, reads them back, writes into
-//! them and blurs them into shadows. Everything here shares one device ([`Shared`]) with the page rasterizer.
-
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use std::time::Duration;
 
-
 #[cfg(target_os = "linux")]
 use crate::fallback::Exported;
 
-/// What a GPU image's memory is exported as: a dma-buf on Linux (`device::Exported`), nothing elsewhere.
 #[cfg(not(target_os = "linux"))]
 pub enum Exported {}
 
 const WAIT: Duration = Duration::from_secs(10);
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
-/// The widest shadow blur, in pixels.
+
 const MAX_RADIUS: f64 = 256.0;
 
-/// ⭐ The device, its queue (every submit takes [`submit_lock`](Self::submit_lock)), and the GPU images made on it.
 pub struct Shared {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub images: Arc<ImageSet>,
     submit: Mutex<()>,
-    /// GPU images made exportable as dma-bufs (for another device to read: Xe3's pages)
     export: bool,
 }
 
@@ -35,15 +27,11 @@ impl Shared {
         Arc::new(Self { device, queue, images: Arc::default(), submit: Mutex::new(()), export: false })
     }
 
-    /// ⭐ As [`new`](Self::new), the GPU images made exportable as linear dma-bufs ([`GpuImage::exported`]): for pages
-    /// drawn on Xe3, which reads them where they are. `device` is a [`Device`](crate::fallback::Device)'s (it has the dma-buf
-    /// extensions); an image whose export fails is made as usual (pages painting with it are then the fallback's).
     #[cfg(target_os = "linux")]
     pub fn exporting(device: wgpu::Device, queue: wgpu::Queue) -> Arc<Self> {
         Arc::new(Self { device, queue, images: Arc::default(), submit: Mutex::new(()), export: true })
     }
 
-    /// Any GPU wgpu can open, a CPU device (lavapipe) last (for drawing off screen when no page rasterizer opened one).
     pub fn open() -> Result<Arc<Self>, String> {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { backends: wgpu::Backends::PRIMARY, ..wgpu::InstanceDescriptor::new_without_display_handle() });
         let adapter = pollster::block_on(instance.enumerate_adapters(wgpu::Backends::PRIMARY))
@@ -63,7 +51,6 @@ impl Shared {
         self.submit.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// The lock itself, for [`Raster::draw`](crate::fallback::Raster).
     pub fn submit_mutex(&self) -> &Mutex<()> {
         &self.submit
     }
@@ -73,7 +60,6 @@ impl Shared {
         self.queue.submit(buffers)
     }
 
-    /// A texture for a GPU image: exportable when the images are ([`exporting`](Self::exporting)).
     fn image(&self, size: (u32, u32), label: &str) -> (wgpu::Texture, Option<Exported>) {
         #[cfg(target_os = "linux")]
         if self.export
@@ -101,7 +87,6 @@ impl Shared {
         })
     }
 
-    /// `data` (`width` × `height` RGBA8, from `from`) written into `image` at `to` (x, y, w, h).
     pub fn write(&self, image: &GpuImage, data: &[u8], (width, height): (u32, u32), from: [u32; 2], [x, y, w, h]: [u32; 4]) {
         if w == 0 || h == 0 || data.len() < (width * height * 4) as usize {
             return;
@@ -114,7 +99,6 @@ impl Shared {
         );
     }
 
-    /// `rect` (x, y, w, h) of `texture` read back as RGBA8 rows; `None` when outside it or the GPU failed.
     pub fn read(&self, texture: &wgpu::Texture, [x, y, w, h]: [u32; 4]) -> Result<Vec<u8>, String> {
         if w == 0 || h == 0 || x + w > texture.width() || y + h > texture.height() {
             return Err(format!("{w}x{h} at ({x}, {y}) is outside the {}x{} texture", texture.width(), texture.height()));
@@ -152,7 +136,6 @@ impl Shared {
     }
 }
 
-/// The GPU images alive on a device, by the id their [`peniko::ImageData`] carries.
 #[derive(Default)]
 pub struct ImageSet(Mutex<HashMap<u64, Weak<GpuImage>>>);
 
@@ -161,7 +144,6 @@ impl ImageSet {
         self.0.lock().unwrap_or_else(|e| e.into_inner()).get(&id)?.upgrade()
     }
 
-    /// The images alive now.
     pub fn live(&self) -> Vec<Arc<GpuImage>> {
         self.0.lock().unwrap_or_else(|e| e.into_inner()).values().filter_map(Weak::upgrade).collect()
     }
@@ -171,11 +153,8 @@ impl ImageSet {
     }
 }
 
-/// ⭐ A texture a scene can paint with: [`brush`](Self::brush) is an image brush whose pixels are the texture's. The
-/// owner calls [`painted`](Self::painted) after changing them; vello copies the texture when it draws a scene with it.
 pub struct GpuImage {
     pub texture: wgpu::Texture,
-    /// its memory as a dma-buf, when made exportable
     exported: Option<Exported>,
     id: u64,
     set: Weak<ImageSet>,
@@ -183,7 +162,6 @@ pub struct GpuImage {
     copied: AtomicU64,
 }
 
-/// No bytes on the CPU: the pixels are the texture's.
 impl AsRef<[u8]> for GpuImage {
     fn as_ref(&self) -> &[u8] {
         &[]
@@ -199,9 +177,7 @@ impl GpuImage {
         Self::with_export(texture, None, set)
     }
 
-    /// An image whose texture's memory is `exported` as a dma-buf.
     pub fn with_export(texture: wgpu::Texture, exported: Option<Exported>, set: &Arc<ImageSet>) -> Arc<Self> {
-        // a fresh blob id, so vello's image cache keys this image by it
         let id = peniko::Blob::<u8>::new(Arc::new(Vec::<u8>::new())).id();
         let image = Arc::new(Self { texture, exported, id, set: Arc::downgrade(set), generation: AtomicU64::new(0), copied: AtomicU64::new(0) });
         set.0.lock().unwrap_or_else(|e| e.into_inner()).insert(id, Arc::downgrade(&image));
@@ -222,12 +198,10 @@ impl GpuImage {
         peniko::ImageBrush { image: self.image(), sampler: peniko::ImageSampler::default() }
     }
 
-    /// The id scenes find it by (its `ImageData`'s blob's).
     pub fn id(&self) -> u64 {
         self.id
     }
 
-    /// Its memory as a dma-buf (linear RGBA8, straight alpha), when made exportable.
     pub fn exported(&self) -> Option<&Exported> {
         self.exported.as_ref()
     }
@@ -236,12 +210,10 @@ impl GpuImage {
         self.generation.load(Ordering::Acquire)
     }
 
-    /// The texture changed: scenes that use the image take the new pixels.
     pub fn painted(&self) {
         self.generation.fetch_add(1, Ordering::Release);
     }
 
-    /// Whether the latest pixels were taken by a submitted frame.
     pub fn copied(&self) -> bool {
         self.copied.load(Ordering::Acquire) >= self.generation()
     }

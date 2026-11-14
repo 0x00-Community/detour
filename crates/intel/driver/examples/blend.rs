@@ -1,14 +1,10 @@
-//! Blending: three overlapping translucent rectangles (premultiplied colors, alpha 0.5 / 0.25 / 0.75) drawn in order
-//! over an opaque clear color with `blend = "premultiplied"`. Through the runtime; every pixel is checked against
-//! `src + dst * (1 - src.a)` applied rectangle after rectangle (within one step of unorm8 rounding).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
 
 const W: u32 = 128;
 const CLEAR: [f64; 4] = [0.2, 0.4, 0.6, 1.0];
-/// (x, y, w, h in pixels), straight color, alpha
+
 type Rect = ((u32, u32, u32, u32), [f64; 3], f64);
 
 const RECTS: [Rect; 3] = [
@@ -52,7 +48,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if x >= rx && x < rx + rw && y >= ry && y < ry + rh {
                     n += 1;
                     let src = [c[0] * a, c[1] * a, c[2] * a, a];
-                    // the GPU blends what the target holds: the previous result as unorm8
                     want = std::array::from_fn(|i| src[i] + (want[i] * 255.0).round() / 255.0 * (1.0 - a));
                 }
             }

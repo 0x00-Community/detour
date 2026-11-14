@@ -1,39 +1,3 @@
-// Copyright 2026 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! CPU-based depth buffers.
-//!
-//! GPUs have depth buffers, so why not use them for CPU rendering as well! For many of the existing
-//! CPU-based 2D renderers, this is not really possible because they use immediate-mode rendering.
-//! But Vello CPU first converts all rendering commands into strips and then processes them, meaning
-//! that before we even start with rasterization, we already have a rough idea of what we are about
-//! to rasterize. Therefore, we can use this information to go about performing rasterization in a
-//! smarter way.
-//!
-//! Unlike GPUs, it is not feasible to have a per-pixel depth buffer. While certain per-pixel work
-//! can be expensive (images, gradients), what is even more expensive is splitting up work in a
-//! too granular fashion, especially when only dealing with solid colors. It is much faster to just
-//! fill a 256x1 buffer of pixels with a single colors than doing it in 32 chunks of 4x1, just to
-//! save 50% pixel work.
-//!
-//! Therefore, the CPU-based depth buffer acts at a much coarser granularity. Vertically, it comes
-//! very natural to simply decide that one depth buffer entry covers a range of [`Tile::HEIGHT`]
-//! pixels, since all commands are executed at this height anyway. Choosing a width is much trickier:
-//! Similarly, the width should be a multiple of [`Tile::WIDTH`], but using this as the granularity
-//! is still to narrow. After some empirical measurements, it was decided that a width of
-//! [`DEPTH_BUCKET_WIDTH`] overall represents a good compromise across different paint types.
-//!
-//! How this essentially works now is that, once we've collected all strips, we split them up
-//! into opaque fills aligned to the depth bucket width, and all other fills which either have
-//! transparency or stem from non-aligned parts of an opaque fill. During rasterization, we
-//! first render the opaque strips front-to-back, each time checking the depth buffer whether
-//! this hasn't already been filled by an opaque strip with a higher z-index. Otherwise, we
-//! perform the fill and update the depth buffer.
-//!
-//! Then, we simply render the remaining strips back to front, again always comparing the depth
-//! against what's written in the depth buffer and skipping any commands that would be fully
-//! covered by existing content.
-
 use crate::vello_cpu::span::TileAlignedSpan;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -47,7 +11,6 @@ const _: () = assert!(
     "depth bucket width must be a multiple of tile width"
 );
 
-/// A horizontal range in depth-bucket coordinates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BucketRange {
     pub(crate) start: u16,
@@ -69,16 +32,10 @@ impl BucketRange {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DepthSegment {
-    /// An opaque span that cannot be tracked in the depth buffer because it is not
-    /// aligned to whole depth buckets.
     Regular(TileAlignedSpan),
-    /// An opaque span that is aligned and can therefore be rendered front-to-back with
-    /// depth-buffer write enabled.
     Opaque(BucketRange),
 }
 
-/// Splits a tile-aligned span into regular edge spans and a depth-trackable
-/// opaque middle span.
 pub(crate) fn split_opaque_span(span: TileAlignedSpan, mut segment: impl FnMut(DepthSegment)) {
     let x = span.tile_x();
     let end = span.tile_end();
@@ -113,14 +70,9 @@ pub(crate) fn split_opaque_span(span: TileAlignedSpan, mut segment: impl FnMut(D
     }
 }
 
-/// Coarse state for the depth buffer.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct DepthState {
-    /// Coarse union of all depth-tracked opaque spans in this row.
     bounds: Option<TileAlignedSpan>,
-    /// Maximum draw ID of any depth-trackable opaque command in this row.
-    ///
-    /// Draw IDs start at 1, so 0 represents "no opaque command".
     max_draw_id: u32,
 }
 
@@ -139,10 +91,6 @@ impl DepthState {
         self.max_draw_id = self.max_draw_id.max(draw_id);
     }
 
-    /// Returns whether this draw can skip consulting the depth buffer.
-    ///
-    /// This is the case in case there is no overlap between the span and the coarse span
-    /// of the current depth buffer.
     pub(crate) fn can_skip(self, span: TileAlignedSpan, draw_id: u32) -> bool {
         if draw_id >= self.max_draw_id {
             return true;
@@ -163,7 +111,6 @@ impl DepthState {
 
 #[derive(Debug)]
 pub(crate) struct DepthBuffer {
-    /// Stores the maximum draw ID for each depth bucket.
     data: Vec<u32>,
 }
 
@@ -174,8 +121,6 @@ impl DepthBuffer {
         }
     }
 
-    /// Calls `f` for every subspan of `span` that is not covered by any entry in the
-    /// depth buffer.
     pub(crate) fn for_each_unset_run(
         &self,
         span: TileAlignedSpan,
@@ -187,9 +132,6 @@ impl DepthBuffer {
         }
     }
 
-    /// Calls `f` for every bucket run in `bucket_range` that is not covered by any
-    /// entry in the depth buffer, and then marks the newly covered buckets in the
-    /// depth buffer.
     pub(crate) fn for_each_unset_run_and_write(
         &mut self,
         bucket_range: BucketRange,
@@ -210,8 +152,6 @@ impl DepthBuffer {
         }
     }
 
-    /// Calls `f` for every subspan of `span` that should be considered as visible assuming the
-    /// given draw ID.
     pub(crate) fn for_each_visible_run(
         &self,
         span: TileAlignedSpan,
@@ -225,7 +165,6 @@ impl DepthBuffer {
         }
     }
 
-    /// Returns the depth-bucket index range touched by `span`.
     fn range(&self, span: TileAlignedSpan) -> (usize, usize) {
         (
             usize::from(span.pixel_x() / DEPTH_BUCKET_WIDTH),
@@ -241,7 +180,6 @@ impl DepthBuffer {
         self.data[range].fill(draw_id);
     }
 
-    /// Finds the next consecutive run of unset depth buckets.
     fn next_unset_run(
         &self,
         idx: &mut usize,
@@ -267,7 +205,6 @@ impl DepthBuffer {
         ))
     }
 
-    /// Finds the next consecutive run visible to `draw_id`.
     fn next_visible_run(
         &self,
         idx: &mut usize,

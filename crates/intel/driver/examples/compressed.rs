@@ -1,11 +1,3 @@
-//! Block-compressed textures (WebGPU `texture-compression-bc`: bc1 / bc3 / bc7-rgba-unorm) on Xe3, sampled: 64
-//! random blocks a format (32 x 8 texels), drawn texel for texel (nearest, texel centers) into an rgba8unorm target and
-//! compared with a decoder written from the formats' definitions (D3D / Khronos Data Format). BC7 here is mode 6 (one
-//! subset, 7-bit RGBA endpoints and p-bits, 4-bit indices): its interpolation is exact (weights / 64, + 32), so every
-//! texel must match. BC1 / BC3: the endpoints (indices 0, 1) must match; their interpolated colors (D3D allows ±1 as
-//! hardware rounds them its own way) are counted against the definitions rounded to nearest and their largest
-//! difference reported (on 0xb0a0 about 85% are the same, none off by more than 1).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -26,7 +18,6 @@ func.func @fs(%uv: vector<2xf32>) -> vector<4xf32> attributes {detour.stage = "f
 }
 "#;
 
-/// xorshift64*
 struct Rng(u64);
 
 impl Rng {
@@ -38,14 +29,11 @@ impl Rng {
     }
 }
 
-/// A 5:6:5 color as 8 bits a channel (bit replication).
 fn rgb565(c: u16) -> [u32; 3] {
     let (r, g, b) = (u32::from(c >> 11), u32::from((c >> 5) & 63), u32::from(c & 31));
     [r << 3 | r >> 2, g << 2 | g >> 4, b << 3 | b >> 2]
 }
 
-/// A BC1 color block's 16 texels (index 0 ..= 3 each, and whether it was an endpoint); `four`: always the 4-color mode
-/// (BC3's color block).
 fn bc1(block: &[u8], four: bool) -> [([u8; 4], bool); 16] {
     let (c0, c1) = (u16::from_le_bytes([block[0], block[1]]), u16::from_le_bytes([block[2], block[3]]));
     let (a, b) = (rgb565(c0), rgb565(c1));
@@ -62,7 +50,6 @@ fn bc1(block: &[u8], four: bool) -> [([u8; 4], bool); 16] {
     })
 }
 
-/// A BC3 block: the alpha block (8 bytes: a0, a1, 3-bit indices) then a BC1 color block in the 4-color mode.
 fn bc3(block: &[u8]) -> [([u8; 4], bool); 16] {
     let (a0, a1) = (u32::from(block[0]), u32::from(block[1]));
     let alphas: [u32; 8] = if a0 > a1 {
@@ -80,7 +67,6 @@ fn bc3(block: &[u8]) -> [([u8; 4], bool); 16] {
     })
 }
 
-/// A random BC7 mode 6 block and its 16 texels (exactly defined).
 fn bc7_mode6(rng: &mut Rng) -> (Vec<u8>, [[u8; 4]; 16]) {
     const WEIGHTS: [u32; 16] = [0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64];
     let mut bits: u128 = 1 << 6;
@@ -113,7 +99,6 @@ fn bc7_mode6(rng: &mut Rng) -> (Vec<u8>, [[u8; 4]; 16]) {
     (bits.to_le_bytes().to_vec(), texels)
 }
 
-/// The texels of `blocks` (block k at x = k % (W / 4), y = k / (W / 4)) row by row, and whether each is exact.
 fn image(blocks: &[[([u8; 4], bool); 16]]) -> (Vec<u8>, Vec<bool>) {
     let (mut px, mut exact) = (vec![0u8; (W * H * 4) as usize], vec![false; (W * H) as usize]);
     for (k, b) in blocks.iter().enumerate() {

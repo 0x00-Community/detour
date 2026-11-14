@@ -1,6 +1,3 @@
-//! Raw uAPI: the structs and ioctl numbers of include/uapi/drm/amdgpu_drm.h (Linux 7.2) that detour uses, laid out as
-//! the kernel has them (all `repr(C)`; the header's unions are Rust unions; sizes checked by the tests at the end).
-
 #![allow(non_camel_case_types)]
 
 use std::ffi::c_ulong;
@@ -137,7 +134,6 @@ pub struct drm_amdgpu_cs_in {
     pub bo_list_handle: u32,
     pub num_chunks: u32,
     pub flags: u32,
-    /// A pointer to an array of pointers to `drm_amdgpu_cs_chunk`.
     pub chunks: u64,
 }
 
@@ -200,7 +196,6 @@ pub struct drm_amdgpu_gem_va {
 pub const AMDGPU_INFO_HW_IP_INFO: u32 = 0x02;
 pub const AMDGPU_INFO_DEV_INFO: u32 = 0x16;
 
-/// `drm_amdgpu_info`; `args` is its union of per-query arguments (16 bytes, the largest member).
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 pub struct drm_amdgpu_info {
@@ -284,7 +279,6 @@ pub struct drm_amdgpu_info_device {
 
 impl Default for drm_amdgpu_info_device {
     fn default() -> Self {
-        // SAFETY: plain integers, all zero is valid.
         unsafe { std::mem::zeroed() }
     }
 }
@@ -315,7 +309,6 @@ pub const DRM_IOCTL_AMDGPU_GEM_VA: c_ulong = Ioctl::w::<drm_amdgpu_gem_va>(BASE 
 mod tests {
     use super::*;
 
-    /// gcc on include/uapi/drm/amdgpu_drm.h (Linux 7.2): `sizeof`, offsets, the `DRM_IOCTL_AMDGPU_*` values.
     #[test]
     fn sizes_match_the_kernel() {
         let sizes = [

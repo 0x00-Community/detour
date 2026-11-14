@@ -1,9 +1,3 @@
-//! Blend states (`GPUBlendState`: any factors, any operation, color and alpha apart) on Xe3, byte for byte: a target
-//! cleared to (0, 255, 255, 255), a quad of (1, 0, 1, 0.2) blended over it, every pixel checked against the formula
-//! (values picked so each result is a whole byte): over with alpha kept apart, add, subtract, reverse subtract, min,
-//! max, the source times the target, the target times the source, src-alpha-saturated, the blend constant (0 unless
-//! set; set: `setBlendConstant`), one-minus-dst-alpha.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -34,7 +28,6 @@ func.func @fs() -> vector<4xf32> attributes {{detour.stage = "fragment"}} {{
     )
 }
 
-/// A blend factor's value for channel `k` (color: 0 ..= 2, alpha: 3), the blend constant `constant`.
 fn factor(name: &str, k: usize, constant: [f64; 4]) -> f64 {
     let (s, d) = (SRC, DST);
     let c = if k == 3 { 3 } else { k };
@@ -57,7 +50,6 @@ fn factor(name: &str, k: usize, constant: [f64; 4]) -> f64 {
     }
 }
 
-/// The blended byte of channel `k`: `src · sf ⊕ dst · df`.
 fn blended(k: usize, (sf, df, op): (&str, &str, &str), constant: [f64; 4]) -> u8 {
     let (s, d) = (SRC[k] * factor(sf, k, constant), DST[k] * factor(df, k, constant));
     let v = match op {

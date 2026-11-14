@@ -1,10 +1,3 @@
-//! Storage textures (`texture_storage_2d`, `textureStore`, read-write `textureLoad`) on Xe3, written by compute:
-//! `@fill` over a 37 x 23 grid (the lanes past x 36 outside, dropped) stores (x, y, x y, 1) into an rgba32float
-//! texture, x y + 0.5 into an r32float one, (x, y, x + y) / 255 into an rgba8unorm one; `@double` reads the rgba32float
-//! texture and stores it doubled into another; after `Recorder::texture_barrier` a draw samples the rgba8unorm texture
-//! (nearest, texel centers) into a target. Every texel against its definition, bit for bit; the bytes past each
-//! texture untouched.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

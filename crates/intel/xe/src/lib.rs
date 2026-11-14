@@ -1,9 +1,3 @@
-//! The xe kernel driver (Intel Xe2 / Xe3 GPUs: Lunar Lake, Battlemage, Panther Lake) as an [`crate::base::Gpu`], without
-//! libdrm: open a render node, query the device, create buffer objects and map them, manage a GPU virtual address
-//! space (VM_BIND), submit batch buffers to an exec queue and wait for them with DRM syncobjs.
-//!
-//! Addresses are the caller's: detour owns its whole VM and places every buffer itself (no relocations in xe).
-
 mod sys;
 
 use std::ffi::c_ulong;
@@ -13,21 +7,15 @@ use std::path::Path;
 
 use crate::base::{BoDesc, Caching, DeviceInfo, Engine, Gpu, Map, MemType, Node, Result, Syncobj};
 
-/// An engine to create exec queues on.
 pub use sys::drm_xe_engine_class_instance as EngineInstance;
 
-// ---- the render node --------------------------------------------------------------------------------------------
-
-/// xe's ioctls on a render node.
 trait XeNode {
     fn xe<T>(&self, request: c_ulong, arg: &mut T) -> Result<()>;
-    /// A device query's answer (asks for the size first).
     fn query(&self, kind: u32) -> Result<Query>;
 }
 
 impl XeNode for Node {
     fn xe<T>(&self, request: c_ulong, arg: &mut T) -> Result<()> {
-        // SAFETY: sys.rs builds every request from the struct it takes; callers fill in its pointers.
         unsafe { self.ioctl(request, arg) }
     }
 
@@ -41,19 +29,15 @@ impl XeNode for Node {
     }
 }
 
-/// What a device query wrote.
 struct Query(Vec<u64>);
 
 impl Query {
     fn bytes(&self) -> &[u8] {
-        // SAFETY: u64 has no padding and every byte pattern is a valid u8.
         unsafe { std::slice::from_raw_parts(self.0.as_ptr().cast(), self.0.len() * 8) }
     }
 
-    /// A header struct followed by `count(header)` items.
     fn items<H: Copy, T: Copy>(&self, count: impl Fn(&H) -> usize) -> Vec<T> {
         let bytes = self.bytes();
-        // SAFETY: the kernel filled the buffer with a header and its items; the reads stay inside it (checked below).
         let head: H = unsafe { std::ptr::read_unaligned(bytes.as_ptr().cast()) };
         let n = count(&head);
         let start = size_of::<H>();
@@ -61,14 +45,12 @@ impl Query {
         (0..n).map(|i| unsafe { std::ptr::read_unaligned(bytes[start + i * size_of::<T>()..].as_ptr().cast()) }).collect()
     }
 
-    /// The topology masks: (header, mask bytes) back to back.
     fn topology(&self) -> Vec<Topology> {
         let bytes = self.bytes();
         let head = size_of::<sys::drm_xe_query_topology_mask>();
         let mut out = Vec::new();
         let mut at = 0;
         while at + head <= bytes.len() {
-            // SAFETY: bounds checked above.
             let h: sys::drm_xe_query_topology_mask = unsafe { std::ptr::read_unaligned(bytes[at..].as_ptr().cast()) };
             at += head;
             let n = h.num_bytes as usize;
@@ -81,23 +63,17 @@ impl Query {
         out
     }
 
-    /// As little-endian dwords.
     fn dwords(&self) -> Vec<u32> {
         self.bytes().as_chunks::<4>().0.iter().map(|c| u32::from_le_bytes(*c)).collect()
     }
 }
 
-// ---- what the device reports ------------------------------------------------------------------------------------
-
-/// One GT (graphics or media tile part).
 #[derive(Clone, Debug)]
 pub struct Gt {
     pub id: u16,
     pub media: bool,
     pub tile: u16,
-    /// Timestamp frequency (Hz) of this GT's engines.
     pub reference_clock: u32,
-    /// Bit mask of mem region instances close to this GT.
     pub near_mem_regions: u64,
     pub ip_version: (u16, u16, u16),
 }
@@ -136,7 +112,6 @@ impl From<sys::drm_xe_mem_region> for MemRegion {
     }
 }
 
-/// A topology mask of one GT (`DRM_XE_TOPO_*`).
 #[derive(Clone, Debug)]
 pub struct Topology {
     pub gt: u16,
@@ -144,7 +119,6 @@ pub struct Topology {
     pub mask: Vec<u8>,
 }
 
-/// What only xe reports, read once at open.
 #[derive(Clone, Debug)]
 pub struct XeInfo {
     pub common: DeviceInfo,
@@ -153,12 +127,10 @@ pub struct XeInfo {
     pub gts: Vec<Gt>,
     pub mem_regions: Vec<MemRegion>,
     pub topology: Vec<Topology>,
-    /// The GuC's hwconfig table: KLVs (u32 key, u32 length in dwords, values), see `hwconfig()`.
     pub hwconfig: Vec<u32>,
 }
 
 impl XeInfo {
-    /// The hwconfig table as (key, values) pairs.
     pub fn hwconfig(&self) -> impl Iterator<Item = (u32, &[u32])> {
         let t = &self.hwconfig;
         let mut i = 0;
@@ -170,12 +142,10 @@ impl XeInfo {
         })
     }
 
-    /// The system memory region's placement bit (`gem_create`).
     fn sysmem_placement(&self) -> u32 {
         self.mem_regions.iter().find(|r| !r.vram).map_or(1, |r| 1 << r.instance)
     }
 
-    /// The first engine of `engine`'s class.
     pub fn engine(&self, engine: Engine) -> Option<EngineInstance> {
         let class = match engine {
             Engine::Render => sys::DRM_XE_ENGINE_CLASS_RENDER,
@@ -217,9 +187,6 @@ impl TryFrom<&Node> for XeInfo {
     }
 }
 
-// ---- the device -------------------------------------------------------------------------------------------------
-
-/// ⭐ An open xe render node.
 pub struct Xe {
     node: Node,
     info: XeInfo,
@@ -250,10 +217,8 @@ impl Gpu for Xe {
     type Vm<'d> = XeVm<'d>;
     type Queue<'d> = XeQueue<'d>;
     type Fence<'d> = Syncobj<'d>;
-    /// The GPU address of a batch buffer ending with MI_BATCH_BUFFER_END.
     type Cmd = u64;
 
-    /// The first render node driven by xe.
     fn open_first() -> Result<Xe> {
         Xe::try_from(Node::open_driver("xe")?)
     }
@@ -286,7 +251,6 @@ impl Gpu for Xe {
         Ok(XeBo { xe: self, handle, size, map: None })
     }
 
-    /// A VM in dma-fence mode (submissions signal syncobjs).
     fn vm(&self) -> Result<XeVm<'_>> {
         let mut c = sys::drm_xe_vm_create::default();
         self.node.xe(sys::DRM_IOCTL_XE_VM_CREATE, &mut c)?;
@@ -311,23 +275,19 @@ impl Gpu for Xe {
     }
 }
 
-// ---- buffer objects ---------------------------------------------------------------------------------------------
-
-/// The PAT index of a mapping, Xe2 / Xe3 entries (Mesa XE2_PAT_ENTRIES, BSpec 71582).
 struct Pat(u16);
 
 impl From<MemType> for Pat {
     fn from(m: MemType) -> Self {
         Pat(match m {
-            MemType::Coherent => 1,   // WB, 1-way coherent with the CPU caches
-            MemType::Streaming => 0,  // WB, not coherent
-            MemType::Scanout => 6,    // WB + display transient
-            MemType::Compressed => 9, // WB + compressed
+            MemType::Coherent => 1,
+            MemType::Streaming => 0,
+            MemType::Scanout => 6,
+            MemType::Compressed => 9,
         })
     }
 }
 
-/// A GEM buffer object, mapped into this process on first use.
 pub struct XeBo<'d> {
     xe: &'d Xe,
     handle: u32,
@@ -361,9 +321,6 @@ impl Drop for XeBo<'_> {
     }
 }
 
-// ---- syncobjs as exec / bind syncs ------------------------------------------------------------------------------
-
-/// A syncobj as a wait (`false`) or a signal (`true`) of an exec or a bind.
 impl From<(&Syncobj<'_>, bool)> for sys::drm_xe_sync {
     fn from((f, signal): (&Syncobj<'_>, bool)) -> Self {
         sys::drm_xe_sync {
@@ -375,7 +332,6 @@ impl From<(&Syncobj<'_>, bool)> for sys::drm_xe_sync {
     }
 }
 
-/// `wait` as waits, then `signal` as signals.
 struct Syncs(Vec<sys::drm_xe_sync>);
 
 impl From<(&[&Syncobj<'_>], &[&Syncobj<'_>])> for Syncs {
@@ -384,9 +340,6 @@ impl From<(&[&Syncobj<'_>], &[&Syncobj<'_>])> for Syncs {
     }
 }
 
-// ---- VMs and exec queues ----------------------------------------------------------------------------------------
-
-/// A GPU virtual address space.
 pub struct XeVm<'d> {
     xe: &'d Xe,
     id: u32,
@@ -433,7 +386,6 @@ impl Drop for XeVm<'_> {
     }
 }
 
-/// A queue of batch buffers on one engine, in one VM.
 pub struct XeQueue<'d> {
     xe: &'d Xe,
     id: u32,
@@ -453,8 +405,6 @@ impl<'d> crate::base::Queue<'d, Xe> for XeQueue<'d> {
         self.xe.node.xe(sys::DRM_IOCTL_XE_EXEC, &mut e)
     }
 
-    /// The queue's ban reason (`DRM_XE_EXEC_QUEUE_BAN_REASON_*`), the same for every job on it; ANV asks the same
-    /// after a wait.
     fn fault(&self, _done: &Syncobj<'d>) -> Result<Option<u64>> {
         let mut p = sys::drm_xe_exec_queue_get_property {
             exec_queue_id: self.id,

@@ -1,6 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use crate::vello_cpu::fine::Splat4thExt;
 use crate::vello_cpu::peniko::{BlendMode, Compose};
 use crate::vello_cpu::util::NormalizedMulExt;
@@ -54,7 +51,6 @@ fn compose_inner<S: Simd>(
         Compose::DestAtop => DestAtop::compose(simd, src_c, bg_c),
         Compose::Xor => Xor::compose(simd, src_c, bg_c),
         Compose::Plus => Plus::compose(simd, src_c, bg_c),
-        // Have not been able to find a formula for this, so just fallback to Plus.
         Compose::PlusLighter => Plus::compose(simd, src_c, bg_c),
     };
 

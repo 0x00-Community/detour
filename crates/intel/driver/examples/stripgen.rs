@@ -1,8 +1,3 @@
-//! vello_common's strip rendering on Xe3 against vello_common's own, bit for bit (roadmap R8.3): random paths (many
-//! past the viewport's left and top), flattened and tiled by vello_common, their strips and alpha bytes
-//! (`strip::render`, non-zero or even-odd) from the sorted tiles and the culled windings. A lane renders one path
-//! (`stripgen/stripgen.mlir`: pass 0 counts its strips and alpha bytes, pass 1 writes them at a prefix sum of those).
-
 use detour::base::vello_common::fearless_simd::Level;
 use detour::base::vello_common::flatten::{self, FlattenCtx, Line};
 use detour::base::vello_common::geometry::RectU16;
@@ -18,7 +13,6 @@ const PATHS: usize = 2000;
 const WIDTH: u16 = 1000;
 const HEIGHT: u16 = 800;
 
-/// xorshift64*
 struct Rng(u64);
 
 impl Rng {
@@ -74,7 +68,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let words = rows.div_ceil(32);
     let stride = (rows * 20 + words * 4 + 4).next_multiple_of(16) as usize;
 
-    // vello_common's own: each path's lines, tiles, windings, strips and alphas
     let mut tiles = Tiles::new(level, WIDTH, HEIGHT);
     let (mut lbytes, mut tbytes, mut paths) = (Vec::new(), Vec::new(), Vec::new());
     let mut wbytes = vec![0u8; PATHS * stride];

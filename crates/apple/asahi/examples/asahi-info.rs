@@ -1,5 +1,3 @@
-//! Print what the asahi device reports: the chip, its clusters and cores, the VM range, submission limits.
-
 use detour::asahi::Asahi;
 use detour::base::Gpu;
 

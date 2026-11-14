@@ -1,7 +1,3 @@
-//! EU encodings checked against Mesa's assembler: tests/eu.mlir has each instruction as an `xe3.eu` op, with the
-//! gentool assembly it is in a comment above it; tests/eu.expected is what `gentool asm -p ptl` assembled that text
-//! into (one line of hex per instruction).
-
 use detour::xe3_dialect::{Inst, Xe3Dialect};
 use mlirformat::{Item, MlirOpt};
 

@@ -1,6 +1,3 @@
-//! The device a page rasterizer and WebGPU share, asked for in tiers (moved back from acde's acde-gpu): all of the
-//! adapter's WebGPU features, then none, then downlevel limits, so a driver that rejects an optional feature still opens.
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct DeviceRequest {
     pub tier: &'static str,

@@ -1,24 +1,15 @@
-//! `detour devices`: the GPUs this machine has (its DRM render nodes), and how far detour drives each.
-//!
-//! What a node is comes from sysfs (`/sys/class/drm/renderD*/device`: its kernel driver, PCI ids, devicetree
-//! `compatible`); a model whose feature is built in is also opened and asked (xe, amdgpu, asahi). How far detour goes is
-//! docs/roadmap.md's state, said in one line.
-
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
 use clap::Args;
 
-/// List the GPUs (DRM render nodes) and whether detour drives them.
 #[derive(Args)]
 pub struct Devices {
-    /// Also print what the driver reports (needs the model's feature).
     #[arg(short, long)]
     verbose: bool,
 }
 
-/// A render node's kernel driver, as sysfs names it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Driver {
     Xe,
@@ -49,26 +40,18 @@ impl From<&str> for Driver {
     }
 }
 
-/// How far detour drives a device.
 enum Support {
-    /// detour's own driver: the model, and the state (docs/roadmap.md, docs/verification.md).
     Native { model: String, state: &'static str },
-    /// detour has a driver for the model, but this build leaves its feature out.
     #[cfg_attr(all(feature = "xe3", feature = "agx-g13", feature = "rdna2"), expect(dead_code, reason = "every model built in"))]
     NotBuilt { feature: &'static str },
-    /// No detour driver for it.
     Unsupported(String),
 }
 
-/// One render node, as sysfs describes it.
 struct Node {
     path: PathBuf,
     driver: Driver,
-    /// sysfs' driver name, kept only to print an [`Driver::Other`].
     driver_name: String,
-    /// PCI vendor and device; none for platform GPUs (Apple).
     pci: Option<(u16, u16)>,
-    /// The devicetree `compatible` strings (Apple: "apple,agx-t8103", "apple,agx-g13g").
     compatible: Vec<String>,
 }
 
@@ -95,7 +78,6 @@ impl Node {
         }
     }
 
-    /// The model and how far detour drives it; with `verbose`, also prints what the driver reports.
     fn support(&self, verbose: bool) -> Support {
         match self.driver {
             Driver::Xe => self.xe(verbose),
@@ -106,7 +88,6 @@ impl Node {
         }
     }
 
-    /// Xe3 (Panther Lake) is the one Intel model.
     fn xe(&self, verbose: bool) -> Support {
         if self.pci.is_some_and(|(_, d)| d != 0xb0a0) {
             return Support::Unsupported("xe, but detour targets Xe3 (8086:b0a0) only".into());
@@ -131,7 +112,6 @@ impl Node {
         }
     }
 
-    /// RDNA2 (GFX 10.3) is the one AMD model.
     fn amdgpu(&self, verbose: bool) -> Support {
         #[cfg(feature = "rdna2")]
         {
@@ -160,7 +140,6 @@ impl Node {
         }
     }
 
-    /// Apple: AGX2 (M1 / M2, M3 as G14) or Apple9 (M4, T8140).
     fn asahi(&self, verbose: bool) -> Support {
         #[cfg(feature = "agx-g13")]
         {
@@ -178,7 +157,6 @@ impl Node {
                         Isa::Apple9 => Support::Native { model, state: "Apple9: identified only" },
                     }
                 }
-                // an unknown generation (M5, ...) is refused at open: `Chip::try_from`
                 Err(e) => Support::Unsupported(format!("{e}")),
             }
         }

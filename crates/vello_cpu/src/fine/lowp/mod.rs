@@ -1,13 +1,3 @@
-// Copyright 2025 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! Low-precision (u8/u16) rendering kernel implementation.
-//!
-//! This module implements the fine rasterization stage using 8-bit unsigned integers
-//! for color values and 16-bit for intermediate calculations. This provides better
-//! performance on many architectures compared to floating-point operations, while
-//! maintaining sufficient precision for most rendering tasks.
-
 pub(crate) mod blend;
 mod compose;
 mod gradient;
@@ -33,7 +23,6 @@ use vello_common::pixmap::Pixmap;
 use vello_common::tile::Tile;
 use vello_common::util::{narrow, normalized_mul_u8};
 
-/// The kernel for doing rendering using u8/u16.
 #[derive(Clone, Copy, Debug)]
 pub struct U8Kernel;
 
@@ -42,15 +31,11 @@ impl<S: Simd> FineKernel<S> for U8Kernel {
     type Composite = u8x32<S>;
     type NumericVec = u8x16<S>;
 
-    /// Extracts RGBA color components from a premultiplied color as u8 values [0, 255].
     #[inline]
     fn extract_color(color: PremulColor) -> [Self::Numeric; 4] {
         color.as_premul_rgba8().to_u8_array()
     }
 
-    /// Applies a filter effect to a rendered layer.
-    ///
-    /// Delegates to the u8-specific filter implementation.
     #[expect(
         private_interfaces,
         reason = "`FineKernel` is public but this specific method is not needed."
@@ -64,9 +49,6 @@ impl<S: Simd> FineKernel<S> for U8Kernel {
         filter_lowp(filter, pixmap, filter_scratch, transform);
     }
 
-    /// Fills a buffer with a solid color using SIMD operations.
-    ///
-    /// Efficiently broadcasts a single RGBA color across all pixels in the destination.
     fn copy_solid(simd: S, dest: &mut [Self::Numeric], src: [Self::Numeric; 4]) {
         simd.vectorize(
             #[inline(always)]
@@ -77,9 +59,6 @@ impl<S: Simd> FineKernel<S> for U8Kernel {
         );
     }
 
-    /// Creates a painter for rendering gradients in u8 precision.
-    ///
-    /// Returns a painter that evaluates the gradient at each pixel position.
     fn gradient_painter<'a>(
         simd: S,
         gradient: &'a EncodedGradient,
@@ -91,9 +70,6 @@ impl<S: Simd> FineKernel<S> for U8Kernel {
         )
     }
 
-    /// Creates a painter for rendering images with bilinear filtering in u8 precision.
-    ///
-    /// Returns a painter that samples the image with bilinear interpolation.
     fn medium_quality_image_painter<'a>(
         simd: S,
         image: &'a EncodedImage,
@@ -107,10 +83,6 @@ impl<S: Simd> FineKernel<S> for U8Kernel {
         )
     }
 
-    /// Creates a painter for rendering axis-aligned images with bilinear filtering in u8 precision.
-    ///
-    /// Returns a painter that samples the image with bilinear interpolation.
-    /// This is an optimized version for images without skew transformation.
     fn plain_medium_quality_image_painter<'a>(
         simd: S,
         image: &'a EncodedImage,
@@ -124,10 +96,6 @@ impl<S: Simd> FineKernel<S> for U8Kernel {
         )
     }
 
-    /// Applies per-pixel mask values to a buffer by multiplying each component.
-    ///
-    /// Used for anti-aliasing and clipping effects. Each pixel is multiplied by
-    /// its corresponding mask value and normalized.
     fn apply_mask(
         simd: S,
         dest: &mut [Self::Numeric],
@@ -145,9 +113,6 @@ impl<S: Simd> FineKernel<S> for U8Kernel {
         );
     }
 
-    /// Applies a painter's output to the destination buffer.
-    ///
-    /// Delegates to the painter's u8-specific implementation.
     #[inline(always)]
     fn apply_painter<'a>(_: S, dest: &mut [Self::Numeric], painter: impl Painter + 'a) {
         painter.paint_u8(dest);
@@ -186,10 +151,6 @@ impl<S: Simd> FineKernel<S> for U8Kernel {
         );
     }
 
-    /// Composites a solid color onto a buffer using alpha blending.
-    ///
-    /// Dispatches to either the masked or unmasked implementation based on the
-    /// presence of per-pixel alpha masks.
     #[inline(always)]
     fn alpha_composite_solid(
         simd: S,
@@ -209,11 +170,6 @@ impl<S: Simd> FineKernel<S> for U8Kernel {
         }
     }
 
-    /// Composites a source buffer onto a destination buffer using alpha blending.
-    ///
-    /// Dispatches to either the masked or unmasked implementation based on the
-    /// presence of per-pixel alpha masks. Each source pixel's alpha determines
-    /// the blending amount.
     fn alpha_composite_buffer(
         simd: S,
         dest: &mut [Self::Numeric],
@@ -234,10 +190,6 @@ impl<S: Simd> FineKernel<S> for U8Kernel {
         }
     }
 
-    /// Applies a blend mode to composite source pixels onto destination.
-    ///
-    /// Dispatches to either the masked or unmasked blend implementation.
-    /// Handles both color mixing (multiply, screen, etc.) and compositing.
     fn blend(
         simd: S,
         dest: &mut [Self::Numeric],
@@ -424,9 +376,6 @@ fn unpack_block<S: Simd>(simd: S, region: &mut Region<'_>, width: usize, scratch
     let mut row3 = &row3[..row_len];
 
     for col in scratch.as_chunks_mut::<CHUNK_LENGTH>().0.iter_mut() {
-        // Note: We experimented with using u32 vs. f32 for this, but it seems like for some reason
-        // f32 works better on M1, while on M4 they are the same. Probably worth doing more
-        // benchmarks on different systems.
         let (src0, rest0) = row0.split_at(Tile::WIDTH as usize * COLOR_COMPONENTS);
         let (src1, rest1) = row1.split_at(Tile::WIDTH as usize * COLOR_COMPONENTS);
         let (src2, rest2) = row2.split_at(Tile::WIDTH as usize * COLOR_COMPONENTS);
@@ -457,11 +406,6 @@ fn unpack_tail(region: &mut Region<'_>, x: usize, width: usize, scratch: &mut [u
 }
 
 mod fill {
-    //! Alpha compositing and blending operations without per-pixel alpha masks.
-    //!
-    //! This module handles the case where we're compositing full opacity pixels,
-    //! using only the source alpha channel for compositing.
-
     use crate::vello_cpu::fine::Splat4thExt;
     use crate::vello_cpu::fine::lowp::blend;
     use crate::vello_cpu::fine::lowp::compose::ComposeExt;
@@ -469,7 +413,6 @@ mod fill {
     use vello_common::fearless_simd::*;
     use vello_common::util::{narrow, normalized_mul_u8};
 
-    /// Applies blend mode compositing to a buffer without per-pixel masks.
     pub(super) fn blend<S: Simd, T: Iterator<Item = u8x32<S>>>(
         simd: S,
         dest: &mut [u8],
@@ -494,9 +437,6 @@ mod fill {
         );
     }
 
-    /// Composites a solid color onto a buffer using alpha blending.
-    ///
-    /// Uses the "over" operator: `result = src + bg * (1 - src_alpha)`
     pub(super) fn alpha_composite_solid<S: Simd>(s: S, dest: &mut [u8], src: [u8; 4]) {
         s.vectorize(
             #[inline(always)]
@@ -505,8 +445,6 @@ mod fill {
                 let src_c = u32x8::splat(s, u32::from_ne_bytes(src)).to_bytes();
 
                 for next_dest in dest.chunks_exact_mut(64) {
-                    // We process in batches of 64 because loading/storing is much faster this way (at least on NEON),
-                    // but since we widen to u16, we can only work with 256 bits, so we split it up.
                     let bg_v = u8x64::from_slice(s, next_dest);
                     let (bg_1, bg_2) = s.split_u8x64(bg_v);
                     let res_1 = alpha_composite_inner(s, bg_1, src_c, one_minus_alpha);
@@ -518,9 +456,6 @@ mod fill {
         );
     }
 
-    /// Composites a buffer of colors onto another buffer using alpha blending.
-    ///
-    /// Each source pixel is composited individually based on its alpha channel.
     pub(super) fn alpha_composite<S: Simd, T: Iterator<Item = u8x32<S>>>(
         simd: S,
         dest: &mut [u8],
@@ -539,10 +474,6 @@ mod fill {
         );
     }
 
-    /// Performs the core alpha compositing calculation.
-    ///
-    /// Formula: `result = src + bg * (1 - src_alpha)`
-    /// This implements the Porter-Duff "source over" operator.
     #[inline(always)]
     fn alpha_composite_inner<S: Simd>(
         _s: S,
@@ -555,11 +486,6 @@ mod fill {
 }
 
 mod alpha_fill {
-    //! Alpha compositing and blending operations with per-pixel alpha masks.
-    //!
-    //! This module handles compositing when each pixel has an additional mask value
-    //! (e.g., from anti-aliasing or clip masks) that modulates the source alpha.
-
     use crate::vello_cpu::fine::Splat4thExt;
     use crate::vello_cpu::fine::lowp::compose::ComposeExt;
     use crate::vello_cpu::fine::lowp::{blend, extract_masks};
@@ -567,7 +493,6 @@ mod alpha_fill {
     use vello_common::fearless_simd::*;
     use vello_common::util::{Div255Ext, narrow, normalized_mul_u8, widen};
 
-    /// Applies blend mode compositing with per-pixel alpha masks.
     pub(super) fn blend<S: Simd, T: Iterator<Item = u8x32<S>>>(
         simd: S,
         dest: &mut [u8],
@@ -598,9 +523,6 @@ mod alpha_fill {
         );
     }
 
-    /// Composites a solid color with per-pixel alpha masks.
-    ///
-    /// Combines source alpha with mask values: `effective_alpha = src_alpha * mask / 255`
     #[inline(always)]
     pub(super) fn alpha_composite_solid<S: Simd>(
         s: S,
@@ -622,9 +544,6 @@ mod alpha_fill {
         );
     }
 
-    /// Composites a buffer of colors with per-pixel alpha masks.
-    ///
-    /// Each pixel's source alpha is modulated by its corresponding mask value.
     #[inline(always)]
     pub(super) fn alpha_composite<S: Simd, T: Iterator<Item = u8x32<S>>>(
         simd: S,
@@ -647,10 +566,6 @@ mod alpha_fill {
         );
     }
 
-    /// Performs alpha compositing with mask modulation.
-    ///
-    /// Formula: `result = src * mask + bg * (1 - src_alpha * mask)`
-    /// The mask value modulates both the source contribution and the inverse alpha.
     #[inline(always)]
     fn alpha_composite_inner<S: Simd>(
         s: S,
@@ -681,11 +596,6 @@ mod alpha_fill {
     }
 }
 
-/// Expands 8 mask bytes into a 32-byte SIMD vector where each pixel's 4 components
-/// share the same mask value (each of 8 mask values is repeated 4 times).
-///
-/// Input: [m0, m1, m2, m3, m4, m5, m6, m7]
-/// Output: [m0, m0, m0, m0, m1, m1, m1, m1, ..., m7, m7, m7, m7]
 #[inline(always)]
 fn extract_masks<S: Simd>(simd: S, masks: &[u8; 8]) -> u8x32<S> {
     let m1 = u32x4::splat(simd, u32::from_ne_bytes(masks[0..4].try_into().unwrap())).to_bytes();
@@ -716,7 +626,6 @@ mod tests {
         let height = Tile::HEIGHT;
         let scratch_len = usize::from(width) * TILE_HEIGHT_COMPONENTS;
 
-        // Just some pseudo-random numbers.
         let scratch = (0..scratch_len)
             .map(|n| ((n * 7 + 13) % 256) as u8)
             .collect::<Vec<_>>();

@@ -1,8 +1,3 @@
-//! Multiple render targets: one draw into two targets (`Recorder::targets`), its fragment shader's result 0 a constant
-//! into the first, result 1 a 16x16 checkerboard sampled with nearest filtering into the second (the texture after
-//! the two targets in the binding table). The quad covers the left half of each 256x128 target (cleared blue first),
-//! so every pixel is known: checked one by one in both.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -26,7 +21,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let corners = cx.clear_vertices()?;
     let texels: Vec<u8> = (0..T).flat_map(|y| (0..T).flat_map(move |x| texel(x, y))).collect();
     let image = cx.texture(T, T, TextureFormat::Rgba8Unorm, &texels)?;
-    // x, y, u, v over the left half: u, v 0 ..= 1 across it
     let quad = cx.floats(&[-1.0, -1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0])?;
     let mut a = cx.target(W, H, TextureFormat::Rgba8Unorm, MemType::Coherent)?;
     let mut b = cx.target(W, H, TextureFormat::Rgba8Unorm, MemType::Coherent)?;

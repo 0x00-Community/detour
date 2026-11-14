@@ -1,12 +1,3 @@
-//! A page composited on Xe3 (`Pages::compose`, as the fallback's `Raster` draws a `Pass`): parts rasterized by `Fine`,
-//! placed by `Frost` over their frosted glass, under their drop shadows, through their CSS filters, against vello_cpu
-//! (`OptimizeSpeed`) drawing each piece and the plain-Rust definition of the effects (common/frost_model.rs), byte for
-//! byte. A wallpaper, a frosted window with a shadow, a panel through a filter (grey, blurred) clipped by its bounds, a
-//! card with two shadows; a whole frame, a frame redrawing two damaged regions over it, a whole frame again (the
-//! tiles' buffer kept from the first), each one submission. Then a whole frame into someone else's dma-buf (a udmabuf
-//! over a memfd, as a compositor's canvas: an offset, rows padded), through `Raster` (the
-//! fallback's interface: canvases per plane, passes, a sync_file back), not waited for: the sync_file polled, the memfd read.
-
 use std::os::fd::{AsFd, AsRawFd, FromRawFd, OwnedFd};
 use std::os::unix::fs::FileExt;
 
@@ -24,7 +15,6 @@ use model::Image;
 const W: u32 = 320;
 const H: u32 = 200;
 
-/// A part's content: a scene in canvas coordinates (whatever region is asked for).
 struct Shapes(fn(&mut Scene));
 
 impl Content for Shapes {
@@ -85,7 +75,6 @@ fn parts() -> Vec<Part<Shapes>> {
     ]
 }
 
-/// The reference: each piece drawn by vello_cpu (as `Pages` replays it), composited by the effects' definition.
 fn reference(canvas: &mut Image, parts: &[Part<Shapes>], targets: Option<&[Px]>) {
     let full = Px::sized((W, H));
     let targets = targets.map_or_else(|| vec![full], <[Px]>::to_vec);
@@ -140,7 +129,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// `struct udmabuf_create` (linux/udmabuf.h) and `UDMABUF_CREATE`, which returns the dma-buf's fd.
 #[repr(C)]
 struct UdmabufCreate {
     memfd: u32,
@@ -149,7 +137,6 @@ struct UdmabufCreate {
     size: u64,
 }
 
-// SAFETY: UDMABUF_CREATE reads the struct and returns a new fd (or fails).
 unsafe impl rustix::ioctl::Ioctl for UdmabufCreate {
     type Output = OwnedFd;
     const IS_MUTATING: bool = false;
@@ -163,13 +150,10 @@ unsafe impl rustix::ioctl::Ioctl for UdmabufCreate {
     }
 
     unsafe fn output_from_ptr(out: rustix::ioctl::IoctlOutput, _: *mut std::ffi::c_void) -> rustix::io::Result<OwnedFd> {
-        // SAFETY: the ioctl succeeded, `out` is the new fd, owned by nobody else
         Ok(unsafe { OwnedFd::from_raw_fd(out) })
     }
 }
 
-/// A whole frame into a udmabuf canvas (from byte 4096, rows of `W + 24` pixels) through `Raster` (as acde's compositor
-/// drives it), its sync_file polled: as `want`.
 fn udmabuf(xe: &Xe, want: &Image) -> Result<(), Box<dyn std::error::Error>> {
     let Ok(dev) = std::fs::File::open("/dev/udmabuf") else {
         println!("udmabuf: /dev/udmabuf not open to us, skipped");
@@ -182,7 +166,6 @@ fn udmabuf(xe: &Xe, want: &Image) -> Result<(), Box<dyn std::error::Error>> {
     rustix::fs::fcntl_add_seals(&memfd, rustix::fs::SealFlags::SHRINK)?;
     let memfd = std::fs::File::from(memfd);
     memfd.write_all_at(&vec![0x33; len as usize], 0)?;
-    // SAFETY: UDMABUF_CREATE on /dev/udmabuf with a sealed memfd of `len` bytes
     let dmabuf = unsafe { rustix::ioctl::ioctl(&dev, UdmabufCreate { memfd: memfd.as_raw_fd() as u32, flags: 1, offset: 0, size: len }) }?;
     let mut raster = Raster::<Xe, Native>::new(xe, [W, H])?;
     let imported = raster.canvases(0, &[Dmabuf { fd: dmabuf.as_fd(), offset, stride, modifier: Dmabuf::LINEAR }], (W, H));
@@ -195,7 +178,6 @@ fn udmabuf(xe: &Xe, want: &Image) -> Result<(), Box<dyn std::error::Error>> {
     memfd.read_exact_at(&mut bytes, 0)?;
     let rows = (0..H as usize).map(|y| &bytes[offset as usize + y * stride as usize..][..W as usize * 4]);
     let bad = rows.zip(want.px.chunks(W as usize)).map(|(got, want)| got.as_chunks::<4>().0.iter().zip(want).filter(|(g, w)| g != w).count()).sum::<usize>();
-    // the padding and what is before the canvas untouched
     let padding = (0..H as usize).all(|y| bytes[offset as usize + y * stride as usize + W as usize * 4..][..24 * 4].iter().all(|b| *b == 0x33)) && bytes[..offset as usize].iter().all(|b| *b == 0x33);
     println!("udmabuf: sync_file signalled {}, {} pixels, {bad} differ, padding kept {padding}", ready == 1, W * H);
     assert!(ready == 1 && bad == 0 && padding);

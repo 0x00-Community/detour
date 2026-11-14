@@ -1,13 +1,8 @@
-//! `detour-expand-clear`: a render pass that clears its target starts with a draw that clears it. The draw is a
-//! triangle over the whole target (corners at -1 and 3 in clip space) whose fragment shader returns the clear color;
-//! the backend needs nothing but draws.
-
 use mlirformat::{Attribute, Const, Error, FloatKind, FunctionType, Op, Scalar, Type};
 use mlirpass::{ApFloat, BlockId, Body, OpData, OpId, Quiet, Rewriter, ValueId, pass};
 
 use crate::base::{A, BlendState, Buffer, DepthState, Heads, Draw, LoadOp, Pipeline, RenderPass, Stage, StepMode, Symbol, Texture, TextureFormat, Topology, VertexAttribute, VertexBufferLayout, VertexFormat};
 
-/// The module being added to.
 struct Clear<'r, 'a> {
     rw: Rewriter<'r, 'a>,
     module: OpId,
@@ -27,7 +22,6 @@ impl<'a> Clear<'_, 'a> {
         Const { ty, values, elements: true }.into()
     }
 
-    /// `func.func @name(args) -> vector<4xf32>` of stage `stage`, its body built by `fill` (given the block).
     fn func(&mut self, name: &str, stage: Stage, args: &[Type<'a>], fill: impl FnOnce(&mut Rewriter<'_, 'a>, BlockId) -> ValueId) {
         let fty = Type::Function(FunctionType { inputs: args.to_vec(), results: vec![Self::vec4()] }.into());
         let top = self.rw.body.top_block(self.module);
@@ -44,8 +38,6 @@ impl<'a> Clear<'_, 'a> {
         self.rw.create(OpData::build("func.return").operands(&[v]), &[]);
     }
 
-    /// The pipeline and vertices of a clear to `color` of a `format` target (`samples` of them), at the module's
-    /// start; the draw.
     fn expand(&mut self, n: usize, format: TextureFormat, samples: Option<u32>, color: &[f64]) -> Draw<'a> {
         let (pipe, vb) = (format!("__clear{n}"), format!("__clear{n}_vb"));
         ClearPipeline { name: &pipe, format, samples, depth: None, color: Some([color[0], color[1], color[2], color[3]]) }.build(self);
@@ -56,25 +48,17 @@ impl<'a> Clear<'_, 'a> {
     }
 }
 
-/// ⭐ A pipeline that clears its target to `color`: a triangle over the whole target (its one vertex buffer of vec4
-/// corners, [`ClearPipeline::CORNERS`]) whose fragment shader returns the color; with `depth`, the corners' z written
-/// as the depth too. What `detour-expand-clear` adds for a render pass that clears; a runtime builds it alone.
 pub struct ClearPipeline<'n> {
-    /// `@name`, its shaders `@name_vs` / `@name_fs`
     pub name: &'n str,
     pub format: TextureFormat,
     pub samples: Option<u32>,
     pub depth: Option<DepthState>,
-    /// the color; none: the blend constant's (the shader returns 1, blended `1 · constant + dst · 0`): one pipeline
-    /// for every color, the color a draw's (`setBlendConstant`)
     pub color: Option<[f64; 4]>,
 }
 
 impl ClearPipeline<'_> {
-    /// The whole-target triangle (x, y, z, w), at depth 0.
     pub const CORNERS: [f32; 12] = [-1.0, -1.0, 0.0, 1.0, 3.0, -1.0, 0.0, 1.0, -1.0, 3.0, 0.0, 1.0];
 
-    /// Adds its shaders and its `detour.pipeline` at the start of `module`.
     pub fn emit<'a>(&self, body: &mut Body<'a>, module: OpId) {
         let mut quiet = Quiet;
         self.build(&mut Clear { rw: Rewriter::new(body, &mut quiet), module });
@@ -97,7 +81,6 @@ impl ClearPipeline<'_> {
     }
 }
 
-/// `detour-expand-clear`.
 #[pass("detour-expand-clear", on = "builtin.module")]
 pub fn detour_expand_clear<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     let mut passes = Vec::new();
@@ -124,7 +107,6 @@ pub fn detour_expand_clear<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Erro
         let inside = clear.rw.body.top_block(pass);
         clear.rw.set_start(inside);
         clear.rw.emit(&draw);
-        // cleared by the draw now: the pass loads what is there
         clear.rw.modify(pass, |b| {
             b[pass].remove("load");
         });

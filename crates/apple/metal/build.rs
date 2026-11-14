@@ -1,8 +1,3 @@
-//! The donor's binary archive (src/donor.metal's `donor` pipeline, serialized) into `$OUT_DIR/donor.bin`, made here
-//! because it must be made in another process than the one that runs the kernels: Metal hands a pipeline compiled in a
-//! process back from its cache, not from an archive asked for afterwards (measured). Without an Apple9 GPU (another
-//! Mac, CI) the file is empty and `M4::open` says so. It is this Mac's GPU's and macOS's: a new macOS wants a rebuild.
-
 fn main() {
     let out = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR")).join("donor.bin");
     println!("cargo::rerun-if-changed=src/donor.metal");

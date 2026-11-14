@@ -1,13 +1,7 @@
-//! WebGPU's copies on Xe3 (`Copies`), byte for byte against the same copy on the CPU, and nothing written outside it:
-//! buffer to buffer (300 KiB 4-aligned, rows of 64 KiB; 1001 bytes from offset 3 to 5: a byte at a time), buffer to
-//! texture (20 x 10 texels of a 37 x 23 rgba8 one at (5, 3), 256-byte rows), texture to buffer (that region back,
-//! 160-byte rows), texture to texture (r8: 13 x 7 from (1, 2) to (4, 0), bytes; rgba8 into a render target).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{BufferTexels, Codegen, Context, Copies, Texels};
 use detour::xe::Xe;
 
-/// `n` bytes of xorshift noise.
 fn noise(n: usize, seed: u32) -> Vec<u8> {
     let mut s = seed | 1;
     (0..n)
@@ -20,7 +14,6 @@ fn noise(n: usize, seed: u32) -> Vec<u8> {
         .collect()
 }
 
-/// A rectangle of `rows` rows of `row` bytes from `src` (rows `ss` apart) into `dst` (rows `ds` apart), on the CPU.
 fn rect(src: &[u8], ss: usize, dst: &mut [u8], ds: usize, row: usize, rows: usize) {
     for y in 0..rows {
         dst[y * ds..][..row].copy_from_slice(&src[y * ss..][..row]);
@@ -40,7 +33,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let copies = Copies::new(&mut cx, &codegen)?;
     let mut ok = true;
 
-    // buffer to buffer
     let src = noise(310 * 1024, 7);
     let a = cx.buffer(&src)?;
     let mut b = cx.buffer(&vec![0xee; 310 * 1024])?;
@@ -57,7 +49,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     want[5..1006].copy_from_slice(&src[3..1004]);
     ok &= report("buffer to buffer, 1001 bytes from 3 to 5", &c.bytes()?[..2048], &want);
 
-    // buffer to texture, texture to buffer
     let (tw, th) = (37u32, 23u32);
     let base = noise((tw * th * 4) as usize, 11);
     let mut tex = cx.texture(tw, th, TextureFormat::Rgba8Unorm, &base)?;
@@ -76,7 +67,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     rect(&staged, 256, &mut back, 160, 80, 10);
     ok &= report("texture to buffer, 160-byte rows", &out.bytes()?[..1600], &back);
 
-    // texture to texture: r8 (bytes), rgba8 into a target
     let (rw, rh) = (19u32, 9u32);
     let r8a = noise((rw * rh) as usize, 17);
     let x = cx.texture(rw, rh, TextureFormat::R8Unorm, &r8a)?;

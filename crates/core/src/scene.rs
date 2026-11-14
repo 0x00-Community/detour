@@ -1,9 +1,3 @@
-//! The 2D scene a window paints into: the drawing interface ([`PaintScene`]) and its recording ([`Scene`]).
-//!
-//! acde's renderer (blitz-paint, crates/render) paints into this and detour draws it: on Xe3 with its own raster, elsewhere
-//! with vello on wgpu on Vulkan (`detour-fallback`). The shape of the interface comes from anyrender 0.14 (MIT OR Apache-2.0, the
-//! anyrender authors), trimmed to what acde uses: no window / image renderers, no custom resources.
-
 use std::sync::Arc;
 
 use kurbo::{Affine, BezPath, Rect, Shape, Stroke, Vec2};
@@ -11,10 +5,8 @@ use peniko::{BlendMode, Brush, BrushRef, Color, Fill, FontData, Gradient, ImageB
 
 use crate::base::Filter;
 
-/// A variable font's normalized axis coordinate (2.14 fixed point).
 pub type NormalizedCoord = i16;
 
-/// A positioned glyph.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Glyph {
     pub id: u32,
@@ -22,7 +14,6 @@ pub struct Glyph {
     pub y: f32,
 }
 
-/// What fills or strokes a shape. [`PaintRef`] is the borrowed form the painting methods take.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Paint<I = ImageBrush, G = Gradient> {
     Solid(Color),
@@ -90,15 +81,9 @@ impl<'a, G> From<ImageBrushRef<'a>> for Paint<ImageBrushRef<'a>, G> {
     }
 }
 
-/// ⭐ Where drawing goes: a sink of drawing commands. [`Scene`] records them; a backend draws them.
-///
-/// Layers clip everything drawn until the matching [`pop_layer`](Self::pop_layer); they do not save or change transforms.
 pub trait PaintScene {
-    /// Drops everything drawn so far.
     fn reset(&mut self);
 
-    /// A layer clipped by `clip`, composited with what is under it by `blend` and `alpha`; `filter` applies to its content,
-    /// `backdrop_filter` to what is under it.
     #[allow(clippy::too_many_arguments, reason = "every argument is part of a CSS layer")]
     fn push_layer(
         &mut self,
@@ -111,7 +96,6 @@ pub trait PaintScene {
         backdrop_filter: Option<Arc<Filter>>,
     );
 
-    /// A layer that only clips.
     fn push_clip_layer(&mut self, fill: Fill, transform: Affine, clip: &impl Shape);
 
     fn pop_layer(&mut self);
@@ -136,24 +120,20 @@ pub trait PaintScene {
         glyphs: impl Iterator<Item = Glyph> + Clone,
     );
 
-    /// A rounded rectangle blurred with a gaussian of `std_dev`.
     fn draw_box_shadow(&mut self, transform: Affine, rect: Rect, color: Color, radius: f64, std_dev: f64);
 
-    /// Replays a recorded scene, under `transform`.
     fn append_scene(&mut self, scene: Scene, transform: Affine) {
         for command in scene.commands {
             command.replay(self, transform);
         }
     }
 
-    /// An image at its natural size.
     fn draw_image(&mut self, image: ImageBrushRef<'_>, transform: Affine) {
         let rect = Rect::new(0.0, 0.0, f64::from(image.image.width), f64::from(image.image.height));
         self.fill(Fill::NonZero, transform, image, None, &rect);
     }
 }
 
-/// One recorded drawing call. Shapes are flattened to paths at the scene's tolerance.
 #[derive(Clone, Debug, PartialEq)]
 pub enum RenderCommand {
     PushLayer(LayerCommand),
@@ -226,7 +206,6 @@ pub struct BoxShadowCommand {
 }
 
 impl RenderCommand {
-    /// The command under `transform` (applied after its own).
     pub fn transformed(mut self, by: Affine) -> Self {
         match &mut self {
             Self::PushLayer(c) => c.transform = by * c.transform,
@@ -240,7 +219,6 @@ impl RenderCommand {
         self
     }
 
-    /// Draws the command again into `to`, under `by`.
     pub fn replay<P: PaintScene + ?Sized>(self, to: &mut P, by: Affine) {
         match self {
             Self::PushLayer(c) => to.push_layer(c.fill, c.blend, c.alpha, by * c.transform, &c.clip, c.filter, c.backdrop_filter),
@@ -266,10 +244,8 @@ impl RenderCommand {
     }
 }
 
-/// ⭐ A recorded scene: plain data, kept and passed around; [`PaintScene::append_scene`] draws it into another.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Scene {
-    /// How closely shapes are flattened into paths.
     pub tolerance: f64,
     pub commands: Vec<RenderCommand>,
 }

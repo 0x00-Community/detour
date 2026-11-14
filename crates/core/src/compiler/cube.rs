@@ -1,8 +1,3 @@
-//! `detour-normalize-cube`: a cube sample's direction divided by its largest component's magnitude (`detour.sample
-//! {cube}`). Intel's sampler (and others') clamps the coordinates to −1 ..= 1 before picking a face, so a direction
-//! longer than that picks the wrong one; Mesa does the same (`nir_normalize_cubemap_coords`). A cube array's
-//! coordinate (`vector<4xf32>`: the direction, then the cube) keeps its fourth component.
-
 use mlirformat::arith::{Constant, DivF, MaxNumF};
 use mlirformat::math::AbsF;
 use mlirformat::vector::{BroadcastOp, ExtractOp, FromElementsOp};
@@ -11,7 +6,6 @@ use mlirpass::{Body, OpId, Quiet, Rewriter, pass};
 
 use crate::base::{Heads, Sample};
 
-/// `detour-normalize-cube`.
 #[pass("detour-normalize-cube", on = "builtin.module")]
 pub fn detour_normalize_cube<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     let mut samples = Vec::new();

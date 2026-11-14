@@ -1,6 +1,3 @@
-//! What a dispatch costs by itself on Xe3: 200 dispatches of a kernel that writes one dword a lane, in one
-//! submission, against one; small and large grids.
-
 use detour::base::{Gpu, Native};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;

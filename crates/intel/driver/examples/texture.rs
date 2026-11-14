@@ -1,7 +1,3 @@
-//! Texture sampling: a 16x16 checkerboard (each texel its own color) stretched over a 128x128 target with nearest
-//! filtering, so each texel covers exactly 8x8 pixels. The texture coordinates are a varying; the fragment shader
-//! samples binding 0. Through the runtime; every pixel is checked against its texel.
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
@@ -20,7 +16,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let textured = cx.pipeline(&codegen, include_str!("texture/checker.mlir"), "textured")?;
     let texels: Vec<u8> = (0..T).flat_map(|y| (0..T).flat_map(move |x| texel(x, y))).collect();
     let image = cx.texture(T, T, TextureFormat::Rgba8Unorm, &texels)?;
-    // x, y, u, v: v = 0 at the first row in memory (y = -1 in clip space maps to row 0)
     let quad = cx.floats(&[-1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0])?;
     let mut target = cx.target(W, W, TextureFormat::Rgba8Unorm, MemType::Coherent)?;
 

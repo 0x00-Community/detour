@@ -1,21 +1,9 @@
-//! Texture formats on Xe3 (`GPUTextureFormat`: rgba8unorm(-srgb), bgra8unorm(-srgb), r8unorm, rg8unorm, r16float,
-//! rg16float, rgba16float, r32float, rg32float, rgba32float), both ways, against their definitions:
-//! - rendered: a fragment shader's (0.25, 0.5, 0.75, 0.125) into a target of each, its bytes the format's encoding
-//!   (unorm round(c 255); sRGB the transfer function's, then round; f16 IEEE round to nearest even; f32 as is);
-//! - sampled: one texel of known bytes of each, sampled into an rgba32float target, its floats the format's decoding
-//!   (missing channels 0, alpha 1).
-//!
-//! Exact for all but sRGB: Xe3's sRGB conversions are within D3D's tolerance, not the transfer function's exact
-//! values. Swept against it: all 256 bytes decoded (under half a byte step off) and 256 linear values encoded (a
-//! gradient; one off at most).
-
 use detour::base::{Gpu, MemType, Native, TextureFormat};
 use detour::xe3::{Codegen, Context};
 use detour::xe::Xe;
 
 const COLOR: [f32; 4] = [0.25, 0.5, 0.75, 0.125];
 
-/// f32 → IEEE binary16, round to nearest even (normal and subnormal results; no overflow here).
 fn half(v: f32) -> u16 {
     let b = v.to_bits();
     let sign = ((b >> 16) & 0x8000) as u16;
@@ -59,7 +47,6 @@ const ALL: [(TextureFormat, &str); 12] = [
     (TextureFormat::Rgba32Float, "rgba32float"),
 ];
 
-/// The channels a format keeps, in memory order (indices into rgba).
 fn channels(f: TextureFormat) -> &'static [usize] {
     match f {
         TextureFormat::R8Unorm | TextureFormat::R16Float | TextureFormat::R32Float => &[0],
@@ -69,7 +56,6 @@ fn channels(f: TextureFormat) -> &'static [usize] {
     }
 }
 
-/// A texel of `f` holding `rgba` (sRGB: the color channels encoded).
 fn encode(f: TextureFormat, rgba: [f32; 4]) -> Vec<u8> {
     let unorm = |c: f32| (c.clamp(0.0, 1.0) * 255.0).round() as u8;
     channels(f)
@@ -86,7 +72,6 @@ fn encode(f: TextureFormat, rgba: [f32; 4]) -> Vec<u8> {
         .collect()
 }
 
-/// What sampling a texel of `f` of bytes `texel` gives.
 fn decode(f: TextureFormat, texel: &[u8]) -> [f32; 4] {
     let mut out = [0.0, 0.0, 0.0, 1.0];
     let size = (f.bytes() / channels(f).len() as u32) as usize;
@@ -119,7 +104,6 @@ func.func @fs() -> vector<4xf32> attributes {{detour.stage = "fragment"}} {{
     )
 }
 
-/// A color gradient: positions (x, y) and colors (r, g, b, a) interpolated.
 const GRADIENT: &str = r#"detour.pipeline @g {vertex = @vs, fragment = @fs, topology = "triangle-list", targets = ["rgba8unorm-srgb"],
   vertex_buffers = [{stride = 24, attributes = [{location = 0, format = "float32x2", offset = 0}, {location = 1, format = "float32x4", offset = 8}]}]}
 func.func @vs(%p: vector<2xf32>, %c: vector<4xf32>) -> (vector<4xf32>, vector<4xf32>) attributes {detour.stage = "vertex"} {
@@ -141,7 +125,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let strip = cx.floats(&[-1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0])?;
     let mut ok = true;
     for (f, name) in ALL {
-        // rendered into
         let p = cx.pipeline(&codegen, &render(name), "p")?;
         let mut target = cx.target(4, 4, f, MemType::Coherent)?;
         let mut r = cx.record();
@@ -153,7 +136,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let px = target.bytes()?;
         let size = want.len();
         let wrote = (0..16).all(|i| px[i * size..][..size] == want[..]);
-        // sampled: a texel of the bytes `stored`
         let stored = encode(f, [0.2, 0.4, 0.6, 0.8]);
         let tex = cx.texture(1, 1, f, &stored)?;
         let mut out = cx.target(4, 4, TextureFormat::Rgba32Float, MemType::Coherent)?;
@@ -171,11 +153,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if wrote { "as encoded".to_owned() } else { format!("(want {want:?})") },
             if sampled { "as decoded".to_owned() } else { format!("(want {read:?})") },
         );
-        // sRGB is checked against the formula in the sweeps below (Xe3's conversion is within tolerance, not exact)
         ok &= f.srgb() || (wrote && sampled);
     }
-    // sRGB sweeps: every byte decoded (a 256 x 1 texture, nearest, into rgba32float), 256 linear values encoded (a
-    // horizontal gradient of the vertex colors, rendered into a 256 x 1 srgb target): the hardware against the formula
     let bytes: Vec<u8> = (0..=255u8).flat_map(|b| [b, b, b, 255]).collect();
     let tex = cx.texture(256, 1, TextureFormat::Rgba8UnormSrgb, &bytes)?;
     let mut out = cx.target(256, 1, TextureFormat::Rgba32Float, MemType::Coherent)?;
@@ -195,7 +174,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("sRGB decode, all 256 bytes: worst |error| {worst:.3e} at {at} ({:.3} of a byte step)", worst * 255.0);
     let gradient = cx.pipeline(&codegen, GRADIENT, "g")?;
-    // x, y, r g b a: red from 0 at the left edge to 1 at the right (pixel i's center: (i + 0.5) / 256)
     let ramp: Vec<f32> = [(-1.0, -1.0, 0.0), (1.0, -1.0, 1.0), (-1.0, 1.0, 0.0), (-1.0, 1.0, 0.0), (1.0, -1.0, 1.0), (1.0, 1.0, 1.0)].iter().flat_map(|&(x, y, r)| [x, y, r, r, r, 1.0]).collect();
     let ramp = cx.floats(&ramp)?;
     let mut target = cx.target(256, 1, TextureFormat::Rgba8UnormSrgb, MemType::Coherent)?;
@@ -213,8 +191,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         most = most.max(d);
     }
     println!("sRGB encode, 256 values: {off} bytes off the formula's, by {most} at most");
-    // the definitions hold exactly but for sRGB, which Xe3 converts within D3D's tolerance (decode under half a byte
-    // step, encode one off at most)
     ok &= worst * 255.0 < 0.5 && most <= 1;
     assert!(ok);
     println!("ok (device {:#06x})", xe.info().device_id);

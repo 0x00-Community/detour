@@ -1,12 +1,3 @@
-//! vello_common's fill path on Xe3 end to end against vello_common's own, bit for bit, and timed (roadmap R8): a page
-//! of small glyph-like paths (quadratics and cubics, non-zero and even-odd) flattened (`flatten/`), tiled (`tiles/`)
-//! and rendered into strips (`stripgen/`) on the GPU, then each given a solid colour and coarse rasterized into the
-//! strip rows' commands against vello_cpu's (`rowcoarse/`, a path a lane), binned by bucket (`rowcoarse/bins.mlir`)
-//! and drawn by fine.rs's kernel, the pixels against vello_cpu's (only the paints' attrs packed on the CPU); the
-//! stages joined there too
-//! (`pipeline/glue.mlir`, the prefix sums `flatten/scan.mlir`); the CPU reads back only the totals the next buffers
-//! are sized by.
-
 use detour::base::vello_common::fearless_simd::Level;
 use detour::base::vello_common::flatten::{self, FlattenCtx, Line};
 use detour::base::vello_common::geometry::RectU16;
@@ -28,14 +19,12 @@ const PATHS: usize = 4000;
 const WIDTH: u16 = 1280;
 const HEIGHT: u16 = 800;
 
-/// What the scene does, in order: a fill of path p in a colour, a layer pushed (its clip path, its opacity), popped.
 enum Op {
     Fill(usize, Color),
     Push(Option<usize>, f32),
     Pop,
 }
 
-/// xorshift64*
 struct Rng(u64);
 
 impl Rng {
@@ -50,16 +39,12 @@ impl Rng {
         (self.next() >> 11) as f64 / (1u64 << 53) as f64
     }
 
-    /// A glyph-like path: one or two closed contours of lines, quadratics and cubics within a 14 px box; now and then
-    /// a big one (100–600 px: an opaque one's gaps make depth commands; shifted up and left a quarter of its size).
     fn glyph(&mut self) -> BezPath {
         let size = if self.next() % 100 == 0 { 100.0 + self.unit() * 500.0 } else { 14.0 };
         self.glyph_sized(size)
     }
 
-    /// A glyph-like path of `size` px.
     fn glyph_sized(&mut self, size: f64) -> BezPath {
-        // (a big one now and then past the left and the top: windings of what lies left of the viewport)
         let (ox, oy) = (self.unit() * (f64::from(WIDTH) - 10.0) - (size - 14.0) * 0.25, self.unit() * (f64::from(HEIGHT) - 10.0) - (size - 14.0) * 0.25);
         let mut p = BezPath::new();
         let contours = 1 + (self.next() % 2);
@@ -82,7 +67,6 @@ impl Rng {
     }
 }
 
-/// The GPU elements of a path (as examples/flatten's); its moves.
 fn elements(path: &BezPath) -> (Vec<(u32, [KPoint; 4])>, Vec<KPoint>) {
     let mut last = KPoint::ZERO;
     let mut start = KPoint::ZERO;
@@ -122,10 +106,8 @@ fn elements(path: &BezPath) -> (Vec<(u32, [KPoint; 4])>, Vec<KPoint>) {
     (out, moves)
 }
 
-/// A dispatch kept: its kernel, workgroups, parameters.
 type Kept<'k> = (&'k Kernel, [u32; 2], Vec<u32>);
 
-/// A Recorder that keeps what it records.
 struct Keeping<'a, 'r, 'd, 'k> {
     r: &'a mut detour::xe3::Recorder<'r, 'd, Xe, Native>,
     kept: &'a mut Vec<Kept<'k>>,
@@ -142,7 +124,6 @@ struct Gpu3<'d, 'k> {
     cx: Context<'d, Xe, Native>,
     scan: &'k Kernel,
     ms: Vec<(&'static str, f64)>,
-    /// every stage's dispatches, in order (all of them again in one submission: [`Gpu3::again`])
     kept: Vec<Kept<'k>>,
 }
 
@@ -155,7 +136,6 @@ impl<'d, 'k> Gpu3<'d, 'k> {
         Ok(self.cx.buffer(&vec![0; bytes.max(16)])?)
     }
 
-    /// The dispatches `f` records, submitted and waited for: their time as `name`.
     fn run(&mut self, name: &'static str, f: impl FnOnce(&mut Keeping<'_, '_, 'd, 'k>, &'k Kernel) -> Result<(), detour::xe3::Error>) -> Result<(), Box<dyn std::error::Error>> {
         let mut r = self.cx.record();
         f(&mut Keeping { r: &mut r, kept: &mut self.kept }, self.scan)?;
@@ -166,8 +146,6 @@ impl<'d, 'k> Gpu3<'d, 'k> {
         Ok(())
     }
 
-    /// Every dispatch kept, then `last`'s, in one submission (the buffers as they are: sized by the stages' totals
-    /// already read back): its time.
     fn again(&mut self, last: impl FnOnce(&mut detour::xe3::Recorder<'_, 'd, Xe, Native>) -> Result<(), detour::xe3::Error>) -> Result<f64, Box<dyn std::error::Error>> {
         let mut r = self.cx.record();
         for (k, groups, params) in &self.kept {
@@ -208,9 +186,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (evflags_k, lclip_k, lbox_k, evbuild_k) = (evflags_k?, lclip_k?, lbox_k?, evbuild_k?);
     let level = Level::try_detect().unwrap_or(Level::baseline());
     let mut rng = Rng(0x7f4a_7c15_9e37_79b9);
-    // the scene: PATHS glyph fills, each its own solid colour; now and then inside nested clip and opacity layers (a
-    // clip's path among the paths, at its push, as vello_cpu makes its strips). The GPU's items (kind (0 fill, 1 pop),
-    // path, layer, opaque or the pop's ordinal) and layers (parent, the box made on the GPU, the clip path)
     let mut lrng = Rng(0x0dd_ba11_cafe_f00d);
     let mut crng = Rng(0x51ed_270b_27a6_12b4);
     let mut paths: Vec<(BezPath, Fill)> = Vec::new();
@@ -258,7 +233,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let nlayers = layers.len() / 8;
     let bbox = RectU16 { x0: 0, y0: 0, x1: WIDTH, y1: HEIGHT };
 
-    // vello_common on the CPU, timed
     let t = Instant::now();
     let mut tiles = Tiles::new(level, WIDTH, HEIGHT);
     let mut ctx = FlattenCtx::default();
@@ -273,7 +247,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         want.push((s, a));
     }
     let cpu_ms = t.elapsed().as_secs_f64() * 1e3;
-    // vello_cpu's coarse rasterization of the scene, timed
     let t = Instant::now();
     let mut rctx = RenderContext::new(WIDTH, HEIGHT);
     let mut resources = Resources::new();
@@ -298,7 +271,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let coarse = rctx.coarse(&mut resources).ok_or("no coarse rasterization")?;
     let cpu_coarse_ms = cpu_coarse_ms0 + t.elapsed().as_secs_f64() * 1e3;
 
-    // the GPU's inputs: the elements, each path's (first element, count), whether a move is NaN, its fill rule
     let mut bytes = Vec::new();
     let (mut pel, mut flags, mut rules) = (Vec::new(), Vec::new(), Vec::new());
     for (path, rule) in &paths {
@@ -332,15 +304,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut eplan = ScanPlan::new(&mut g.cx, ecounts.addr, eoffsets.addr, n)?;
     let fscratch = g.zeros(n * 640)?;
     let nans = g.zeros(n * 4)?;
-    // the lanes' elements: sorted by kind (a lane's work is its kind's)
     let mut perm: Vec<u32> = (0..n as u32).collect();
     perm.sort_by_key(|&e| bytes[e as usize * 128]);
     let perm_b = g.words(&perm)?;
     let fparams = |pts: u64, lines: u64| [elems.addr, consts.addr, ecounts.addr, eoffsets.addr, pts, fscratch.addr, lines, nans.addr, perm_b.addr].map(|a| a as u32);
     let fp0 = g.words(&fparams(0, 0))?;
     let eg = [n.div_ceil(16) as u32, 1];
-    // the GPU's clock up first (the count and its scan again and again: the same counts): cold, every stage takes
-    // two or three times as long
     for _ in 0..20 {
         let mut r = g.cx.record();
         r.dispatch(&flatten_k, eg, &[fp0.addr as u32, n as u32, 0])?;
@@ -364,8 +333,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         r.dispatch(&ranges_k, pg, &[pel_b.addr as u32, flags_b.addr as u32, eoffsets.addr as u32, nans.addr as u32, ltotal as u32, ranges.addr as u32, npaths as u32, n as u32])
     })?;
 
-    // the windings of what lies left of the viewport: only the paths with lines there have theirs (the count pass
-    // flags them; block 1 + their prefix sum), the others share block 0 (zeros)
     let (wflags, wpre) = (g.zeros(npaths * 4)?, g.zeros(npaths * 4)?);
     let mut wplan = ScanPlan::new(&mut g.cx, wflags.addr, wpre.addr, npaths)?;
     let tconsts = g.words(&[cols, rows, wstride, wflags.addr as u32, wpre.addr as u32])?;
@@ -385,12 +352,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let windings = g.zeros(wbytes)?;
     let tp1 = g.words(&tparams(tiles_b.addr, windings.addr))?;
     let spaths = g.zeros(npaths * 16)?;
-    // written unsorted, then counted into cells (tiles/cells.mlir): each path's box, its cells, their prefix sum; the
-    // cells' counts, theirs; the tiles placed, ranked in their cells
     let tmp = g.zeros(ntiles * 16)?;
     let tgs = [ntiles.div_ceil(16) as u32, 1];
     g.run("tiles: write", |r, _| {
-        // (the windings are added into: zeroed first, for the frame recorded again)
         r.dispatch(&zero_k, [wbytes.div_ceil(256) as u32, 1], &[windings.addr as u32, (wbytes / 4) as u32])?;
         r.dispatch(&tiles_k, pg, &[tp1.addr as u32, npaths as u32, 2])
     })?;
@@ -405,7 +369,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         bplan.record(r, s)
     })?;
     let ncells = bplan.total()? as usize;
-    // (whole 16 bytes: @zero's)
     let cbytes = ncells.next_multiple_of(4) * 4;
     let (cellcount, celloff, cellfill) = (g.zeros(cbytes)?, g.zeros(cbytes)?, g.zeros(cbytes)?);
     let cplan2 = ScanPlan::new(&mut g.cx, cellcount.addr, celloff.addr, ncells)?;
@@ -423,7 +386,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     g.run("tiles: stripin", |r, _| r.dispatch(&stripin_k, pg, &[ranges.addr as u32, toffsets.addr as u32, tcounts.addr as u32, rules_b.addr as u32, spaths.addr as u32, npaths as u32]))?;
 
     let sconsts = g.words(&[rows, vw, wstride, wflags.addr as u32, wpre.addr as u32])?;
-    // strip rendering a row run a lane: each path's runs counted, their offsets, written densely
     let rcounts = g.zeros(npaths * 4)?;
     let roffsets = g.zeros(npaths * 4)?;
     let mut rplan = ScanPlan::new(&mut g.cx, rcounts.addr, roffsets.addr, npaths)?;
@@ -459,10 +421,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sp1 = g.words(&sparams(strips_b.addr, alphas_b.addr))?;
     g.run("strips: write", |r, _| r.dispatch(&strips_k, sg, &[sp1.addr as u32, nslots as u32, 1]))?;
 
-    // coarse rasterization an event a lane (rowcoarse/layers.mlir): the paths' strips (rowcoarse's path table, @cpaths);
-    // the scene's events and its layers' boxes made from them (pipeline/events.mlir); each (row, layer)'s first fill
-    // marked; the events' (row, event) pairs in (row, event) order (rowcoarse/pairs.mlir); their commands' counts,
-    // scanned in that order (one longer: the total last); written
     let cpaths_b = g.zeros(npaths * 32)?;
     let nrows = rows as usize;
     let nl = nlayers.max(1);
@@ -491,7 +449,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         prplan.record(r, s)
     })?;
     let (npaints, npairs) = (paintplan.total()?, prplan.total()? as usize);
-    // (dwords in whole 16 bytes: @zero's)
     let dwords = |n: usize| n.next_multiple_of(4) * 4;
     let (rowcount, rowstart, rowfill) = (g.zeros(dwords(nrows + 1))?, g.zeros(dwords(nrows + 1))?, g.zeros(dwords(nrows + 1))?);
     let rsplan = ScanPlan::new(&mut g.cx, rowcount.addr, rowstart.addr, nrows + 1)?;
@@ -506,7 +463,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cparams = |cmds: u64, depth: u64| [strips_b.addr, events_b.addr, layers_b.addr, cconsts.addr, first.addr, ctab.addr, dtab.addr, coffs.addr, doffs.addr, cmds, depth].map(|a| a as u32);
     let cq0 = g.words(&cparams(0, 0))?;
     let prg = [npairs.div_ceil(16) as u32, 1];
-    // @zero's / @fill's workgroups and parameters for n dwords at a
     let zp = |a: u64, n: usize| ([dwords(n).div_ceil(256) as u32, 1], [a as u32, (dwords(n) / 4) as u32]);
     g.run("coarse: pairs + count + scans", |r, s| {
         for (a, n) in [(rowcount.addr, nrows + 1), (rowfill.addr, nrows + 1), (ctab.addr, npairs), (dtab.addr, npairs)] {
@@ -532,7 +488,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cq1 = g.words(&cparams(cmds_b.addr, depth_b.addr))?;
     g.run("coarse: write", |r, _| r.dispatch(&coarse_k, ig, &[cq1.addr as u32, nitems as u32, 1]))?;
 
-    // the rows' commands binned by 128 px bucket as the fine kernel reads them, a (row, bucket) a lane
     let nb = usize::from(WIDTH).div_ceil(128);
     let nbl = nrows * nb;
     let (bcc, bdc, bco, bdo) = (g.zeros(nbl * 4)?, g.zeros(nbl * 4)?, g.zeros(nbl * 4)?, g.zeros(nbl * 4)?);
@@ -553,16 +508,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bq1 = g.words(&bparams(bcmds.addr, bdepth.addr, brows.addr))?;
     g.run("bins: write", |r, _| r.dispatch(&bins_k, bg, &[bq1.addr as u32, nbl as u32, 1]))?;
 
-    // the pixels: fine.rs's kernel on the GPU's bins and alphas (only the paints' attrs packed on the CPU)
     let fine = Fine::new(&mut g.cx, &codegen)?;
     let ftiles = FineTiles::new(&coarse, &[], &[])?;
     let mut fbuf = g.zeros(ftiles.bytes())?;
     let faddr = fbuf.addr;
     let at = ftiles.write(fbuf.bytes()?, faddr, &[])?.with_gpu(brows.addr, bcmds.addr, bdepth.addr, alphas_b.addr);
     g.run("fine", |r, _| fine.record(r.r, &at))?;
-    // the whole frame again in one submission (the buffers sized already): no reading back between the stages
     let one_ms = g.again(|r| fine.record(r, &at))?;
-    // fine again (the same pixels), its fastest of ten: the GPU's clock and the machine's load vary a lot
     let mut fine_ms = Vec::new();
     for _ in 0..10 {
         let mut r = g.cx.record();
@@ -579,12 +531,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let px_bad = got_px.chunks(4).zip(want_px.chunks(4)).filter(|(a, b)| a != b).count();
     println!("{} pixels, {px_bad} differ from vello_cpu's", got_px.len() / 4);
 
-    // bit for bit, path by path
     let mut soff = soffsets;
     let mut roff = roffsets;
     let word = |b: &[u8], at: usize| u32::from_le_bytes(b[at..][..4].try_into().unwrap());
     let (ob, tob, sb, ab) = (soff.bytes()?.to_vec(), roff.bytes()?.to_vec(), strips_b.bytes()?.to_vec(), alphas_b.bytes()?.to_vec());
-    // a path's strips and alphas: its slots' in turn, from its first slot's offsets to the next path's
     let slot0 = |p: usize| if p < npaths { word(&tob, 4 * p) as usize } else { nslots };
     let at = |slot: usize| if slot < nslots { (word(&ob, 8 * slot) as usize, word(&ob, 8 * slot + 4) as usize) } else { (nstrips, nalphas) };
     let mut ok = 0;
@@ -603,8 +553,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             first_bad = Some((p, ns, w.len(), na, wa.len()));
         }
     }
-    // the rows' commands bit for bit (a push's span left out: fine does not read it); a row's: its pairs rowstart[r] ..
-    // rowstart[r + 1] (the offsets one longer)
     let (mut coffs, mut doffs, mut rowstart) = (coffs, doffs, rowstart);
     let (cob, dob, rsb, cb, db) = (coffs.bytes()?.to_vec(), doffs.bytes()?.to_vec(), rowstart.bytes()?.to_vec(), cmds_b.bytes()?.to_vec(), depth_b.bytes()?.to_vec());
     let kind = |c: &Cmd| match *c {
@@ -636,7 +584,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(b) = first_bad_row {
         println!("  first wrong: row {}: {} commands (want {}), first differing {:?}; {} depth (want {})", b.0, b.1, b.2, b.3, b.4, b.5);
     }
-    // the bins bit for bit: fine.rs's packing of vello_cpu's rows
     let (mut want_rows, mut want_cmds, mut want_depth) = (Vec::<u32>::new(), Vec::<u32>::new(), Vec::<u32>::new());
     for row in coarse.rows.iter().take(nrows) {
         for b in 0..nb as u32 {
