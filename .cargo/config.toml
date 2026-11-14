@@ -1,0 +1,3 @@
+[registries.ac]
+index = "sparse+http://gitea.dopamine/api/packages/AC/cargo/"
+credential-provider = "cargo:token"

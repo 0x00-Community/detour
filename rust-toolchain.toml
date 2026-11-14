@@ -1,0 +1,3 @@
+# mlirformat (0.6 onwards) uses `if let` guards: 1.91 refuses them, 1.96 is the oldest checked to build detour
+[toolchain]
+channel = "1.96.0"
