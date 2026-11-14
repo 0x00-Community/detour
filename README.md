@@ -16,7 +16,7 @@
 [![AMD](https://img.shields.io/badge/AMD-RDNA2-ED1C24?style=flat-square&logo=amd)](#-gpus)
 [![Linux](https://img.shields.io/badge/Linux-xe%20%7C%20asahi%20%7C%20amdgpu-FCC624?style=flat-square&logo=linux&logoColor=black)](#-gpus)
 
-**🇬🇧 English** · [🇨🇳 简体中文](README.zh-CN.md)
+**🇺🇸 English** · [🇨🇳 简体中文](README.zh-CN.md)
 
 </div>
 

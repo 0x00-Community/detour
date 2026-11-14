@@ -16,7 +16,7 @@
 [![AMD](https://img.shields.io/badge/AMD-RDNA2-ED1C24?style=flat-square&logo=amd)](#-支持的-gpu)
 [![Linux](https://img.shields.io/badge/Linux-xe%20%7C%20asahi%20%7C%20amdgpu-FCC624?style=flat-square&logo=linux&logoColor=black)](#-支持的-gpu)
 
-[🇬🇧 English](README.md) · **🇨🇳 简体中文**
+[🇺🇸 English](README.md) · **🇨🇳 简体中文**
 
 </div>
 
@@ -145,6 +145,6 @@ Apache-2.0. `crates/intel/dialect/genxml/xe3.xml` 来自 Mesa (MIT, Intel).
 
 **🛣️ 走 detour. 绕路才是捷径.**
 
-[⬆️ 回到顶部](#top) · [🇬🇧 English](README.md)
+[⬆️ 回到顶部](#top) · [🇺🇸 English](README.md)
 
 </div>
