@@ -1,5 +1,6 @@
 [package]
-name = "detour"
+# detour is taken on crates.io (a function-hooking library): the package is detour-gpu, the library is still detour
+name = "detour-gpu"
 description = "detour for its users (acde): the 2D scene and the drivers, aggregated; one feature per GPU model so only the drivers asked for build"
 version.workspace = true
 edition.workspace = true
@@ -8,6 +9,12 @@ license.workspace = true
 publish.workspace = true
 # benches/ is local measurement against Vulkan (its own dev dependencies), not part of the package
 exclude = ["benches/"]
+repository.workspace = true
+readme = "README.md"
+
+[lib]
+name = "detour"
+path = "src/lib.rs"
 
 [dependencies]
 # the shader compiler and the drivers' codegen (feature `compiler`): acde's 2D types and the Vulkan fallback do not need them
@@ -495,8 +502,8 @@ edition = "2024"
 # mlirformat's (0.6 onwards) `if let` guards (rust-toolchain.toml pins it here; a git dependent like acde-base reads this)
 rust-version = "1.96"
 license = "Apache-2.0"
-repository = "http://gitea.dopamine/AC/detour"
-publish = ["ac"]
+repository = "https://github.com/0x00-Community/detour"
+publish = ["ac", "crates-io"]
 
 [workspace.dependencies]
 # mlirformat and mlirpass from crates.io: the same mlirformat for both

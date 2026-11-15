@@ -7,6 +7,6 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-detour = { path = "../..", default-features = false, features = ["xe3"] }
+detour = { package = "detour-gpu", path = "../..", default-features = false, features = ["xe3"] }
 winit = "0.30"
 softbuffer = "0.4"
