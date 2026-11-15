@@ -7,6 +7,6 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-detour = { path = "../..", default-features = false, features = ["xe3", "fallback-vulkan"] }
+detour = { package = "detour-gpu", path = "../..", default-features = false, features = ["xe3", "fallback-vulkan"] }
 wgpu = "30"
 rustix = { version = "1", features = ["event"] }
