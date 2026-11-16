@@ -1,0 +1,117 @@
+# Texture objects: names, targets, images, storage, parameters, unpacking (GL ES 3.0 §3.8)
+gen_textures 3
+bind_texture TEXTURE_2D 1
+is_texture 1
+is_texture 2
+bind_texture TEXTURE_CUBE_MAP 1          # its target is TEXTURE_2D now
+bind_texture TEXTURE_2D 99               # never generated
+bind_texture 12345 2                     # not a target
+
+# glTexImage2D
+tex_image_2d TEXTURE_2D 0 RGBA8 4 4 0 RGBA UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 1 RGBA8 2 2 0 RGBA UNSIGNED_BYTE null
+tex_image_2d TEXTURE_2D -1 RGBA8 4 4 0 RGBA UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 15 RGBA8 1 1 0 RGBA UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 0 RGBA8 -1 4 0 RGBA UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 0 RGBA8 16385 1 0 RGBA UNSIGNED_BYTE null
+tex_image_2d TEXTURE_2D 0 RGBA8 4 4 1 RGBA UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 0 RGBA8 4 4 0 RGB UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 0 RGBA8 4 4 0 RGBA FLOAT data
+tex_image_2d TEXTURE_2D 0 RGBA32F 4 4 0 RGBA FLOAT data
+tex_image_2d TEXTURE_2D 0 RGBA16F 4 4 0 RGBA HALF_FLOAT data
+tex_image_2d TEXTURE_2D 0 R8 4 4 0 RED UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 0 RGB 4 4 0 RGB UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 0 RGB 4 4 0 RGBA UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 0 DEPTH_COMPONENT24 4 4 0 DEPTH_COMPONENT UNSIGNED_INT data
+tex_image_2d TEXTURE_2D 0 DEPTH24_STENCIL8 4 4 0 DEPTH_STENCIL UNSIGNED_INT_24_8 data
+tex_image_2d TEXTURE_2D 0 12345 4 4 0 RGBA UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 0 RGBA8 4 4 0 12345 UNSIGNED_BYTE data
+tex_image_2d TEXTURE_2D 0 RGBA8 4 4 0 RGBA 12345 data
+tex_image_2d TEXTURE_3D 0 RGBA8 4 4 0 RGBA UNSIGNED_BYTE data
+
+# glTexSubImage2D
+tex_image_2d TEXTURE_2D 0 RGBA8 8 8 0 RGBA UNSIGNED_BYTE data
+tex_sub_image_2d TEXTURE_2D 0 2 2 4 4 RGBA UNSIGNED_BYTE data
+tex_sub_image_2d TEXTURE_2D 0 6 6 4 4 RGBA UNSIGNED_BYTE data
+tex_sub_image_2d TEXTURE_2D 0 -1 0 1 1 RGBA UNSIGNED_BYTE data
+tex_sub_image_2d TEXTURE_2D 0 0 0 1 1 RGB UNSIGNED_BYTE data
+tex_sub_image_2d TEXTURE_2D 3 0 0 1 1 RGBA UNSIGNED_BYTE data
+tex_sub_image_2d TEXTURE_2D 0 0 0 0 0 RGBA UNSIGNED_BYTE data
+
+# cube maps
+bind_texture TEXTURE_CUBE_MAP 2
+tex_image_2d TEXTURE_CUBE_MAP_POSITIVE_X 0 RGBA8 4 4 0 RGBA UNSIGNED_BYTE data
+tex_image_2d TEXTURE_CUBE_MAP_NEGATIVE_Z 0 RGBA8 4 2 0 RGBA UNSIGNED_BYTE data
+tex_image_2d TEXTURE_CUBE_MAP 0 RGBA8 4 4 0 RGBA UNSIGNED_BYTE data
+
+# glTexStorage
+bind_texture TEXTURE_2D 3
+tex_storage_2d TEXTURE_2D 0 RGBA8 8 8
+tex_storage_2d TEXTURE_2D 5 RGBA8 8 8
+tex_storage_2d TEXTURE_2D 4 RGBA 8 8
+tex_storage_2d TEXTURE_2D 4 RGBA8 0 8
+tex_storage_2d TEXTURE_2D 4 RGBA8 8 8
+get_tex_parameter TEXTURE_2D TEXTURE_IMMUTABLE_FORMAT
+get_tex_parameter TEXTURE_2D TEXTURE_IMMUTABLE_LEVELS
+tex_storage_2d TEXTURE_2D 1 RGBA8 8 8
+tex_image_2d TEXTURE_2D 0 RGBA8 8 8 0 RGBA UNSIGNED_BYTE data
+tex_sub_image_2d TEXTURE_2D 3 0 0 1 1 RGBA UNSIGNED_BYTE data
+tex_sub_image_2d TEXTURE_2D 4 0 0 1 1 RGBA UNSIGNED_BYTE data
+get_tex_parameter TEXTURE_CUBE_MAP TEXTURE_IMMUTABLE_FORMAT
+
+# 3D and array textures
+gen_textures 2
+bind_texture TEXTURE_3D 4
+tex_image_3d TEXTURE_3D 0 RGBA8 4 4 4 0 RGBA UNSIGNED_BYTE data
+tex_image_3d TEXTURE_3D 0 RGBA8 4 4 2049 0 RGBA UNSIGNED_BYTE null
+tex_sub_image_3d TEXTURE_3D 0 0 0 1 4 4 3 RGBA UNSIGNED_BYTE data
+tex_sub_image_3d TEXTURE_3D 0 0 0 2 4 4 3 RGBA UNSIGNED_BYTE data
+tex_image_3d TEXTURE_2D 0 RGBA8 4 4 1 0 RGBA UNSIGNED_BYTE data
+bind_texture TEXTURE_2D_ARRAY 5
+tex_storage_3d TEXTURE_2D_ARRAY 3 RGBA8 4 4 6
+get_tex_parameter TEXTURE_2D_ARRAY TEXTURE_IMMUTABLE_LEVELS
+tex_storage_3d TEXTURE_2D_ARRAY 1 RGBA8 4 4 2049
+
+# parameters
+bind_texture TEXTURE_2D 1
+get_tex_parameter TEXTURE_2D TEXTURE_MIN_FILTER
+get_tex_parameter TEXTURE_2D TEXTURE_MAG_FILTER
+get_tex_parameter TEXTURE_2D TEXTURE_WRAP_R
+get_tex_parameter TEXTURE_2D TEXTURE_MAX_LEVEL
+get_tex_parameter TEXTURE_2D TEXTURE_COMPARE_FUNC
+get_tex_parameter TEXTURE_2D TEXTURE_SWIZZLE_A
+tex_parameteri TEXTURE_2D TEXTURE_MIN_FILTER LINEAR_MIPMAP_NEAREST
+get_tex_parameter TEXTURE_2D TEXTURE_MIN_FILTER
+tex_parameteri TEXTURE_2D TEXTURE_MAG_FILTER LINEAR_MIPMAP_NEAREST
+tex_parameteri TEXTURE_2D TEXTURE_WRAP_S CLAMP_TO_EDGE
+tex_parameteri TEXTURE_2D TEXTURE_WRAP_S NEAREST
+tex_parameteri TEXTURE_2D TEXTURE_BASE_LEVEL -1
+tex_parameteri TEXTURE_2D TEXTURE_BASE_LEVEL 2
+get_tex_parameter TEXTURE_2D TEXTURE_BASE_LEVEL
+tex_parameteri TEXTURE_2D TEXTURE_COMPARE_MODE COMPARE_REF_TO_TEXTURE
+tex_parameteri TEXTURE_2D TEXTURE_COMPARE_FUNC GREATER
+get_tex_parameter TEXTURE_2D TEXTURE_COMPARE_FUNC
+tex_parameteri TEXTURE_2D TEXTURE_SWIZZLE_R ONE
+get_tex_parameter TEXTURE_2D TEXTURE_SWIZZLE_R
+tex_parameteri TEXTURE_2D TEXTURE_SWIZZLE_R BACK
+tex_parameteri TEXTURE_2D 4100 0               # TEXTURE_BORDER_COLOR: not in ES 3.0
+get_tex_parameter TEXTURE_2D 12345
+
+# unpacking
+pixel_storei UNPACK_ALIGNMENT 3
+pixel_storei UNPACK_ALIGNMENT 8
+pixel_storei UNPACK_ROW_LENGTH -1
+pixel_storei UNPACK_ROW_LENGTH 16
+tex_image_2d TEXTURE_2D 0 RGB8 5 3 0 RGB UNSIGNED_BYTE data
+pixel_storei UNPACK_ROW_LENGTH 0
+pixel_storei PACK_ALIGNMENT 1
+
+# texture units
+active_texture TEXTURE31
+active_texture TEXTURE0
+active_texture 12345
+
+# deleting: the binding goes back to 0
+delete_textures 1
+is_texture 1
+bind_texture TEXTURE_2D 1
