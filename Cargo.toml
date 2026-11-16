@@ -497,7 +497,7 @@ resolver = "3"
 members = ["crates/apple/metal", "benches/interop", "benches/triangle", "benches/triangle3d"]
 
 [workspace.package]
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 # mlirformat's (0.6 onwards) `if let` guards (rust-toolchain.toml pins it here; a git dependent like acde-base reads this)
 rust-version = "1.96"
