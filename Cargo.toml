@@ -1,7 +1,7 @@
 [package]
 # detour is taken on crates.io (a function-hooking library): the package is detour-gpu, the library is still detour
 name = "detour-gpu"
-description = "detour: the 2D scene, the kernel interface traits and the shader compiler, OpenGL (src/gl) and Vulkan (src/vk) on them"
+description = "detour: a GPU user-mode driver in Rust over mlirpass: the kernel interface, OpenGL (src/gl) and Vulkan (src/vk)"
 version = "0.1.6"
 edition = "2024"
 # mlirformat's (0.6 onwards) `if let` guards (rust-toolchain.toml pins it here; a git dependent like acde-base reads this)
@@ -17,22 +17,11 @@ path = "src/lib.rs"
 
 [dependencies]
 # mlirformat and mlirpass from crates.io: the same mlirformat for both
-mlirformat = { version = "0.8.1", optional = true }
-# the dialects detour's frontend and backends run (their folds, canonicalization and inlining are behind them)
-mlirpass = { version = "0.10.3", default-features = false, features = ["std", "dialect.arith", "dialect.func", "dialect.scf", "dialect.vector", "dialect.math", "dialect.gpu", "dialect.llvm", "dialect.spirv", "dialect.image"], optional = true }
-# the executor mlirpass runs a pipeline on (mlirpass does not re-export it)
-moremath = { version = "0.2.1", default-features = false, features = ["alloc"], optional = true }
-# the 2D rasterizer's CPU half (strips), the same as acde's vello_cpu 0.3
-vello_common = { version = "0.3", features = ["std"], optional = true }
+mlirformat = "0.8.4"
+# GLSL ⇒ SPIR-V (gl) and SPIR-V ⇒ Xe3 machine code and genxml batches: every IR and pass is mlirpass's, detour only runs them
+mlirpass = { version = "0.10.5", default-features = false, features = ["std", "dialect.glsl", "target.spirv", "target.xe3"] }
 serde = { version = "1", features = ["derive"] }
 libc = "0.2"
-# the 2D scene's geometry and paints: the versions acde's blitz and vello use
-kurbo = "0.13.1"
-peniko = "0.6.1"
-
-[features]
-default = ["compiler"]
-compiler = ["dep:mlirformat", "dep:mlirpass", "dep:moremath", "dep:vello_common"]
 
 [profile.release]
 debug = 1

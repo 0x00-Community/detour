@@ -1,1 +1,1 @@
-//! Vulkan on detour core
+//! Vulkan on detour
