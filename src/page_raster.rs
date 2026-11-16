@@ -87,7 +87,7 @@ impl<'d> PageRaster<'d> {
     }
 
     fn merge(a: &OwnedFd, b: &OwnedFd) -> Result<OwnedFd, String> {
-        let mut data = SyncMerge { name: *b"detour pages\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", fd2: std::os::fd::AsRawFd::as_raw_fd(b), fence: -1, flags: 0, pad: 0 };
+        let mut data = SyncMerge { name: *b"detour pages\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", fd2: std::os::fd::AsRawFd::as_raw_fd(b), fence: -1, flags: 0, pad: 0 };
         unsafe { rustix::ioctl::ioctl(a.as_fd(), rustix::ioctl::Updater::<{ rustix::ioctl::opcode::read_write::<SyncMerge>(b'>', 3) }, SyncMerge>::new(&mut data)) }.map_err(|e| format!("merging sync_files: {e}"))?;
         Ok(unsafe { OwnedFd::from_raw_fd(data.fence) })
     }

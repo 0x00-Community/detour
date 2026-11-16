@@ -456,7 +456,7 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "detour-apple-metal"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "detour-gpu",
  "mlirpass",
@@ -467,7 +467,7 @@ dependencies = [
 
 [[package]]
 name = "detour-gpu"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "ash",
  "bytemuck",
@@ -887,7 +887,7 @@ dependencies = [
 
 [[package]]
 name = "interop"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "detour-gpu",
  "rustix 1.1.6",
@@ -2422,7 +2422,7 @@ checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 
 [[package]]
 name = "triangle"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "detour-gpu",
  "softbuffer",
@@ -2431,7 +2431,7 @@ dependencies = [
 
 [[package]]
 name = "triangle3d"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "detour-gpu",
  "triangle",
