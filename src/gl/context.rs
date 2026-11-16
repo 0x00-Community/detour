@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use mlirformat::Error;
 
 use super::{GlslPipelines, Attrib, Buffer, BufferTarget, Capability, GlError, GlResult, Linked, Names, Program, Shader, ShaderType, State, Usage, UniformValue, VertexArray};
-use super::Framebuffer;
+use super::{ColorBuffer, DefaultFramebuffer, Framebuffer, MAX_COMBINED_TEXTURE_IMAGE_UNITS, Renderbuffer, Texture, TextureTarget, Unpack};
 use mlirpass::ColorFormat;
 
 use crate::Toolchain;
@@ -30,7 +30,23 @@ pub struct Context<'t> {
     pub program: u32,
     pub state: State,
     /// the default framebuffer: its pixels live here between draws
-    pub framebuffer: Framebuffer,
+    pub framebuffer: DefaultFramebuffer,
+    pub textures: Names<Texture>,
+    /// each texture unit's bindings, by target
+    pub units: Vec<BTreeMap<TextureTarget, u32>>,
+    /// glActiveTexture's unit
+    pub active_unit: u32,
+    pub renderbuffers: Names<Renderbuffer>,
+    pub renderbuffer: u32,
+    pub framebuffers: Names<Framebuffer>,
+    pub draw_framebuffer: u32,
+    pub read_framebuffer: u32,
+    /// the default framebuffer's draw and read buffers (BACK or NONE)
+    pub default_draw: ColorBuffer,
+    pub default_read: ColorBuffer,
+    pub unpack: Unpack,
+    /// glReadPixels' layout (the unpack state's pack fields)
+    pub pack: Unpack,
 }
 
 impl<'t> Context<'t> {
@@ -48,7 +64,19 @@ impl<'t> Context<'t> {
             default_vertex_array: VertexArray::default(),
             program: 0,
             state: State::new(width, height),
-            framebuffer: Framebuffer::new(width, height, format),
+            framebuffer: DefaultFramebuffer::new(width, height, format),
+            textures: Names::default(),
+            units: vec![BTreeMap::new(); MAX_COMBINED_TEXTURE_IMAGE_UNITS as usize],
+            active_unit: 0,
+            renderbuffers: Names::default(),
+            renderbuffer: 0,
+            framebuffers: Names::default(),
+            draw_framebuffer: 0,
+            read_framebuffer: 0,
+            default_draw: ColorBuffer::Back,
+            default_read: ColorBuffer::Back,
+            unpack: Unpack::default(),
+            pack: Unpack::default(),
         })
     }
 
@@ -70,7 +98,7 @@ impl<'t> Context<'t> {
     }
 
     /// An entry point's outcome: an error is recorded (the first one stays), the call does nothing
-    fn record<T: Default>(&mut self, r: GlResult<T>) -> T {
+    pub(super) fn record<T: Default>(&mut self, r: GlResult<T>) -> T {
         r.unwrap_or_else(|e| {
             self.error.get_or_insert(e);
             T::default()
@@ -82,8 +110,10 @@ impl<'t> Context<'t> {
     }
 
     pub fn bind_buffer(&mut self, target: BufferTarget, name: u32) {
-        let r = if name == 0 { Ok(()) } else { self.buffers.bind(name, Buffer::default) };
-        if self.record(r.map(|()| true)) {
+        if name != 0 {
+            self.buffers.bind_any(name, Buffer::default);
+        }
+        {
             self.bound.insert(target, name);
             if target == BufferTarget::ElementArray {
                 self.vertex_array_mut().elements = name;

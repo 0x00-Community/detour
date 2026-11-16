@@ -40,16 +40,16 @@ pub struct ClearMask {
 }
 
 /// The default framebuffer's color buffer: row 0 is the bottom row (glReadPixels' order)
-pub struct Framebuffer {
+pub struct DefaultFramebuffer {
     pub width: u32,
     pub height: u32,
     pub format: ColorFormat,
     pub pixels: Vec<u8>,
 }
 
-impl Framebuffer {
+impl DefaultFramebuffer {
     pub fn new(width: u32, height: u32, format: ColorFormat) -> Self {
-        Framebuffer { width, height, format, pixels: vec![0; (width * height * format.bytes()) as usize] }
+        DefaultFramebuffer { width, height, format, pixels: vec![0; (width * height * format.bytes()) as usize] }
     }
 
     /// One pixel of `rgba` as the format stores it

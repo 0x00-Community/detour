@@ -1,0 +1,122 @@
+# Renderbuffers and framebuffer objects: storage, attachments, completeness (GL ES 3.0 §4.4)
+gen_textures 3
+gen_renderbuffers 3
+gen_framebuffers 2
+framebuffer_renderbuffer FRAMEBUFFER COLOR_ATTACHMENT0 RENDERBUFFER 1   # the default framebuffer
+draw_buffers COLOR_ATTACHMENT0
+draw_buffers BACK
+draw_buffers NONE
+read_buffer COLOR_ATTACHMENT0
+read_buffer BACK
+
+# renderbuffer storage
+bind_renderbuffer RENDERBUFFER 1
+get_renderbuffer_parameter RENDERBUFFER RENDERBUFFER_INTERNAL_FORMAT
+renderbuffer_storage RENDERBUFFER RGBA8 16 16
+get_renderbuffer_parameter RENDERBUFFER RENDERBUFFER_WIDTH
+get_renderbuffer_parameter RENDERBUFFER RENDERBUFFER_INTERNAL_FORMAT
+renderbuffer_storage RENDERBUFFER RGB9_E5 16 16
+renderbuffer_storage RENDERBUFFER RGBA 16 16
+renderbuffer_storage RENDERBUFFER RGBA8 -1 16
+renderbuffer_storage RENDERBUFFER RGBA8 16385 16
+renderbuffer_storage TEXTURE_2D RGBA8 16 16
+renderbuffer_storage_multisample RENDERBUFFER 3 RGBA8 16 16
+get_renderbuffer_parameter RENDERBUFFER RENDERBUFFER_SAMPLES
+renderbuffer_storage_multisample RENDERBUFFER 4 RGBA8UI 16 16
+renderbuffer_storage_multisample RENDERBUFFER 64 RGBA8 16 16
+renderbuffer_storage RENDERBUFFER RGBA8 16 16
+bind_renderbuffer RENDERBUFFER 2
+renderbuffer_storage RENDERBUFFER DEPTH24_STENCIL8 16 16
+bind_renderbuffer RENDERBUFFER 3
+renderbuffer_storage RENDERBUFFER DEPTH_COMPONENT16 16 16
+
+# a framebuffer object
+bind_framebuffer FRAMEBUFFER 1
+check_framebuffer_status FRAMEBUFFER
+get_framebuffer_attachment_parameter FRAMEBUFFER COLOR_ATTACHMENT0 FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE
+get_framebuffer_attachment_parameter FRAMEBUFFER COLOR_ATTACHMENT0 FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL
+framebuffer_renderbuffer FRAMEBUFFER COLOR_ATTACHMENT0 RENDERBUFFER 1
+check_framebuffer_status FRAMEBUFFER
+get_framebuffer_attachment_parameter FRAMEBUFFER COLOR_ATTACHMENT0 FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE
+get_framebuffer_attachment_parameter FRAMEBUFFER COLOR_ATTACHMENT0 FRAMEBUFFER_ATTACHMENT_OBJECT_NAME
+framebuffer_renderbuffer FRAMEBUFFER DEPTH_STENCIL_ATTACHMENT RENDERBUFFER 2
+check_framebuffer_status FRAMEBUFFER
+get_framebuffer_attachment_parameter FRAMEBUFFER DEPTH_STENCIL_ATTACHMENT FRAMEBUFFER_ATTACHMENT_OBJECT_NAME
+framebuffer_renderbuffer FRAMEBUFFER DEPTH_ATTACHMENT RENDERBUFFER 3
+check_framebuffer_status FRAMEBUFFER
+get_framebuffer_attachment_parameter FRAMEBUFFER DEPTH_STENCIL_ATTACHMENT FRAMEBUFFER_ATTACHMENT_OBJECT_NAME
+framebuffer_renderbuffer FRAMEBUFFER STENCIL_ATTACHMENT RENDERBUFFER 0
+check_framebuffer_status FRAMEBUFFER
+framebuffer_renderbuffer FRAMEBUFFER COLOR_ATTACHMENT0 RENDERBUFFER 99
+framebuffer_renderbuffer FRAMEBUFFER COLOR_ATTACHMENT0 TEXTURE_2D 1
+framebuffer_renderbuffer FRAMEBUFFER 12345 RENDERBUFFER 1
+
+# a depth format on a color point, a color format on the depth point
+framebuffer_renderbuffer FRAMEBUFFER COLOR_ATTACHMENT1 RENDERBUFFER 3
+check_framebuffer_status FRAMEBUFFER
+framebuffer_renderbuffer FRAMEBUFFER COLOR_ATTACHMENT1 RENDERBUFFER 0
+framebuffer_renderbuffer FRAMEBUFFER DEPTH_ATTACHMENT RENDERBUFFER 1
+check_framebuffer_status FRAMEBUFFER
+framebuffer_renderbuffer FRAMEBUFFER DEPTH_ATTACHMENT RENDERBUFFER 0
+
+# textures
+bind_texture TEXTURE_2D 1
+tex_storage_2d TEXTURE_2D 3 RGBA8 16 16
+framebuffer_texture_2d FRAMEBUFFER COLOR_ATTACHMENT0 TEXTURE_2D 1 1
+check_framebuffer_status FRAMEBUFFER
+get_framebuffer_attachment_parameter FRAMEBUFFER COLOR_ATTACHMENT0 FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE
+get_framebuffer_attachment_parameter FRAMEBUFFER COLOR_ATTACHMENT0 FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL
+framebuffer_texture_2d FRAMEBUFFER COLOR_ATTACHMENT0 TEXTURE_2D 1 5
+check_framebuffer_status FRAMEBUFFER
+framebuffer_texture_2d FRAMEBUFFER COLOR_ATTACHMENT0 TEXTURE_2D 1 -1
+framebuffer_texture_2d FRAMEBUFFER COLOR_ATTACHMENT0 TEXTURE_CUBE_MAP_POSITIVE_X 1 0
+framebuffer_texture_2d FRAMEBUFFER COLOR_ATTACHMENT0 TEXTURE_2D 99 0
+framebuffer_texture_2d FRAMEBUFFER COLOR_ATTACHMENT0 TEXTURE_3D 1 0
+framebuffer_texture_2d FRAMEBUFFER COLOR_ATTACHMENT0 TEXTURE_2D 1 0
+check_framebuffer_status FRAMEBUFFER
+bind_texture TEXTURE_CUBE_MAP 2
+tex_storage_2d TEXTURE_CUBE_MAP 1 RGBA8 16 16
+framebuffer_texture_2d FRAMEBUFFER COLOR_ATTACHMENT2 TEXTURE_CUBE_MAP_NEGATIVE_Y 2 0
+get_framebuffer_attachment_parameter FRAMEBUFFER COLOR_ATTACHMENT2 FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE
+check_framebuffer_status FRAMEBUFFER
+bind_texture TEXTURE_2D_ARRAY 3
+tex_storage_3d TEXTURE_2D_ARRAY 1 RGBA8 16 16 4
+framebuffer_texture_layer FRAMEBUFFER COLOR_ATTACHMENT3 3 0 2
+get_framebuffer_attachment_parameter FRAMEBUFFER COLOR_ATTACHMENT3 FRAMEBUFFER_ATTACHMENT_TEXTURE_LAYER
+check_framebuffer_status FRAMEBUFFER
+framebuffer_texture_layer FRAMEBUFFER COLOR_ATTACHMENT3 3 0 4
+check_framebuffer_status FRAMEBUFFER
+framebuffer_texture_layer FRAMEBUFFER COLOR_ATTACHMENT3 3 0 -1
+framebuffer_texture_layer FRAMEBUFFER COLOR_ATTACHMENT3 1 0 0
+framebuffer_texture_layer FRAMEBUFFER COLOR_ATTACHMENT3 0 0 0
+check_framebuffer_status FRAMEBUFFER
+
+# multisample mismatch
+bind_renderbuffer RENDERBUFFER 3
+renderbuffer_storage_multisample RENDERBUFFER 4 DEPTH_COMPONENT16 16 16
+framebuffer_renderbuffer FRAMEBUFFER DEPTH_ATTACHMENT RENDERBUFFER 3
+check_framebuffer_status FRAMEBUFFER
+framebuffer_renderbuffer FRAMEBUFFER DEPTH_ATTACHMENT RENDERBUFFER 0
+
+# draw and read buffers
+draw_buffers COLOR_ATTACHMENT0 COLOR_ATTACHMENT1
+draw_buffers COLOR_ATTACHMENT0 NONE COLOR_ATTACHMENT2
+draw_buffers COLOR_ATTACHMENT1
+draw_buffers BACK
+read_buffer COLOR_ATTACHMENT2
+read_buffer BACK
+read_buffer COLOR_ATTACHMENT9
+
+# deleting an attached renderbuffer or texture detaches it from the bound framebuffer
+delete_renderbuffers 2
+get_framebuffer_attachment_parameter FRAMEBUFFER DEPTH_STENCIL_ATTACHMENT FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE
+delete_textures 1
+get_framebuffer_attachment_parameter FRAMEBUFFER COLOR_ATTACHMENT0 FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE
+
+# the read and the draw framebuffer
+bind_framebuffer READ_FRAMEBUFFER 2
+check_framebuffer_status READ_FRAMEBUFFER
+check_framebuffer_status DRAW_FRAMEBUFFER
+bind_framebuffer FRAMEBUFFER 99
+delete_framebuffers 1
+check_framebuffer_status DRAW_FRAMEBUFFER

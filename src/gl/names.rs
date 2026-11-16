@@ -35,7 +35,13 @@ impl<T> Names<T> {
         name
     }
 
-    /// glBind*: a name glGen* gave creates its object; any other name is an error
+    /// glBind* on buffers, textures, renderbuffers and framebuffers: any name, generated or not, has its object
+    /// made by the first bind (GL ES 3.0 keeps ES 2.0's rule)
+    pub fn bind_any(&mut self, name: u32, make: impl FnOnce() -> T) {
+        self.reserved.entry(name).or_insert(None).get_or_insert_with(make);
+    }
+
+    /// glBindVertexArray: a name glGen* gave creates its object; any other name is an error
     pub fn bind(&mut self, name: u32, make: impl FnOnce() -> T) -> GlResult<()> {
         match self.reserved.get_mut(&name) {
             Some(slot) => {
