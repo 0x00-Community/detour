@@ -1,7 +1,7 @@
 use mlirformat::Error;
 use mlirpass::{ColorFormat, ColorTarget, CullMode, Draw, DrawPrimitive, VertexBuffer, VertexElement, VertexFormat};
 
-use super::{AttribType, Context, Face, GlError, Rect, ShaderType, Storage};
+use super::{DEFAULT_UNIFORM_BLOCK, AttribType, Context, Face, GlError, Rect, ShaderType, Storage};
 use crate::Device;
 
 /// glDrawArrays' mode
@@ -130,7 +130,7 @@ impl Context<'_> {
         let draw = Draw {
             buffers,
             elements,
-            uniforms: Vec::new(),
+            uniforms: if linked.block.is_empty() { Vec::new() } else { vec![(DEFAULT_UNIFORM_BLOCK, linked.block.as_slice())] },
             primitive: mode.try_into()?,
             first,
             count,

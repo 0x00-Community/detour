@@ -1,16 +1,12 @@
 use std::collections::BTreeMap;
 
 use mlirformat::Error;
-use mlirpass::PassManager;
 
-use super::{Attrib, Buffer, BufferTarget, Capability, GlError, GlResult, Linked, Names, Program, Shader, ShaderType, State, Usage, UniformValue, VertexArray};
+use super::{GlslPipelines, Attrib, Buffer, BufferTarget, Capability, GlError, GlResult, Linked, Names, Program, Shader, ShaderType, State, Usage, UniformValue, VertexArray};
 use super::Framebuffer;
 use mlirpass::ColorFormat;
 
 use crate::Toolchain;
-
-/// GLSL to SPIR-V as OpenGL computes it: GL ES's linker assigns what the shaders leave out, then the SPIR-V
-const GLSL: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=opengl})";
 
 /// Shaders and programs share one name space
 enum Object<'t> {
@@ -21,7 +17,7 @@ enum Object<'t> {
 /// A GL ES 3.0 context: the objects, the bindings and the state; draws are recorded from it
 pub struct Context<'t> {
     tools: &'t Toolchain<'t>,
-    glsl: PassManager,
+    glsl: GlslPipelines,
     error: Option<GlError>,
     pub buffers: Names<Buffer>,
     pub vertex_arrays: Names<VertexArray>,
@@ -42,7 +38,7 @@ impl<'t> Context<'t> {
     pub fn new(tools: &'t Toolchain<'t>, width: u32, height: u32, format: ColorFormat) -> Result<Self, Error> {
         Ok(Context {
             tools,
-            glsl: tools.pipeline(GLSL)?,
+            glsl: GlslPipelines::new(tools)?,
             error: None,
             buffers: Names::default(),
             vertex_arrays: Names::default(),
