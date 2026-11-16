@@ -3,7 +3,7 @@
 //!   attribute NAME LOCATION N V...   three vertices of N floats
 //!   uniform NAME LOCATION f|i V...   glUniform{1,2,3,4}{f,i}v (16 floats: glUniformMatrix4fv)
 //!
-//!   cargo run --example compare -- GLRUN [CASE...]
+//!   cargo run --example compare -- GLRUN [CASE...]      (DETOUR_FULL=1: the whole error, with the IR)
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -113,7 +113,7 @@ impl Case {
 
     /// "ok", or what differs
     fn run(&self, tools: &Toolchain<'_>, device: &Device, glrun: &Path, out: &Path) -> Result<String, String> {
-        let ours = self.detour(tools, device).map_err(|e| format!("detour: {}", e.lines().next().unwrap_or("")))?;
+        let ours = self.detour(tools, device).map_err(|e| if std::env::var_os("DETOUR_FULL").is_some() { format!("detour: {e}") } else { format!("detour: {}", e.lines().next().unwrap_or("")) })?;
         let theirs = self.mesa(glrun, out).map_err(|e| format!("mesa: {e}"))?;
         let px = |b: &[u8], i: usize| b[i * PIXEL..(i + 1) * PIXEL].chunks(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect::<Vec<_>>();
         let covered = theirs.chunks(PIXEL).filter(|p| p.iter().any(|b| *b != 0)).count();
