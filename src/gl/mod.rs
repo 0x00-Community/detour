@@ -1,6 +1,7 @@
 //! OpenGL ES 3.0 on detour: the objects, the bindings and the state; shaders through mlirpass's GLSL
 mod buffer;
 mod context;
+mod draw;
 mod error;
 mod names;
 mod program;
@@ -9,6 +10,7 @@ mod vertex;
 
 pub use buffer::*;
 pub use context::*;
+pub use draw::*;
 pub use error::*;
 pub use names::*;
 pub use program::*;

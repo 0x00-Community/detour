@@ -1,4 +1,4 @@
-use detour::{Context, ShaderType, Toolchain};
+use detour::{Context, ShaderType, SurfaceFormat, Toolchain};
 use mlirpass::ShaderStage;
 
 const VERT: &str = "#version 300 es
@@ -23,7 +23,7 @@ void main() { v = vec3(scale); gl_Position = vec4(pos * scale, 0.0, 1.0); }
 
 fn main() {
     let tools = Toolchain::new().unwrap();
-    let mut gl = Context::new(&tools, 64, 64).unwrap();
+    let mut gl = Context::new(&tools, 64, 64, SurfaceFormat::R8G8B8A8Unorm).unwrap();
     for vert in [VERT, LOOSE] {
         let shaders = [(ShaderType::Vertex, vert), (ShaderType::Fragment, FRAG)].map(|(ty, src)| {
             let s = gl.create_shader(ty);

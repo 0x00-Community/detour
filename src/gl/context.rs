@@ -4,7 +4,8 @@ use mlirformat::Error;
 use mlirpass::PassManager;
 
 use super::{Attrib, Buffer, BufferTarget, Capability, GlError, GlResult, Linked, Names, Program, Shader, ShaderType, State, Usage, UniformValue, VertexArray};
-use crate::Toolchain;
+use super::Framebuffer;
+use crate::{SurfaceFormat, Toolchain};
 
 /// GLSL to SPIR-V as OpenGL computes it: GL ES's linker assigns what the shaders leave out, then the SPIR-V
 const GLSL: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=opengl})";
@@ -30,10 +31,13 @@ pub struct Context<'t> {
     default_vertex_array: VertexArray,
     pub program: u32,
     pub state: State,
+    /// the default framebuffer: its pixels live here between draws
+    pub framebuffer: Framebuffer,
 }
 
 impl<'t> Context<'t> {
-    pub fn new(tools: &'t Toolchain<'t>, width: u32, height: u32) -> Result<Self, Error> {
+    /// A context whose default framebuffer is `width` × `height` pixels of `format`
+    pub fn new(tools: &'t Toolchain<'t>, width: u32, height: u32, format: SurfaceFormat) -> Result<Self, Error> {
         Ok(Context {
             tools,
             glsl: tools.pipeline(GLSL)?,
@@ -46,12 +50,25 @@ impl<'t> Context<'t> {
             default_vertex_array: VertexArray::default(),
             program: 0,
             state: State::new(width, height),
+            framebuffer: Framebuffer::new(width, height, format),
         })
     }
 
     /// glGetError: the first error since the last call, then none
     pub fn error(&mut self) -> Option<GlError> {
         self.error.take()
+    }
+
+    pub(super) fn record_error(&mut self, e: GlError) {
+        self.error.get_or_insert(e);
+    }
+
+    /// A linked program, read-only
+    pub(super) fn objects_program(&self, name: u32) -> Option<&Linked<'t>> {
+        match self.objects.get(name) {
+            Some(Object::Program(p)) => p.linked.as_ref(),
+            _ => None,
+        }
     }
 
     /// An entry point's outcome: an error is recorded (the first one stays), the call does nothing

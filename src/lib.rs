@@ -2,11 +2,13 @@
 
 mod gl;
 mod kmd;
+mod render;
 mod shader;
 mod vk;
 mod xe;
 
 pub use gl::*;
 pub use kmd::*;
+pub use render::*;
 pub use shader::*;
 pub use xe::*;
