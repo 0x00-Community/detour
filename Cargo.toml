@@ -17,9 +17,9 @@ path = "src/lib.rs"
 
 [dependencies]
 # mlirformat and mlirpass from crates.io: the same mlirformat for both
-mlirformat = "0.8.4"
+mlirformat = "0.8.5"
 # GLSL ⇒ SPIR-V (gl) and SPIR-V ⇒ Xe3 machine code and genxml batches: every IR and pass is mlirpass's, detour only runs them
-mlirpass = { version = "0.10.5", default-features = false, features = ["std", "dialect.glsl", "target.spirv", "target.xe3"] }
+mlirpass = { version = "0.10.7", default-features = false, features = ["std", "dialect.glsl", "target.spirv", "target.xe3"] }
 serde = { version = "1", features = ["derive"] }
 libc = "0.2"
 

@@ -1,5 +1,5 @@
-use detour::{Context, ShaderType, SurfaceFormat, Toolchain};
-use mlirpass::ShaderStage;
+use detour::{Context, ShaderType, Toolchain};
+use mlirpass::ColorFormat;
 
 const VERT: &str = "#version 300 es
 in vec2 pos;
@@ -22,8 +22,8 @@ void main() { v = vec3(scale); gl_Position = vec4(pos * scale, 0.0, 1.0); }
 ";
 
 fn main() {
-    let tools = Toolchain::new().unwrap();
-    let mut gl = Context::new(&tools, 64, 64, SurfaceFormat::R8G8B8A8Unorm).unwrap();
+    let tools = Toolchain::new();
+    let mut gl = Context::new(&tools, 64, 64, ColorFormat::Rgba8Unorm).unwrap();
     for vert in [VERT, LOOSE] {
         let shaders = [(ShaderType::Vertex, vert), (ShaderType::Fragment, FRAG)].map(|(ty, src)| {
             let s = gl.create_shader(ty);
@@ -40,12 +40,6 @@ fn main() {
             continue;
         }
         println!("pos {} color {} scale {}", gl.attrib_location(p, "pos"), gl.attrib_location(p, "color"), gl.uniform_location(p, "scale"));
-        let linked = gl.linked(p).unwrap();
-        for stage in [ShaderStage::Vertex, ShaderStage::Fragment] {
-            let k = linked.xe3.kernel(stage).unwrap();
-            let h = linked.xe3.head(k).unwrap();
-            println!("{stage:?}: {} bytes, inputs {:?} varyings {:?} bindings {:?} buffers {:?} push {:?}", linked.xe3.code(k).unwrap().len(), h.inputs, h.varyings, h.bindings, h.buffers, h.push);
-        }
     }
     println!("error {:?}", gl.error());
 }

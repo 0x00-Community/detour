@@ -5,7 +5,7 @@ use mlirformat::{Attribute, Dim, Error, FloatKind, ShapedKind, Signedness, Type}
 use mlirpass::{Body, GlslReader, GlslStage, OpId};
 
 use super::{GlError, GlResult};
-use crate::{Toolchain, Xe3Program};
+use crate::{Compiled, Toolchain};
 
 /// glCreateShader's type
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -213,9 +213,9 @@ impl UniformValue<'_> {
     }
 }
 
-/// What glLinkProgram made: the Xe3 kernels and the interface GL queries
+/// What glLinkProgram made: the machine code and the interface GL queries
 pub struct Linked<'t> {
-    pub xe3: Xe3Program<'t>,
+    pub compiled: Compiled<'t>,
     pub variables: Vec<Variable<'t>>,
     /// uniform locations: an array uniform takes one location per element
     pub uniforms: BTreeMap<u32, (usize, u32)>,
@@ -232,7 +232,7 @@ pub struct Program<'t> {
 
 impl<'t> Program<'t> {
     /// glLinkProgram: the attached stages from source, glsl-link and convert-glsl-to-spirv (as OpenGL computes),
-    /// then Xe3; a failed link keeps the previous program running (GL ES 3.0 §2.11.3)
+    /// then the GPU's machine code; a failed link keeps the previous program running (GL ES 3.0 §2.11.3)
     pub fn link(&mut self, tools: &'t Toolchain<'t>, glsl: &mlirpass::PassManager, shaders: &[&Shader]) -> bool {
         match Program::build(tools, glsl, shaders) {
             Ok(linked) => {
@@ -270,7 +270,7 @@ impl<'t> Program<'t> {
             }
         }
         let (uniforms, values) = Program::uniforms(&variables)?;
-        Ok(Linked { xe3: tools.xe3(body)?, variables, uniforms, values })
+        Ok(Linked { compiled: tools.compile(body)?, variables, uniforms, values })
     }
 
     /// The default block's uniforms, by location; one used in both stages is one uniform

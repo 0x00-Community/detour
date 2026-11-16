@@ -6,7 +6,8 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use detour::{Attrib, BufferTarget, ClearMask, Context, Device, DrawMode, ShaderType, SurfaceFormat, Toolchain, Usage};
+use detour::{Attrib, BufferTarget, ClearMask, Context, Device, DrawMode, ShaderType, Toolchain, Usage};
+use mlirpass::ColorFormat;
 
 const SIZE: u32 = 64;
 const PIXEL: usize = 16;
@@ -34,9 +35,9 @@ fn main() {
     let out = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/triangle");
     fs::create_dir_all(&out).unwrap();
 
-    let tools = Toolchain::new().unwrap();
+    let tools = Toolchain::new();
     let device = Device::open().unwrap();
-    let mut gl = Context::new(&tools, SIZE, SIZE, SurfaceFormat::R32G32B32A32Float).unwrap();
+    let mut gl = Context::new(&tools, SIZE, SIZE, ColorFormat::Rgba32Float).unwrap();
     let shaders = [(ShaderType::Vertex, VERT), (ShaderType::Fragment, FRAG)].map(|(ty, src)| {
         let s = gl.create_shader(ty);
         gl.shader_source(s, src);
@@ -62,7 +63,7 @@ fn main() {
     }
     gl.viewport(0, 0, SIZE as i32, SIZE as i32);
     gl.clear_color([0.0; 4]);
-    gl.clear(ClearMask { color: true, ..Default::default() }).unwrap();
+    gl.clear(ClearMask { color: true, ..Default::default() });
     gl.draw_arrays(&device, DrawMode::Triangles, 0, 3).unwrap();
     assert_eq!(gl.error(), None);
     let ours = gl.framebuffer.pixels.clone();

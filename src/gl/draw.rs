@@ -1,7 +1,8 @@
 use mlirformat::Error;
+use mlirpass::{ColorFormat, ColorTarget, CullMode, Draw, DrawPrimitive, VertexBuffer, VertexElement, VertexFormat};
 
-use super::{AttribType, Context, Face, GlError, Storage, ShaderType};
-use crate::{Cull, Device, Draw, Primitive, SurfaceFormat, Target, VertexBuffer, VertexElement};
+use super::{AttribType, Context, Face, GlError, Rect, ShaderType, Storage};
+use crate::Device;
 
 /// glDrawArrays' mode
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -15,16 +16,16 @@ pub enum DrawMode {
     TriangleFan,
 }
 
-impl TryFrom<DrawMode> for Primitive {
+impl TryFrom<DrawMode> for DrawPrimitive {
     type Error = Error;
 
-    fn try_from(m: DrawMode) -> Result<Primitive, Error> {
+    fn try_from(m: DrawMode) -> Result<DrawPrimitive, Error> {
         match m {
-            DrawMode::Points => Ok(Primitive::Points),
-            DrawMode::Lines => Ok(Primitive::Lines),
-            DrawMode::LineStrip => Ok(Primitive::LineStrip),
-            DrawMode::Triangles => Ok(Primitive::Triangles),
-            DrawMode::TriangleStrip => Ok(Primitive::TriangleStrip),
+            DrawMode::Points => Ok(DrawPrimitive::Points),
+            DrawMode::Lines => Ok(DrawPrimitive::Lines),
+            DrawMode::LineStrip => Ok(DrawPrimitive::LineStrip),
+            DrawMode::Triangles => Ok(DrawPrimitive::Triangles),
+            DrawMode::TriangleStrip => Ok(DrawPrimitive::TriangleStrip),
             m => Err(Error(format!("{m:?}: not drawn yet"))),
         }
     }
@@ -42,49 +43,49 @@ pub struct ClearMask {
 pub struct Framebuffer {
     pub width: u32,
     pub height: u32,
-    pub format: SurfaceFormat,
+    pub format: ColorFormat,
     pub pixels: Vec<u8>,
 }
 
 impl Framebuffer {
-    pub fn new(width: u32, height: u32, format: SurfaceFormat) -> Self {
+    pub fn new(width: u32, height: u32, format: ColorFormat) -> Self {
         Framebuffer { width, height, format, pixels: vec![0; (width * height * format.bytes()) as usize] }
     }
 
     /// One pixel of `rgba` as the format stores it
-    fn texel(&self, rgba: [f32; 4]) -> Result<Vec<u8>, Error> {
+    fn texel(&self, rgba: [f32; 4]) -> Vec<u8> {
         match self.format {
-            SurfaceFormat::R32G32B32A32Float => Ok(rgba.iter().flat_map(|c| c.to_le_bytes()).collect()),
-            SurfaceFormat::R8G8B8A8Unorm => Ok(rgba.iter().map(|c| (c * f32::from(u8::MAX)).round() as u8).collect()),
-            f => Err(Error(format!("a color buffer of {f:?}"))),
+            ColorFormat::Rgba32Float => rgba.iter().flat_map(|c| c.to_le_bytes()).collect(),
+            ColorFormat::Rgba8Unorm => rgba.iter().map(|c| (c * f32::from(u8::MAX)).round() as u8).collect(),
         }
+    }
+
+    /// The pixels `r` covers, clipped to the framebuffer: x0, y0, x1, y1
+    fn clip(&self, r: Rect) -> [u32; 4] {
+        let end = |at: i32, len: u32, max: u32| ((i64::from(at) + i64::from(len)).max(0) as u32).min(max);
+        [r.x.max(0) as u32, r.y.max(0) as u32, end(r.x, r.width, self.width), end(r.y, r.height, self.height)]
     }
 }
 
 impl Context<'_> {
     /// glClear: the color buffer within the scissor (when on), with the color mask
-    pub fn clear(&mut self, mask: ClearMask) -> Result<(), Error> {
+    pub fn clear(&mut self, mask: ClearMask) {
         if !mask.color {
-            return Ok(());
+            return;
         }
         let fb = &mut self.framebuffer;
-        let texel = fb.texel(self.state.clear_color)?;
-        let full = super::Rect { x: 0, y: 0, width: fb.width, height: fb.height };
-        let r = if self.state.scissor_test { self.state.scissor } else { full };
-        let (x0, y0) = (r.x.max(0) as u32, r.y.max(0) as u32);
-        let (x1, y1) = (((r.x as i64 + r.width as i64).max(0) as u32).min(fb.width), ((r.y as i64 + r.height as i64).max(0) as u32).min(fb.height));
+        let texel = fb.texel(self.state.clear_color);
+        let full = Rect { x: 0, y: 0, width: fb.width, height: fb.height };
+        let [x0, y0, x1, y1] = fb.clip(if self.state.scissor_test { self.state.scissor } else { full });
         let per = texel.len() / 4;
         for y in y0..y1 {
             for x in x0..x1 {
                 let at = ((y * fb.width + x) as usize) * texel.len();
-                for (c, on) in self.state.color_mask.iter().enumerate() {
-                    if *on {
-                        fb.pixels[at + c * per..at + (c + 1) * per].copy_from_slice(&texel[c * per..(c + 1) * per]);
-                    }
+                for (c, _) in self.state.color_mask.iter().enumerate().filter(|(_, on)| **on) {
+                    fb.pixels[at + c * per..at + (c + 1) * per].copy_from_slice(&texel[c * per..(c + 1) * per]);
                 }
             }
         }
-        Ok(())
     }
 
     /// glDrawArrays into the default framebuffer on `device`. A GL error is recorded (nothing drawn); an error
@@ -103,13 +104,13 @@ impl Context<'_> {
             return Ok(());
         }
         let cull = match (self.state.cull, self.state.cull_face) {
-            (false, _) => Cull::None,
-            (true, Face::Back) => Cull::Back,
-            (true, Face::Front) => Cull::Front,
+            (false, _) => CullMode::None,
+            (true, Face::Back) => CullMode::Back,
+            (true, Face::Front) => CullMode::Front,
             (true, Face::FrontAndBack) if matches!(mode, DrawMode::Triangles | DrawMode::TriangleStrip | DrawMode::TriangleFan) => return Ok(()),
-            (true, Face::FrontAndBack) => Cull::None,
+            (true, Face::FrontAndBack) => CullMode::None,
         };
-        let vao = self.vertex_array().clone();
+        let vao = self.vertex_array();
         let Some(linked) = self.objects_program(program) else { return Ok(()) };
         let mut inputs: Vec<_> = linked.variables.iter().filter(|v| v.stage == ShaderType::Vertex && v.storage == Storage::Input && !v.builtin).collect();
         inputs.sort_by_key(|v| v.location);
@@ -123,28 +124,28 @@ impl Context<'_> {
             }
             let data = &self.buffers.get(a.buffer).ok_or_else(|| Error(format!("attribute {}: client-side arrays are not drawn", v.name)))?.data;
             buffers.push(VertexBuffer { bytes: data.get(a.offset..).unwrap_or_default(), stride: a.step() });
-            elements.push(VertexElement { buffer: elements.len() as u32, format: SurfaceFormat::floats(a.size)?, offset: 0 });
+            elements.push(VertexElement { buffer: elements.len() as u32, format: VertexFormat::try_from(a.size)?, offset: 0 });
         }
-        let s = &self.state;
+        let (s, fb) = (&self.state, &self.framebuffer);
         let draw = Draw {
-            program: &linked.xe3,
             buffers,
             elements,
             uniforms: Vec::new(),
-            topology: mode.try_into()?,
+            primitive: mode.try_into()?,
             first,
             count,
             instances: 1,
             viewport: [s.viewport.x as f32, s.viewport.y as f32, s.viewport.width as f32, s.viewport.height as f32],
             depth_range: s.depth_range,
-            scissor: s.scissor_test.then_some([s.scissor.x.max(0) as u32, s.scissor.y.max(0) as u32, s.scissor.width, s.scissor.height]),
+            scissor: s.scissor_test.then(|| {
+                let [x0, y0, x1, y1] = fb.clip(s.scissor);
+                [x0, y0, x1.saturating_sub(x0), y1.saturating_sub(y0)]
+            }),
             cull,
             front_ccw: s.front_ccw,
+            target: ColorTarget { width: fb.width, height: fb.height, format: fb.format, pixels: &fb.pixels },
         };
-        let fb = &self.framebuffer;
-        let mut pixels = fb.pixels.clone();
-        let mut target = Target { width: fb.width, height: fb.height, format: fb.format, pixels: &mut pixels };
-        device.draw(&draw, &mut target)?;
+        let pixels = device.draw(&linked.compiled, &draw)?;
         self.framebuffer.pixels = pixels;
         Ok(())
     }

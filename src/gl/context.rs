@@ -5,7 +5,9 @@ use mlirpass::PassManager;
 
 use super::{Attrib, Buffer, BufferTarget, Capability, GlError, GlResult, Linked, Names, Program, Shader, ShaderType, State, Usage, UniformValue, VertexArray};
 use super::Framebuffer;
-use crate::{SurfaceFormat, Toolchain};
+use mlirpass::ColorFormat;
+
+use crate::Toolchain;
 
 /// GLSL to SPIR-V as OpenGL computes it: GL ES's linker assigns what the shaders leave out, then the SPIR-V
 const GLSL: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=opengl})";
@@ -37,7 +39,7 @@ pub struct Context<'t> {
 
 impl<'t> Context<'t> {
     /// A context whose default framebuffer is `width` × `height` pixels of `format`
-    pub fn new(tools: &'t Toolchain<'t>, width: u32, height: u32, format: SurfaceFormat) -> Result<Self, Error> {
+    pub fn new(tools: &'t Toolchain<'t>, width: u32, height: u32, format: ColorFormat) -> Result<Self, Error> {
         Ok(Context {
             tools,
             glsl: tools.pipeline(GLSL)?,
