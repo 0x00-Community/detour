@@ -10,18 +10,22 @@ license = "Apache-2.0"
 publish = ["ac", "crates-io"]
 repository = "https://github.com/0x00-Community/detour"
 readme = "README.md"
+# the generator, its genxml and the tests stay in the repository
+exclude = ["tools", "data", "tests", "scripts"]
 
 [lib]
 name = "detour"
 path = "src/lib.rs"
 
 [dependencies]
-# mlirformat and mlirpass from crates.io: the same mlirformat for both
-mlirformat = "0.8.5"
-# GLSL ⇒ SPIR-V (gl) and SPIR-V ⇒ Xe3 machine code and genxml batches: every IR and pass is mlirpass's, detour only runs them
-mlirpass = { version = "0.10.7", default-features = false, features = ["std", "dialect.glsl", "target.spirv", "target.xe3"] }
+# mlirpass with `target.gpu` (what an outside GPU backend needs) is not on crates.io yet: both from git, the same
+# mlirformat for both, until mlirpass 0.10.8
+mlirformat = { git = "https://github.com/Jabberwocky238/mlirformat.git", tag = "0.8.5", version = "0.8.5" }
+# GLSL ⇒ SPIR-V (gl) and what an outside GPU backend needs (target.gpu); detour's Xe3 backend is src/passes/xe3
+mlirpass = { git = "https://github.com/Jabberwocky238/mlirpass.git", rev = "08b10d2b8895c172fd8cdff8b74df511a2c701e2", version = "0.10.7", default-features = false, features = ["std", "target.gpu", "dialect.glsl", "target.spirv"] }
 serde = { version = "1", features = ["derive"] }
 libc = "0.2"
 
 [profile.release]
 debug = 1
+

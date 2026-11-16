@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use mlirformat::Error;
-use mlirpass::{Draw, Image, Xe3Draw};
+use mlirpass::{Draw, Image};
 
-use crate::{Bo, Caching, Compiled, Engine, Fence, Gpu, Host, MemType, Native, Queue, Vm, Xe};
+use crate::{Xe3Draw, Bo, Caching, Compiled, Engine, Fence, Gpu, Host, MemType, Native, Queue, Vm, Xe};
 
 /// How long a submission may take before the GPU is called hung
 const TIMEOUT: Duration = Duration::from_secs(5);

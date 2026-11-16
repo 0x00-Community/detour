@@ -163,8 +163,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "mlirformat"
 version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32772cbf03c854e03805e55e70c3c8e4767e07866a6c1628d75b724e1e2fa68d"
+source = "git+https://github.com/Jabberwocky238/mlirformat.git?tag=0.8.5#b80a0358a9753dbf24cea38bb8aca31e20f35194"
 dependencies = [
  "clap",
  "mlirformat-macros",
@@ -179,8 +178,7 @@ dependencies = [
 [[package]]
 name = "mlirformat-macros"
 version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0df58852ecd357668fbd3240c34434a5f32d77b6ef849a3ef91cbe2b36dbf547"
+source = "git+https://github.com/Jabberwocky238/mlirformat.git?tag=0.8.5#b80a0358a9753dbf24cea38bb8aca31e20f35194"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -190,8 +188,7 @@ dependencies = [
 [[package]]
 name = "mlirpass"
 version = "0.10.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d141001b9e5e6759a42f6be96e6bf0796942825ed33ab3f5cf1617dc0ac6913"
+source = "git+https://github.com/Jabberwocky238/mlirpass.git?rev=08b10d2b8895c172fd8cdff8b74df511a2c701e2#08b10d2b8895c172fd8cdff8b74df511a2c701e2"
 dependencies = [
  "libm",
  "mlirformat",
@@ -205,8 +202,7 @@ dependencies = [
 [[package]]
 name = "mlirpass-macros"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80fcefcc17a46729cc9c132d15c13bc1ebe955765e0603a1c9440efabd800d56"
+source = "git+https://github.com/Jabberwocky238/mlirpass.git?rev=08b10d2b8895c172fd8cdff8b74df511a2c701e2#08b10d2b8895c172fd8cdff8b74df511a2c701e2"
 dependencies = [
  "proc-macro2",
  "quote",
