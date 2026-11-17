@@ -201,6 +201,8 @@ impl<'a> Xe3Draw<'_, 'a> {
     }
 
     /// The draw's image, built in `body` (a module `compile` left one vertex and one fragment kernel in)
+    /// The image of a draw shaped as `d`, its data still zero (`fill` writes it): the same for every draw of that
+    /// program, state and data sizes
     pub fn image(body: &'_ mut Body<'a>, d: &Draw<'_>) -> Result<Image, Error> {
         let root = body.root;
         let kernels = Kernels::all(body, root, Xe3Kernel::NAME);
@@ -231,14 +233,14 @@ impl<'a> Xe3Draw<'_, 'a> {
         me.put(code, &ImageData { align: Some(FENCE_ALIGN), ..ImageData::zeros(Xe3Draw::FENCE, FENCE_SIZE) });
         me.null_surface();
         let target = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::TARGET, MemType::Coherent))?;
-        me.words(target, &format!("{}_data", Xe3Draw::TARGET), d.target.pixels);
+        me.room(target, &format!("{}_data", Xe3Draw::TARGET), d.target.pixels.len());
         for (i, b) in d.buffers.iter().enumerate() {
-            let m = Xe3Draw::memory(me.body, &ImageMemory::named(format!("vb{i}"), MemType::Streaming))?;
-            me.words(m, &format!("vb{i}_data"), b.bytes);
+            let m = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::vertex_buffer(i), MemType::Streaming))?;
+            me.room(m, &format!("vb{i}_data"), b.bytes.len());
         }
         for &(binding, bytes) in &d.uniforms {
-            let m = Xe3Draw::memory(me.body, &ImageMemory::named(format!("ubo{binding}"), MemType::Streaming))?;
-            me.words(m, &format!("ubo{binding}_data"), bytes);
+            let m = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::uniform_buffer(binding), MemType::Streaming))?;
+            me.room(m, &format!("ubo{binding}_data"), bytes.len());
         }
         me.context();
         me.draw(d, &vs, &fs)?;
@@ -279,13 +281,35 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.body[o].set(ImagePlaced::ALIGN, A::from(align).into());
     }
 
-    fn words(&mut self, block: BlockId, name: &str, bytes: &[u8]) {
-        let values = bytes.chunks(4).map(|c| {
-            let mut w = [0u8; 4];
-            w[..c.len()].copy_from_slice(c);
-            A::from(u32::from_le_bytes(w)).into()
-        });
-        self.put(block, &ImageWords::new(A::str(name).into(), values.collect(), None, None));
+    /// Room for `len` bytes of a draw's data, alone in its memory: `fill` writes them into the image
+    fn room(&mut self, block: BlockId, name: &str, len: usize) {
+        self.put(block, &ImageData::zeros(name, len as u64));
+    }
+
+    fn vertex_buffer(i: usize) -> String {
+        format!("vb{i}")
+    }
+
+    fn uniform_buffer(binding: u32) -> String {
+        format!("ubo{binding}")
+    }
+
+    /// Where a draw's data goes: the memory (each alone at its start) and the bytes: the target's pixels before the
+    /// draw, the vertex buffers, the uniform blocks
+    pub fn data<'d>(d: &Draw<'d>) -> Vec<(String, &'d [u8])> {
+        let buffers = d.buffers.iter().enumerate().map(|(i, b)| (Xe3Draw::vertex_buffer(i), b.bytes));
+        let uniforms = d.uniforms.iter().map(|&(binding, bytes)| (Xe3Draw::uniform_buffer(binding), bytes));
+        core::iter::once((Xe3Draw::TARGET.to_owned(), d.target.pixels)).chain(buffers).chain(uniforms).collect()
+    }
+
+    /// The draw's data written into an image `image` made for a draw of the same shape
+    pub fn fill(image: &mut Image, d: &Draw<'_>) -> Result<(), Error> {
+        for (name, bytes) in Xe3Draw::data(d) {
+            let s = image.segments.iter_mut().find(|s| s.name == name).ok_or_else(|| Error(format!("no memory {name} in the image")))?;
+            let room = s.bytes.len();
+            s.bytes.get_mut(..bytes.len()).ok_or_else(|| Error(format!("{name}: {} bytes do not fit {room}", bytes.len())))?.copy_from_slice(bytes);
+        }
+        Ok(())
     }
 
     fn pc_flush(&mut self) {

@@ -90,7 +90,7 @@ impl Context<'_> {
 
     /// glDrawArrays into the default framebuffer on `device`. A GL error is recorded (nothing drawn); an error
     /// returned is what detour cannot draw yet, or the device's
-    pub fn draw_arrays(&mut self, device: &Device, mode: DrawMode, first: i32, count: i32) -> Result<(), Error> {
+    pub fn draw_arrays(&mut self, device: &Device<'_>, mode: DrawMode, first: i32, count: i32) -> Result<(), Error> {
         let (Ok(first), Ok(count)) = (u32::try_from(first), u32::try_from(count)) else {
             self.record_error(GlError::InvalidValue);
             return Ok(());
