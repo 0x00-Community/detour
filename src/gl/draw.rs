@@ -1,5 +1,5 @@
 use mlirformat::Error;
-use crate::{ColorFormat, ColorTarget, CullMode, Draw, DrawPrimitive, VertexBuffer, VertexElement, VertexFormat};
+use crate::{ColorFormat, ColorTarget, CullMode, Draw, DrawPrimitive, Surface, TargetClear, TargetFill, TargetLoad, VertexBuffer, VertexElement, VertexFormat};
 
 use super::{DEFAULT_UNIFORM_BLOCK, AttribType, Context, Face, GlError, Rect, ShaderType, Storage};
 use crate::Device;
@@ -39,17 +39,38 @@ pub struct ClearMask {
     pub stencil: bool,
 }
 
-/// The default framebuffer's color buffer: row 0 is the bottom row (glReadPixels' order)
+/// The default framebuffer's color buffer: row 0 is the bottom row (glReadPixels' order). Its pixels live on the GPU
+/// once drawn into (in the device's surface); before that, and between a clear and the next draw, as `base` and
+/// `clears` say
 pub struct DefaultFramebuffer {
     pub width: u32,
     pub height: u32,
     pub format: ColorFormat,
-    pub pixels: Vec<u8>,
+    pub surface: Option<Surface>,
+    base: Base,
+    /// cleared rectangles over `base`, in order
+    clears: Vec<TargetClear>,
+}
+
+/// What a default framebuffer holds under its pending clears
+#[derive(Clone, Debug)]
+enum Base {
+    /// these pixels (zero before anything is drawn)
+    Pixels(Vec<u8>),
+    /// every pixel this texel
+    Fill(Vec<u8>),
+    /// what its surface holds
+    Surface,
 }
 
 impl DefaultFramebuffer {
     pub fn new(width: u32, height: u32, format: ColorFormat) -> Self {
-        DefaultFramebuffer { width, height, format, pixels: vec![0; (width * height * format.bytes()) as usize] }
+        DefaultFramebuffer { width, height, format, surface: None, base: Base::Pixels(vec![0; (width * height * format.bytes()) as usize]), clears: Vec::new() }
+    }
+
+    /// Its bytes
+    pub fn len(&self) -> usize {
+        (self.width * self.height * self.format.bytes()) as usize
     }
 
     /// One pixel of `rgba` as the format stores it
@@ -65,6 +86,31 @@ impl DefaultFramebuffer {
         let end = |at: i32, len: u32, max: u32| ((i64::from(at) + i64::from(len)).max(0) as u32).min(max);
         [r.x.max(0) as u32, r.y.max(0) as u32, end(r.x, r.width, self.width), end(r.y, r.height, self.height)]
     }
+
+    /// What the next draw loads the target with
+    fn load(&self) -> TargetLoad<'_> {
+        match &self.base {
+            Base::Pixels(p) => TargetLoad::Pixels(p, &self.clears),
+            Base::Fill(t) => TargetLoad::Fill(t, &self.clears),
+            Base::Surface => TargetLoad::Keep(&self.clears),
+        }
+    }
+
+    /// Its pixels (glReadPixels' order), read from the device when they are on the GPU
+    pub fn pixels(&self, device: &Device<'_>) -> Result<Vec<u8>, Error> {
+        let mut pixels = match (&self.base, self.surface) {
+            (Base::Pixels(p), _) => p.clone(),
+            (Base::Fill(t), _) => {
+                let mut p = vec![0; self.len()];
+                TargetFill::apply(&mut p, t);
+                p
+            }
+            (Base::Surface, Some(s)) => device.read(s, self.len())?,
+            (Base::Surface, None) => return Err(Error("a framebuffer on the GPU without a surface".into())),
+        };
+        self.clears.iter().for_each(|c| c.apply(&mut pixels, self.width));
+        Ok(pixels)
+    }
 }
 
 impl Context<'_> {
@@ -76,16 +122,17 @@ impl Context<'_> {
         let fb = &mut self.framebuffer;
         let texel = fb.texel(self.state.clear_color);
         let full = Rect { x: 0, y: 0, width: fb.width, height: fb.height };
-        let [x0, y0, x1, y1] = fb.clip(if self.state.scissor_test { self.state.scissor } else { full });
-        let per = texel.len() / 4;
-        for y in y0..y1 {
-            for x in x0..x1 {
-                let at = ((y * fb.width + x) as usize) * texel.len();
-                for (c, _) in self.state.color_mask.iter().enumerate().filter(|(_, on)| **on) {
-                    fb.pixels[at + c * per..at + (c + 1) * per].copy_from_slice(&texel[c * per..(c + 1) * per]);
-                }
-            }
+        let rect = fb.clip(if self.state.scissor_test { self.state.scissor } else { full });
+        let channels = self.state.color_mask;
+        if rect[0] >= rect[2] || rect[1] >= rect[3] || !channels.iter().any(|c| *c) {
+            return;
         }
+        if rect == [0, 0, fb.width, fb.height] && channels.iter().all(|c| *c) {
+            fb.base = Base::Fill(texel);
+            fb.clears.clear();
+            return;
+        }
+        fb.clears.push(TargetClear { rect, channels, texel });
     }
 
     /// glDrawArrays into the default framebuffer on `device`. A GL error is recorded (nothing drawn); an error
@@ -143,10 +190,17 @@ impl Context<'_> {
             }),
             cull,
             front_ccw: s.front_ccw,
-            target: ColorTarget { width: fb.width, height: fb.height, format: fb.format, pixels: &fb.pixels },
+            target: ColorTarget { width: fb.width, height: fb.height, format: fb.format, load: fb.load() },
         };
-        let pixels = device.draw(&linked.compiled, &draw)?;
-        self.framebuffer.pixels = pixels;
+        let surface = match fb.surface {
+            Some(s) => s,
+            None => device.surface(fb.len())?,
+        };
+        device.draw(&linked.compiled, &draw, surface)?;
+        let fb = &mut self.framebuffer;
+        fb.surface = Some(surface);
+        fb.base = Base::Surface;
+        fb.clears.clear();
         Ok(())
     }
 }

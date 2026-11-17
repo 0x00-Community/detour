@@ -46,7 +46,7 @@ detour 是**我们自己的 GPU 驱动用户态**. GL 状态、着色器到机�
 | 📞 | GL 调用 (`examples/glcalls`): 纹理、renderbuffer、framebuffer 对象的调用脚本分别在 detour 和 Mesa 上跑 | **203 / 203** 次调用: 每次 `glGetError` 和每个查询值都相同 |
 | 🔣 | 编码 (`tests/binary`) | Xe3 EU 对 gentool、genxml 对 Mesa, RDNA2 对 llvm-mc 和 Mesa 寄存器宏, AGX 对 Mesa AGX2 用例和 `agx_pack`, Apple9 对 M4 跑过的编码: **7 / 7** |
 | 🪜 | 下降 (`tests/pass`) | kernel 对 acgpu (Xe3、RDNA2、AGX)、GLSL 到 Xe3、RDNA2 IB 和 AGX CDM 流对 Mesa、Apple9 kernel 对 M4: **7 / 7** |
-| 🏁 | 和官方驱动比速度 (`examples/bench_opengl`、`examples/bench_vulkan`): 同一批用例分别在 detour 和 Mesa 上跑 (GL ES 对 iris, Vulkan 用同一份 SPIR-V 对 ANV), 每例 100 帧 256×256 | 每帧比 Mesa **慢约 1300 倍** (约 320 ms 对 0.24 ms: 每次绘制都重建整个镜像、BO 和 VM); GL 编译 + 链接慢约 20 倍 (约 117 ms 对 6 ms) |
+| 🏁 | 和官方驱动比速度 (`examples/bench_opengl`、`examples/bench_vulkan`): 同一批用例分别在 detour 和 Mesa 上跑 (GL ES 对 iris, Vulkan 用同一份 SPIR-V 对 ANV), 每例 100 帧 256×256 | 每帧是 Mesa 的**约 2 倍** (GL 约 0.24 ms 对 0.11 ms, Vulkan 路径约 0.22 对 0.10: 镜像常驻、帧缓冲留在 GPU、上下文只设一次); GL 编译 + 链接和 Mesa 相当 (约 5 ms 对 5) |
 
 ## 🎮 支持的 GPU
 

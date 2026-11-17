@@ -1,7 +1,7 @@
 //! detour's SPIR-V path on Xe3 against the official Vulkan driver (Mesa's ANV), the same work on both: each case
 //! under examples/cases made SPIR-V for Vulkan once (detour's GLSL front end), then on each side the two SPIR-V
 //! modules made machine code (detour: SPIR-V read, lowered to Xe3; ANV: shader modules + pipeline) and FRAMES frames
-//! of clear + the triangle into a SIZE² RGBA32F target, each waited for. A case setting uniforms is left out (Vulkan
+//! of the target cleared (Vulkan's load op) + the triangle into a SIZE² RGBA32F target, each waited for. A case setting uniforms is left out (Vulkan
 //! takes them in a block, which these cases do not declare).
 //!
 //! detour has no Vulkan API yet: its side is what one will run, the SPIR-V a Vulkan application hands it drawn
@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 #[path = "glcase/mod.rs"]
 mod glcase;
 
-use detour::{ColorFormat, ColorTarget, CullMode, Device, Draw, DrawPrimitive, Toolchain, VertexBuffer, VertexElement, VertexFormat};
+use detour::{ColorFormat, ColorTarget, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Toolchain, VertexBuffer, VertexElement, VertexFormat};
 use glcase::{Case, Resource, VERTICES};
 use mlirformat::Error;
 use mlirpass::{Body, Emit, GlslReader, GlslStage, Shift, SpirvBinary};
@@ -92,7 +92,9 @@ impl Spirv {
         let compiled = tools.compile(body).map_err(|e| e.0)?;
         let compile = start.elapsed();
         let bytes: Vec<Vec<u8>> = self.inputs.iter().map(|(_, _, v)| v.iter().flat_map(|f| f.to_le_bytes()).collect()).collect();
-        let pixels = vec![0u8; (size * size * ColorFormat::Rgba32Float.bytes()) as usize];
+        let clear = [0u8; 16];
+        let target = ColorTarget { width: size, height: size, format: ColorFormat::Rgba32Float, load: TargetLoad::Fill(&clear, &[]) };
+        let surface = device.surface(target.len()).map_err(|e| e.0)?;
         let mut elements = Vec::new();
         for (i, (_, n, _)) in self.inputs.iter().enumerate() {
             elements.push(VertexElement { buffer: i as u32, format: VertexFormat::try_from(*n).map_err(|e| e.0)?, offset: 0 });
@@ -110,12 +112,12 @@ impl Spirv {
             scissor: None,
             cull: CullMode::None,
             front_ccw: true,
-            target: ColorTarget { width: size, height: size, format: ColorFormat::Rgba32Float, pixels: &pixels },
+            target,
         };
         let mut times = Vec::new();
         for _ in 0..frames {
             let t = Instant::now();
-            device.draw(&compiled, &draw).map_err(|e| e.0)?;
+            device.draw(&compiled, &draw, surface).map_err(|e| e.0)?;
             times.push(t.elapsed());
         }
         let rest = &times[1..];
