@@ -29,8 +29,13 @@ builds the command streams and submits them **through the kernel driver's ioctls
   to SPIR-V, then by detour to Xe3.
 - 🌋 **Vulkan** (`src/vk`): next.
 - 🪟 **Direct3D 11 and 12**: to come, on the same backend (shaders through SPIR-V like GL's and Vulkan's).
-- 🔵 **Intel Xe3** (`src/passes/xe3`): the xe3 dialect (EU instructions, genxml commands and states), SPIR-V and GPU
-  kernels lowered to Xe3 machine code, register allocation, scoreboard, a draw's image.
+- 🔵 **Intel Xe3**: the xe3 dialect (EU instructions, genxml commands and states), SPIR-V and GPU kernels lowered to
+  Xe3 machine code, register allocation, scoreboard, a draw's image.
+- 🧱 **More GPUs' backends**: AMD RDNA2, Apple AGX and Apple9 (M3 / M4) dialects, lowerings and encoders, checked
+  against llvm-mc, Mesa and an M4.
+- 🔌 **On mlirformat and mlirpass as plugins**: `src/dialect` adds the GPU dialects to mlirformat (`MlirOpt::load`),
+  `src/pass` adds the lowerings to mlirpass (`Passes::with(DetourPasses::add)`), `src/binary` writes machine code and
+  images (`Binaries`, `Read` / `Write`).
 - 🐧 **Kernel interface** (`src/kmd`, `src/xe.rs`): DRM render nodes, buffer objects, VM binds, exec queues, syncobjs,
   on Linux's `xe` driver.
 
@@ -42,7 +47,8 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | --- | --- | --- |
 | 🎨 | Draws (`examples/compare`): the same GLSL and vertices through detour on Xe3 and through Mesa, a 64×64 RGBA32F target | 6 of 10 cases **byte for byte** (triangle, uniforms in both stages, vector `?:`, `\|\|`, component stores); the rest wait for Mesa's NIR math (`mod`, integer division, GLSL built-ins, Mesa's value-changing NIR rewrites) |
 | 📞 | GL calls (`examples/glcalls`): scripts of textures, renderbuffers and framebuffer objects run on detour and on Mesa | **203 / 203** calls: every `glGetError` and every queried value the same |
-| 🔣 | Xe3 encodings and lowerings (`tests/xe3.rs`) | EU encoding vs gentool, genxml packing vs Mesa, kernels, GLSL reaching Xe3: **4 / 4** |
+| 🔣 | Encodings (`tests/binary`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc and Mesa's registers, AGX vs Mesa's AGX2 cases and `agx_pack`, Apple9 vs what an M4 ran: **7 / 7** |
+| 🪜 | Lowerings (`tests/pass`) | kernels as acgpu compiled them (Xe3, RDNA2, AGX), GLSL reaching Xe3, an RDNA2 IB and an AGX CDM stream as Mesa writes them, Apple9 kernels as the M4 ran them: **7 / 7** |
 
 ## 🎮 GPUs
 
@@ -57,13 +63,15 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | `src/gl` | GL ES 3.0: context, buffers, vertex arrays, shaders and programs (default uniform block), textures, renderbuffers, framebuffers, GLenums (`enums.gen.rs` from `GLES3/gl3.h`) |
 | `src/vk` | Vulkan (to come) |
 | — | Direct3D 11 and 12 (to come) |
-| `src/passes/xe3` | Xe3: dialect, `convert-gpu-to-xe3`, the `xe3-*` passes, `Xe3Draw` |
-| `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + the Xe3 passes) and the device a draw runs on |
+| `src/dialect` | mlirformat plugins: the `xe3`, `rdna2`, `agx`, `apple9` and `image` dialects |
+| `src/pass` | mlirpass plugins: `convert-gpu-to-*`, register allocation, waits, command streams, image layout, `Xe3Draw`, `gpu-module-to-binary` with these GPUs |
+| `src/binary` | machine code and images: each GPU's encoder, records packed by layout tables, image writing |
+| `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + detour's passes) and the device a draw runs on |
 | `src/kmd`, `src/xe.rs` | the kernel interface and `xe` |
 | `examples/` | `compare` (draws vs Mesa), `glcalls` (GL calls vs Mesa), `gl_link`, `xe_info` |
-| `tests/xe3.rs` | Xe3 encodings and lowerings |
-| `tools/xe3gen`, `data/intel` | the genxml generator and Mesa's Xe3 genxml |
-| `scripts/` | `gl_enums.py`, `xe3_eu_oracle.sh` |
+| `tests/binary`, `tests/pass` | encodings, and lowerings |
+| `tools/{xe3gen,rdna2gen,agxgen}`, `data/{intel,amd,apple}` | the dialects' generators and the Mesa data they read |
+| `scripts/` | `gl_enums.py`, opcode tables, and the oracles each test's expected bytes come from (`*_oracle.*`, `apple9_check.py`) |
 
 ## 🚀 Quick start
 

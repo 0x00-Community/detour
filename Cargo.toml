@@ -1,8 +1,8 @@
 [package]
 # detour is taken on crates.io (a function-hooking library): the package is detour-gpu, the library is still detour
 name = "detour-gpu"
-description = "detour: a GPU userspace driver in Rust over mlirpass: OpenGL ES (src/gl), Vulkan (src/vk), Direct3D 11 and 12 to come, on its own Xe3 backend (src/passes/xe3)"
-version = "0.1.6"
+description = "detour: a GPU userspace driver in Rust over mlirpass: OpenGL ES (src/gl), Vulkan (src/vk), Direct3D 11 and 12 to come; its GPUs' dialects (src/dialect), lowerings (src/pass) and machine code (src/binary)"
+version = "0.2.0"
 edition = "2024"
 # mlirformat's (0.6 onwards) `if let` guards (rust-toolchain.toml pins it here; a git dependent like acde-base reads this)
 rust-version = "1.96"
@@ -19,12 +19,18 @@ path = "src/lib.rs"
 
 [dependencies]
 # mlirformat and mlirpass from crates.io: the same mlirformat for both
-mlirformat = "0.8.5"
-# GLSL ⇒ SPIR-V (gl) and what an outside GPU backend needs (target.gpu); detour's Xe3 backend is src/passes/xe3
-mlirpass = { version = "0.11.0", default-features = false, features = ["std", "target.gpu", "dialect.glsl", "target.spirv"] }
+mlirformat = "0.9.0"
+# GLSL source and SPIR-V (target.glsl, target.spirv), and the upstream dialects the GPU lowerings start from
+mlirpass = { version = "0.13.0", default-features = false, features = ["std", "all-dialects", "target.glsl"] }
+libm = "0.2"
+moremath = { version = "0.2.1", default-features = false, features = ["alloc"] }
 serde = { version = "1", features = ["derive"] }
 libc = "0.2"
 
+[workspace]
+members = ["tools/*"]
+
 [profile.release]
 debug = 1
+
 

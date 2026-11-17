@@ -14,7 +14,7 @@ use detour::{
     AttachPoint, BufferTarget, ColorBuffer, Context, Dims, FramebufferTarget, Gl, GlError, ImageTarget, InternalFormat, PixelFormat, PixelStore, PixelType, Region, TexParam,
     TexelSource, TextureTarget, Toolchain, Usage,
 };
-use mlirpass::ColorFormat;
+use detour::ColorFormat;
 
 /// Client data every `data` argument points at (examples/support/glcalls.c's DATA)
 const DATA: usize = 1 << 20;

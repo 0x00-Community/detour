@@ -1,5 +1,5 @@
 use mlirformat::Error;
-use mlirpass::{ColorFormat, ColorTarget, CullMode, Draw, DrawPrimitive, VertexBuffer, VertexElement, VertexFormat};
+use crate::{ColorFormat, ColorTarget, CullMode, Draw, DrawPrimitive, VertexBuffer, VertexElement, VertexFormat};
 
 use super::{DEFAULT_UNIFORM_BLOCK, AttribType, Context, Face, GlError, Rect, ShaderType, Storage};
 use crate::Device;

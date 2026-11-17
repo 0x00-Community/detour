@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use detour::{Attrib, BufferTarget, ClearMask, Context, Device, DrawMode, ShaderType, Toolchain, UniformValue, Usage};
-use mlirpass::ColorFormat;
+use detour::ColorFormat;
 
 const SIZE: u32 = 64;
 const PIXEL: usize = 16;

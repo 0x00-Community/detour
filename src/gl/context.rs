@@ -4,7 +4,7 @@ use mlirformat::Error;
 
 use super::{GlslPipelines, Attrib, Buffer, BufferTarget, Capability, GlError, GlResult, Linked, Names, Program, Shader, ShaderType, State, Usage, UniformValue, VertexArray};
 use super::{ColorBuffer, DefaultFramebuffer, Framebuffer, MAX_COMBINED_TEXTURE_IMAGE_UNITS, Renderbuffer, Texture, TextureTarget, Unpack};
-use mlirpass::ColorFormat;
+use crate::ColorFormat;
 
 use crate::Toolchain;
 
