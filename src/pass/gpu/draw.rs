@@ -84,18 +84,71 @@ pub struct VertexBuffer<'d> {
     pub stride: u32,
 }
 
-/// A linear color target and its pixels before the draw (row 0 is the bottom row of the viewport's y axis)
-#[derive(Clone, Copy, Debug)]
+/// A linear color target: its size and format, and what it holds before the draw (row 0 is the bottom row of the
+/// viewport's y axis)
+#[derive(Clone, Debug)]
 pub struct ColorTarget<'d> {
     pub width: u32,
     pub height: u32,
     pub format: ColorFormat,
-    pub pixels: &'d [u8],
+    pub load: TargetLoad<'d>,
 }
 
 impl ColorTarget<'_> {
     pub const fn pitch(&self) -> u32 {
         self.width * self.format.bytes()
+    }
+
+    /// Its bytes
+    pub const fn len(&self) -> usize {
+        (self.pitch() * self.height) as usize
+    }
+}
+
+/// What a color target holds before a draw: what it held after the last one, every pixel one texel, or these
+/// pixels; then cleared rectangles over it
+#[derive(Clone, Debug)]
+pub enum TargetLoad<'d> {
+    Keep(&'d [TargetClear]),
+    Fill(&'d [u8], &'d [TargetClear]),
+    Pixels(&'d [u8], &'d [TargetClear]),
+}
+
+/// A rectangle of a target set to one texel, some of its channels (glClear within the scissor, with a color mask)
+#[derive(Clone, Debug, PartialEq)]
+pub struct TargetClear {
+    /// x0, y0, x1, y1 (exclusive), within the target
+    pub rect: [u32; 4],
+    pub channels: [bool; 4],
+    pub texel: Vec<u8>,
+}
+
+impl TargetClear {
+    /// The clear applied to `pixels`, a target `width` pixels wide
+    pub fn apply(&self, pixels: &mut [u8], width: u32) {
+        let [x0, y0, x1, y1] = self.rect;
+        let size = self.texel.len();
+        let per = size / self.channels.len();
+        for y in y0..y1 {
+            let row = &mut pixels[(y * width) as usize * size..][(x0 as usize * size)..(x1 as usize * size)];
+            for px in row.chunks_exact_mut(size) {
+                for (c, _) in self.channels.iter().enumerate().filter(|(_, on)| **on) {
+                    px[c * per..(c + 1) * per].copy_from_slice(&self.texel[c * per..(c + 1) * per]);
+                }
+            }
+        }
+    }
+}
+
+/// Every pixel of `pixels` set to `texel`
+pub struct TargetFill;
+
+impl TargetFill {
+    pub fn apply(pixels: &mut [u8], texel: &[u8]) {
+        match texel.iter().all(|b| *b == texel[0]) {
+            true => pixels.fill(texel[0]),
+            false => pixels.chunks_exact_mut(texel.len()).for_each(|p| p.copy_from_slice(texel)),
+        }
     }
 }
 

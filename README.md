@@ -49,7 +49,7 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | 📞 | GL calls (`examples/glcalls`): scripts of textures, renderbuffers and framebuffer objects run on detour and on Mesa | **203 / 203** calls: every `glGetError` and every queried value the same |
 | 🔣 | Encodings (`tests/binary`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc and Mesa's registers, AGX vs Mesa's AGX2 cases and `agx_pack`, Apple9 vs what an M4 ran: **7 / 7** |
 | 🪜 | Lowerings (`tests/pass`) | kernels as acgpu compiled them (Xe3, RDNA2, AGX), GLSL reaching Xe3, an RDNA2 IB and an AGX CDM stream as Mesa writes them, Apple9 kernels as the M4 ran them: **7 / 7** |
-| 🏁 | Speed against the official drivers (`examples/bench_opengl`, `examples/bench_vulkan`): the same cases on detour and on Mesa (iris for GL ES, ANV for Vulkan with the same SPIR-V), 100 frames of 256×256 a case | every frame is **~1,300× slower** than Mesa's (~320 ms against ~0.24 ms: each draw rebuilds its whole image, buffers and VM); GL compile + link ~20× slower (~117 ms against ~6 ms) |
+| 🏁 | Speed against the official drivers (`examples/bench_opengl`, `examples/bench_vulkan`): the same cases on detour and on Mesa (iris for GL ES, ANV for Vulkan with the same SPIR-V), 100 frames of 256×256 a case | a frame takes **~2×** Mesa's (GL ~0.24 ms against ~0.11 ms, Vulkan path ~0.22 against ~0.10: images resident, the framebuffer on the GPU, the context set up once); GL compile + link about as fast (~5 ms against ~5) |
 
 ## 🎮 GPUs
 

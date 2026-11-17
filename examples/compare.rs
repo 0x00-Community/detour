@@ -30,7 +30,7 @@ impl Case {
         gl.clear_color([0.0; 4]);
         gl.clear(ClearMask { color: true, ..Default::default() });
         gl.draw_arrays(device, DrawMode::Triangles, 0, VERTICES).map_err(|e| e.0)?;
-        Ok(gl.framebuffer.pixels.clone())
+        gl.framebuffer.pixels(device).map_err(|e| e.0)
     }
 
     fn mesa(&self, glrun: &Path, out: &Path) -> Result<Vec<u8>, String> {

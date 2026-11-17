@@ -56,9 +56,16 @@ pub struct Image {
     pub segments: Vec<Segment>,
     pub stream: u64,
     pub stream_end: u64,
+    /// every command stream: its name and address
+    pub streams: Vec<(String, u64)>,
 }
 
 impl Image {
+    /// The address of command stream `name`
+    pub fn stream_named(&self, name: &str) -> Option<u64> {
+        self.streams.iter().find(|(n, _)| n == name).map(|(_, a)| *a)
+    }
+
     pub fn segment(&self, name: &str) -> Option<&Segment> {
         self.segments.iter().find(|s| s.name == name)
     }
@@ -101,6 +108,7 @@ impl<T: ImageBytes> ImageWriter<'_, T> {
         let top = ir.top_block(ir.root);
         let mut segments = Vec::new();
         let mut stream: Option<(u64, u64)> = None;
+        let mut streams = Vec::new();
         for m in ir.block_ops(top).into_iter().filter(|m| ir[*m].name == Memory::NAME) {
             let head = Memory::try_from(ir[m].op)?;
             let name = Image::symbol(&head.sym_name)?;
@@ -112,15 +120,16 @@ impl<T: ImageBytes> ImageWriter<'_, T> {
                 let offset = ir[item].get(Placed::OFFSET).map(Attribute::int).transpose()?.unwrap_or(0) as usize;
                 let b = self.0.contents(&ir, item)?;
                 bytes[offset..offset + b.len()].copy_from_slice(&b);
-                if ir[item].name == Stream::NAME && stream.is_none() {
+                if ir[item].name == Stream::NAME {
                     let at = addr + offset as u64;
-                    stream = Some((at, at + b.len() as u64));
+                    stream.get_or_insert((at, at + b.len() as u64));
+                    streams.push((Image::symbol(&Stream::try_from(ir[item].op)?.sym_name)?, at));
                 }
             }
             segments.push(Segment { name, addr, mem, bytes });
         }
         let (stream, stream_end) = stream.ok_or_else(|| Error("no image.stream".into()))?;
-        Ok(Image { segments, stream, stream_end })
+        Ok(Image { segments, stream, stream_end, streams })
     }
 }
 

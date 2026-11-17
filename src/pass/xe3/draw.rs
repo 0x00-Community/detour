@@ -37,6 +37,9 @@ const CACHE_MODE_SS_VALUE: u32 = 0x0020_0000;
 const VRT_MASK: u32 = 1 << 10;
 /// The drawing rectangle covers every pixel 16-bit coordinates reach
 const DRAWING_MAX: u32 = 0xffff;
+
+/// Bytes the command streamer may read past a stream's end (its prefetch): left mapped after the batch
+const CS_PREFETCH: u64 = 4096;
 /// URB: the 64-byte units the VS's entries share, starting after the push constants (four stages of 8 KB)
 const URB_SPACE: u32 = 5888;
 const URB_START: u32 = 4;
@@ -167,7 +170,10 @@ impl<'a> Xe3Draw<'_, 'a> {
     pub const TARGET: &'static str = "target";
     const CODE: &'static str = "code";
     const SURFACES: &'static str = "surfaces";
-    const BATCH: &'static str = "batch";
+    /// The stream of the draw: run for every draw
+    pub const BATCH: &'static str = "batch";
+    /// The stream setting up the context (base addresses, modes): run once on a queue, before its first draw
+    pub const INIT: &'static str = "init";
     const FENCE: &'static str = "fence";
     const NULL: &'static str = "null_surface";
     const BT_NULL: &'static str = "bt_null";
@@ -201,13 +207,14 @@ impl<'a> Xe3Draw<'_, 'a> {
     }
 
     /// The draw's image, built in `body` (a module `compile` left one vertex and one fragment kernel in)
-    /// The image of a draw shaped as `d`, its data still zero (`fill` writes it): the same for every draw of that
-    /// program, state and data sizes
+    /// The image of a draw shaped as `d`, its data still zero (`data` says where it goes): the same for every draw
+    /// of that program, state and data sizes. Its stream `INIT` sets the context up, `BATCH` draws
     pub fn image(body: &'_ mut Body<'a>, d: &Draw<'_>) -> Result<Image, Error> {
         let root = body.root;
         let kernels = Kernels::all(body, root, Xe3Kernel::NAME);
         let code = Xe3Draw::memory(body, &ImageMemory::named(Xe3Draw::CODE, MemType::Streaming))?;
         let batch_memory = Xe3Draw::memory(body, &ImageMemory::named(Xe3Draw::BATCH, MemType::Streaming))?;
+        let init = Xe3Draw::container(body, batch_memory, OpData::head(&ImageStream::named(Xe3Draw::INIT))?);
         let batch = Xe3Draw::container(body, batch_memory, OpData::head(&ImageStream::named(Xe3Draw::BATCH))?);
         let pool = ImageMemory { size: Some(u64::from(POOL)), align: Some(u64::from(POOL)), ..ImageMemory::named(Xe3Draw::SURFACES, MemType::Streaming) };
         let surfaces = Xe3Draw::memory(body, &pool)?;
@@ -229,11 +236,11 @@ impl<'a> Xe3Draw<'_, 'a> {
             body.detach(s);
         }
         let (Some(vs), Some(fs)) = (vs, fs) else { return Err(Error("a draw needs a vertex and a fragment kernel".into())) };
-        let mut me = Xe3Draw { body, code, surfaces, batch };
+        let mut me = Xe3Draw { body, code, surfaces, batch: init };
         me.put(code, &ImageData { align: Some(FENCE_ALIGN), ..ImageData::zeros(Xe3Draw::FENCE, FENCE_SIZE) });
         me.null_surface();
-        let target = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::TARGET, MemType::Coherent))?;
-        me.room(target, &format!("{}_data", Xe3Draw::TARGET), d.target.pixels.len());
+        let target = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::TARGET, MemType::Streaming))?;
+        me.room(target, &format!("{}_data", Xe3Draw::TARGET), d.target.len());
         for (i, b) in d.buffers.iter().enumerate() {
             let m = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::vertex_buffer(i), MemType::Streaming))?;
             me.room(m, &format!("vb{i}_data"), b.bytes.len());
@@ -242,7 +249,9 @@ impl<'a> Xe3Draw<'_, 'a> {
             let m = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::uniform_buffer(binding), MemType::Streaming))?;
             me.room(m, &format!("ubo{binding}_data"), bytes.len());
         }
+        me.put(batch_memory, &ImageData::zeros("prefetch", CS_PREFETCH));
         me.context();
+        me.batch = batch;
         me.draw(d, &vs, &fs)?;
         me.pc_flush();
         Xe3Batch::end(body, root);
@@ -281,7 +290,7 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.body[o].set(ImagePlaced::ALIGN, A::from(align).into());
     }
 
-    /// Room for `len` bytes of a draw's data, alone in its memory: `fill` writes them into the image
+    /// Room for `len` bytes of a draw's data, alone in its memory: the device writes them there
     fn room(&mut self, block: BlockId, name: &str, len: usize) {
         self.put(block, &ImageData::zeros(name, len as u64));
     }
@@ -294,22 +303,12 @@ impl<'a> Xe3Draw<'_, 'a> {
         format!("ubo{binding}")
     }
 
-    /// Where a draw's data goes: the memory (each alone at its start) and the bytes: the target's pixels before the
-    /// draw, the vertex buffers, the uniform blocks
+    /// Where a draw's data goes: the memory (each alone at its start) and the bytes: the vertex buffers and the
+    /// uniform blocks (the color target is the device's, at `TARGET`)
     pub fn data<'d>(d: &Draw<'d>) -> Vec<(String, &'d [u8])> {
         let buffers = d.buffers.iter().enumerate().map(|(i, b)| (Xe3Draw::vertex_buffer(i), b.bytes));
         let uniforms = d.uniforms.iter().map(|&(binding, bytes)| (Xe3Draw::uniform_buffer(binding), bytes));
-        core::iter::once((Xe3Draw::TARGET.to_owned(), d.target.pixels)).chain(buffers).chain(uniforms).collect()
-    }
-
-    /// The draw's data written into an image `image` made for a draw of the same shape
-    pub fn fill(image: &mut Image, d: &Draw<'_>) -> Result<(), Error> {
-        for (name, bytes) in Xe3Draw::data(d) {
-            let s = image.segments.iter_mut().find(|s| s.name == name).ok_or_else(|| Error(format!("no memory {name} in the image")))?;
-            let room = s.bytes.len();
-            s.bytes.get_mut(..bytes.len()).ok_or_else(|| Error(format!("{name}: {} bytes do not fit {room}", bytes.len())))?.copy_from_slice(bytes);
-        }
-        Ok(())
+        buffers.chain(uniforms).collect()
     }
 
     fn pc_flush(&mut self) {
