@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use mlirformat::Error;
-use mlirpass::{Draw, Image};
+use crate::{Draw, Image};
 
 use crate::{Xe3Draw, Bo, Caching, Compiled, Engine, Fence, Gpu, Host, MemType, Native, Queue, Vm, Xe};
 

@@ -1,5 +1,5 @@
 use detour::{Context, ShaderType, Toolchain};
-use mlirpass::ColorFormat;
+use detour::ColorFormat;
 
 const VERT: &str = "#version 300 es
 in vec2 pos;

@@ -9,35 +9,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use detour::{Attrib, BufferTarget, ClearMask, Context, Device, DrawMode, ShaderType, Toolchain, UniformValue, Usage};
-use mlirpass::ColorFormat;
+#[path = "glcase/mod.rs"]
+mod glcase;
+
+use detour::{ClearMask, Device, DrawMode, Toolchain};
+use glcase::VERTICES;
 
 const SIZE: u32 = 64;
 const PIXEL: usize = 16;
-const VERTICES: i32 = 3;
-const MAT4: usize = 16;
-
-/// One line of `resources`
-enum Resource {
-    Attribute { name: String, size: u32, values: Vec<f32> },
-    Float { name: String, values: Vec<f32> },
-    Int { name: String, values: Vec<i32> },
-}
-
-impl TryFrom<&str> for Resource {
-    type Error = String;
-
-    fn try_from(line: &str) -> Result<Resource, String> {
-        let w: Vec<&str> = line.split_whitespace().collect();
-        let floats = |v: &[&str]| v.iter().map(|x| x.parse::<f32>().map_err(|e| format!("{line}: {e}"))).collect::<Result<Vec<_>, _>>();
-        match w.as_slice() {
-            ["attribute", name, _, n, v @ ..] => Ok(Resource::Attribute { name: (*name).into(), size: n.parse().map_err(|e| format!("{line}: {e}"))?, values: floats(v)? }),
-            ["uniform", name, _, "f", v @ ..] => Ok(Resource::Float { name: (*name).into(), values: floats(v)? }),
-            ["uniform", name, _, "i", v @ ..] => Ok(Resource::Int { name: (*name).into(), values: v.iter().map(|x| x.parse().map_err(|e| format!("{line}: {e}"))).collect::<Result<_, _>>()? }),
-            _ => Err(format!("resources: {line}")),
-        }
-    }
-}
 
 /// A case's pixels from both, or why one could not draw
 struct Case {
@@ -46,56 +25,7 @@ struct Case {
 
 impl Case {
     fn detour(&self, tools: &Toolchain<'_>, device: &Device) -> Result<Vec<u8>, String> {
-        let read = |f: &str| fs::read_to_string(self.dir.join(f)).map_err(|e| format!("{f}: {e}"));
-        let (vert, frag, res) = (read("shader.vert")?, read("shader.frag")?, read("resources")?);
-        let mut gl = Context::new(tools, SIZE, SIZE, ColorFormat::Rgba32Float).map_err(|e| e.0)?;
-        let mut shaders = Vec::new();
-        for (ty, src) in [(ShaderType::Vertex, &vert), (ShaderType::Fragment, &frag)] {
-            let s = gl.create_shader(ty);
-            gl.shader_source(s, src);
-            gl.compile_shader(s);
-            if !gl.shader_compiled(s) {
-                return Err(gl.shader_log(s));
-            }
-            shaders.push(s);
-        }
-        let p = gl.create_program();
-        shaders.iter().for_each(|&s| gl.attach_shader(p, s));
-        gl.link_program(p);
-        if !gl.link_status(p) {
-            return Err(gl.program_log(p));
-        }
-        gl.use_program(p);
-        let vao = gl.gen_vertex_arrays(1)[0];
-        gl.bind_vertex_array(vao);
-        for line in res.lines().filter(|l| !l.trim().is_empty()) {
-            match Resource::try_from(line)? {
-                Resource::Attribute { name, size, values } => {
-                    let b = gl.gen_buffers(1)[0];
-                    gl.bind_buffer(BufferTarget::Array, b);
-                    let bytes: Vec<u8> = values.iter().flat_map(|f| f.to_le_bytes()).collect();
-                    gl.buffer_data(BufferTarget::Array, bytes.len(), Some(&bytes), Usage::StaticDraw);
-                    let at = gl.attrib_location(p, &name);
-                    if at < 0 {
-                        continue;
-                    }
-                    gl.vertex_attrib_pointer(at as u32, Attrib { size, ..Attrib::default() });
-                    gl.enable_vertex_attrib_array(at as u32, true);
-                }
-                Resource::Float { name, values } => {
-                    let at = gl.uniform_location(p, &name);
-                    let v = if values.len() == MAT4 { UniformValue::Matrix(4, 4, &values) } else { UniformValue::Float(values.len() as u32, &values) };
-                    gl.uniform(at, v);
-                }
-                Resource::Int { name, values } => {
-                    let at = gl.uniform_location(p, &name);
-                    gl.uniform(at, UniformValue::Int(values.len() as u32, &values));
-                }
-            }
-        }
-        if let Some(e) = gl.error() {
-            return Err(format!("GL error {e:?} setting the resources"));
-        }
+        let mut gl = glcase::Case { dir: self.dir.clone() }.context(tools, SIZE)?;
         gl.viewport(0, 0, SIZE as i32, SIZE as i32);
         gl.clear_color([0.0; 4]);
         gl.clear(ClearMask { color: true, ..Default::default() });

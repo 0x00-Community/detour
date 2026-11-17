@@ -29,9 +29,14 @@ builds the command streams and submits them **through the kernel driver's ioctls
   to SPIR-V, then by detour to Xe3.
 - 🌋 **Vulkan** (`src/vk`): next.
 - 🪟 **Direct3D 11 and 12**: to come, on the same backend (shaders through SPIR-V like GL's and Vulkan's).
-- 🔵 **Intel Xe3** (`src/passes/xe3`): the xe3 dialect (EU instructions, genxml commands and states), SPIR-V and GPU
-  kernels lowered to Xe3 machine code, register allocation, scoreboard, a draw's image.
-- 🐧 **Kernel interface** (`src/kmd`, `src/xe.rs`): DRM render nodes, buffer objects, VM binds, exec queues, syncobjs,
+- 🔵 **Intel Xe3**: the xe3 dialect (EU instructions, genxml commands and states), SPIR-V and GPU kernels lowered to
+  Xe3 machine code, register allocation, scoreboard, a draw's image.
+- 🧱 **More GPUs' backends**: AMD RDNA2, Apple AGX and Apple9 (M3 / M4) dialects, lowerings and encoders, checked
+  against llvm-mc, Mesa and an M4.
+- 🔌 **On mlirformat and mlirpass as plugins**: `src/dialect` adds the GPU dialects to mlirformat (`MlirOpt::load`),
+  `src/pass` adds the lowerings to mlirpass (`Passes::with(DetourPasses::add)`), `src/binary` writes machine code and
+  images (`Binaries`, `Read` / `Write`).
+- 🐧 **Kernel interface** (`src/kmd`, its `xe` driver in `src/kmd/xe`): DRM render nodes, buffer objects, VM binds, exec queues, syncobjs,
   on Linux's `xe` driver.
 
 ## 🎯 Checked against Mesa
@@ -42,7 +47,9 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | --- | --- | --- |
 | 🎨 | Draws (`examples/compare`): the same GLSL and vertices through detour on Xe3 and through Mesa, a 64×64 RGBA32F target | 6 of 10 cases **byte for byte** (triangle, uniforms in both stages, vector `?:`, `\|\|`, component stores); the rest wait for Mesa's NIR math (`mod`, integer division, GLSL built-ins, Mesa's value-changing NIR rewrites) |
 | 📞 | GL calls (`examples/glcalls`): scripts of textures, renderbuffers and framebuffer objects run on detour and on Mesa | **203 / 203** calls: every `glGetError` and every queried value the same |
-| 🔣 | Xe3 encodings and lowerings (`tests/xe3.rs`) | EU encoding vs gentool, genxml packing vs Mesa, kernels, GLSL reaching Xe3: **4 / 4** |
+| 🔣 | Encodings (`tests/binary`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc and Mesa's registers, AGX vs Mesa's AGX2 cases and `agx_pack`, Apple9 vs what an M4 ran: **7 / 7** |
+| 🪜 | Lowerings (`tests/pass`) | kernels as acgpu compiled them (Xe3, RDNA2, AGX), GLSL reaching Xe3, an RDNA2 IB and an AGX CDM stream as Mesa writes them, Apple9 kernels as the M4 ran them: **7 / 7** |
+| 🏁 | Speed against the official drivers (`examples/bench_opengl`, `examples/bench_vulkan`): the same cases on detour and on Mesa (iris for GL ES, ANV for Vulkan with the same SPIR-V), 100 frames of 256×256 a case | every frame is **~1,300× slower** than Mesa's (~320 ms against ~0.24 ms: each draw rebuilds its whole image, buffers and VM); GL compile + link ~20× slower (~117 ms against ~6 ms) |
 
 ## 🎮 GPUs
 
@@ -57,13 +64,14 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | `src/gl` | GL ES 3.0: context, buffers, vertex arrays, shaders and programs (default uniform block), textures, renderbuffers, framebuffers, GLenums (`enums.gen.rs` from `GLES3/gl3.h`) |
 | `src/vk` | Vulkan (to come) |
 | — | Direct3D 11 and 12 (to come) |
-| `src/passes/xe3` | Xe3: dialect, `convert-gpu-to-xe3`, the `xe3-*` passes, `Xe3Draw` |
-| `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + the Xe3 passes) and the device a draw runs on |
-| `src/kmd`, `src/xe.rs` | the kernel interface and `xe` |
-| `examples/` | `compare` (draws vs Mesa), `glcalls` (GL calls vs Mesa), `gl_link`, `xe_info` |
-| `tests/xe3.rs` | Xe3 encodings and lowerings |
-| `tools/xe3gen`, `data/intel` | the genxml generator and Mesa's Xe3 genxml |
-| `scripts/` | `gl_enums.py`, `xe3_eu_oracle.sh` |
+| `src/dialect` | mlirformat plugins: the `xe3`, `rdna2`, `agx`, `apple9` and `image` dialects |
+| `src/pass` | mlirpass plugins: `convert-gpu-to-*`, register allocation, waits, command streams, image layout, `Xe3Draw`, `gpu-module-to-binary` with these GPUs |
+| `src/binary` | machine code and images: each GPU's encoder, records packed by layout tables, image writing |
+| `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + detour's passes) and the device a draw runs on |
+| `src/kmd` | the kernel interface: DRM, the `Gpu` trait, and the `xe` driver (`src/kmd/xe`) |
+| `examples/` | `compare` (draws vs Mesa), `glcalls` (GL calls vs Mesa), `bench_opengl` / `bench_vulkan` (speed vs Mesa's GL ES / Vulkan; `support/glbench.c`, `support/vkbench.c`), `gl_link`, `xe_info` |
+| `tests/binary`, `tests/pass` | encodings, and lowerings |
+| `scripts/` | the dialects' generators (`xe3gen`, `rdna2gen`, `agxgen`) and the Mesa data they read (`data/{intel,amd,apple}`), `gl_enums.py`, opcode tables, and the oracles each test's expected bytes come from (`*_oracle.*`, `apple9_check.py`) |
 
 ## 🚀 Quick start
 
@@ -72,11 +80,17 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 cargo run --example xe_info
 
 # 🧪 Xe3 encodings and lowerings
-cargo test --test xe3
+cargo test --test binary --test pass
 
 # 🎨 draws vs Mesa (glrun: mlirpass's tests/support/glrun.c)
 cc -O1 -o glrun path/to/mlirpass/tests/support/glrun.c -lEGL -lGL
 cargo run --example compare -- ./glrun
+
+# 🏁 speed vs Mesa (GL ES, Vulkan)
+cc -O2 -o glbench examples/support/glbench.c -lEGL -lGLESv2
+cargo run --release --example bench_opengl -- ./glbench
+cc -O2 -o vkbench examples/support/vkbench.c -lvulkan
+cargo run --release --example bench_vulkan -- ./vkbench
 
 # 📞 GL calls vs Mesa
 cc -O1 -o glcalls examples/support/glcalls.c -lEGL -lGLESv2
@@ -85,7 +99,7 @@ cargo run --example glcalls -- ./glcalls
 
 ## 📜 License
 
-Apache-2.0. `data/intel/xe3.xml` is Mesa's genxml (MIT, Intel).
+Apache-2.0. `scripts/data/intel/xe3.xml` is Mesa's genxml (MIT, Intel).
 
 <div align="center">
 

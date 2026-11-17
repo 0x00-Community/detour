@@ -19,13 +19,13 @@ pub enum MemType {
     Compressed,
 }
 
-impl From<mlirpass::MemType> for MemType {
-    fn from(m: mlirpass::MemType) -> Self {
+impl From<crate::ImageMemType> for MemType {
+    fn from(m: crate::ImageMemType) -> Self {
         match m {
-            mlirpass::MemType::Coherent => Self::Coherent,
-            mlirpass::MemType::Streaming => Self::Streaming,
-            mlirpass::MemType::Scanout => Self::Scanout,
-            mlirpass::MemType::Compressed => Self::Compressed,
+            crate::ImageMemType::Coherent => Self::Coherent,
+            crate::ImageMemType::Streaming => Self::Streaming,
+            crate::ImageMemType::Scanout => Self::Scanout,
+            crate::ImageMemType::Compressed => Self::Compressed,
         }
     }
 }

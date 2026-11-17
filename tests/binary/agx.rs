@@ -1,0 +1,82 @@
+//! Apple AGX machine code and command buffers: USC instructions encoded as Mesa's disassembler
+//! cases are, structs packed as Mesa's `agx_pack` packs them
+
+use detour::{AgxIsa, Pack};
+use detour::{AGX, AgxDialect, AgxStructs, Usc};
+use mlirformat::Operation;
+
+use super::{attrs, twice};
+
+/// `fixtures/usc.mlir` (Mesa's AGX2 disassembler cases decoded by Mesa's model) encodes as
+/// `fixtures/usc.expected`, read again from its printed form too, each op its typed op
+#[test]
+fn usc_encodes_mesa_cases() {
+    let src = include_str!("agx/fixtures/usc.mlir");
+    twice(AgxDialect, src, |ops, reread| {
+        let asm: Vec<&str> = src
+            .lines()
+            .skip(2)
+            .filter_map(|l| l.strip_prefix("// "))
+            .collect();
+        let expected: Vec<&str> = include_str!("agx/fixtures/usc.expected").lines().collect();
+        assert_eq!(ops.len(), expected.len());
+        let encode = |o: &Operation<'_>| match AgxIsa::encode(&o.name, &attrs(o)) {
+            Ok(bytes) => bytes.iter().map(|x| format!("{x:02x}")).collect::<String>(),
+            Err(e) => e.to_string(),
+        };
+        let mut bad = Vec::new();
+        for (((op, re), want), asm) in ops.iter().zip(reread).zip(&expected).zip(&asm) {
+            let (got, got_again) = (encode(op), encode(re));
+            let typed = Usc::op(&op.name)
+                .ok_or_else(|| "not a USC op".to_owned())
+                .and_then(|o| o.verify(op).map_err(|e| e.to_string()));
+            if got != *want || got_again != got || typed.is_err() {
+                bad.push(format!("{asm}\n want {want}\n  got {got}\n printed and read again {got_again}\n typed {typed:?}"));
+            }
+        }
+        assert!(
+            bad.is_empty(),
+            "{} of {} differ:\n{}",
+            bad.len(),
+            expected.len(),
+            bad.join("\n")
+        );
+    });
+}
+
+/// `fixtures/oracle.mlir` (every struct, random field values) packs as Mesa's `agx_pack` packs the
+/// same values (`fixtures/oracle.expected`)
+#[test]
+fn structs_pack_as_mesa() {
+    twice(AgxDialect, include_str!("agx/fixtures/oracle.mlir"), |ops, reread| {
+        let expected: Vec<&str> = include_str!("agx/fixtures/oracle.expected").lines().collect();
+        assert_eq!(ops.len(), expected.len());
+        let pack = |o: &Operation<'_>| {
+            let item = AGX.get(&o.name).unwrap();
+            let dw = Pack(AGX)
+                .pack(&o.name, &attrs(o))
+                .unwrap_or_else(|e| panic!("{}: {e}", o.name));
+            std::iter::once(item.name.to_owned())
+                .chain(dw.iter().map(|d| format!("{d:08x}")))
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+        let mut bad = Vec::new();
+        for ((op, re), want) in ops.iter().zip(reread).zip(&expected) {
+            let (got, got_again) = (pack(op), pack(re));
+            let typed = AgxStructs::verify(op).map(|r| r.map_err(|e| e.to_string()));
+            if got != *want || got_again != got || !matches!(typed, Some(Ok(()))) {
+                bad.push(format!(
+                    "want {want}\n got {got}\n printed and read again {got_again}\n typed {typed:?}"
+                ));
+            }
+        }
+        assert!(
+            bad.is_empty(),
+            "{} of {} differ:\n{}",
+            bad.len(),
+            expected.len(),
+            bad.join("\n")
+        );
+    });
+}
