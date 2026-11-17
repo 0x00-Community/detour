@@ -1,5 +1,5 @@
 #!/usr/bin/env dash
-# Regenerate tests/binary/agx/fixtures/oracle.{mlir,expected} and tests/pass/agx/cdm.expected: every AGX struct of data/apple/cmdbuf.xml, each
+# Regenerate tests/binary/agx/fixtures/oracle.{mlir,expected} and tests/pass/agx/cdm.expected: every AGX struct of scripts/data/apple/cmdbuf.xml, each
 # settable field a random value its type and modifier take (seeded; floats are dyadic, so C and MLIR read the same
 # number), as an agx op; and what Mesa packs from the same values: agx_pack.h made by Mesa's own
 # src/asahi/genxml/gen_pack.py, compiled, `agx_pack(cl, T, cfg)` (its `_header` defaults, then the values).
@@ -12,8 +12,8 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 cd "$root"
 grep -qw f16c /proc/cpuinfo || { echo "needs an x86-64 with F16C (Mesa's half conversion)" >&2; exit 1; }
-python3 "$mesa/src/asahi/genxml/gen_pack.py" "data/apple/cmdbuf.xml" "$mesa/src/asahi/genxml/agx_pack_header.h" > "$tmp/agx_pack.h"
-python3 - "data/apple/cmdbuf.xml" tests/binary/agx/fixtures/oracle.mlir "$tmp/oracle.c" <<'PY'
+python3 "$mesa/src/asahi/genxml/gen_pack.py" "scripts/data/apple/cmdbuf.xml" "$mesa/src/asahi/genxml/agx_pack_header.h" > "$tmp/agx_pack.h"
+python3 - "scripts/data/apple/cmdbuf.xml" tests/binary/agx/fixtures/oracle.mlir "$tmp/oracle.c" <<'PY'
 import random, sys, xml.etree.ElementTree as ET
 xml, mlir, c = sys.argv[1:]
 random.seed(13)

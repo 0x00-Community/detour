@@ -36,7 +36,7 @@ builds the command streams and submits them **through the kernel driver's ioctls
 - 🔌 **On mlirformat and mlirpass as plugins**: `src/dialect` adds the GPU dialects to mlirformat (`MlirOpt::load`),
   `src/pass` adds the lowerings to mlirpass (`Passes::with(DetourPasses::add)`), `src/binary` writes machine code and
   images (`Binaries`, `Read` / `Write`).
-- 🐧 **Kernel interface** (`src/kmd`, `src/xe.rs`): DRM render nodes, buffer objects, VM binds, exec queues, syncobjs,
+- 🐧 **Kernel interface** (`src/kmd`, its `xe` driver in `src/kmd/xe`): DRM render nodes, buffer objects, VM binds, exec queues, syncobjs,
   on Linux's `xe` driver.
 
 ## 🎯 Checked against Mesa
@@ -67,11 +67,10 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | `src/pass` | mlirpass plugins: `convert-gpu-to-*`, register allocation, waits, command streams, image layout, `Xe3Draw`, `gpu-module-to-binary` with these GPUs |
 | `src/binary` | machine code and images: each GPU's encoder, records packed by layout tables, image writing |
 | `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + detour's passes) and the device a draw runs on |
-| `src/kmd`, `src/xe.rs` | the kernel interface and `xe` |
+| `src/kmd` | the kernel interface: DRM, the `Gpu` trait, and the `xe` driver (`src/kmd/xe`) |
 | `examples/` | `compare` (draws vs Mesa), `glcalls` (GL calls vs Mesa), `gl_link`, `xe_info` |
 | `tests/binary`, `tests/pass` | encodings, and lowerings |
-| `tools/{xe3gen,rdna2gen,agxgen}`, `data/{intel,amd,apple}` | the dialects' generators and the Mesa data they read |
-| `scripts/` | `gl_enums.py`, opcode tables, and the oracles each test's expected bytes come from (`*_oracle.*`, `apple9_check.py`) |
+| `scripts/` | the dialects' generators (`xe3gen`, `rdna2gen`, `agxgen`) and the Mesa data they read (`data/{intel,amd,apple}`), `gl_enums.py`, opcode tables, and the oracles each test's expected bytes come from (`*_oracle.*`, `apple9_check.py`) |
 
 ## 🚀 Quick start
 
@@ -93,7 +92,7 @@ cargo run --example glcalls -- ./glcalls
 
 ## 📜 License
 
-Apache-2.0. `data/intel/xe3.xml` is Mesa's genxml (MIT, Intel).
+Apache-2.0. `scripts/data/intel/xe3.xml` is Mesa's genxml (MIT, Intel).
 
 <div align="center">
 

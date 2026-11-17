@@ -1,7 +1,7 @@
 #!/usr/bin/env dash
 # Regenerate tests/binary/rdna2/fixtures/oracle.{mlir,expected}: every gfx103 register (and packet dword) with fields,
 # each field (but RESERVED) set to a random value of its width (seeded), as an rdna2 op; and what Mesa's S_* macros (amdgfxregs.h,
-# made by Mesa's own src/amd/registers/makeregheader.py from data/amd/*.json) pack from the same values.
+# made by Mesa's own src/amd/registers/makeregheader.py from scripts/data/amd/*.json) pack from the same values.
 # MESA: a Mesa tree (default ~/coding/mesa); only read.
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -9,8 +9,8 @@ mesa=${MESA:-$HOME/coding/mesa}
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 cd "$root"
-python3 "$mesa/src/amd/registers/makeregheader.py" "data/amd/gfx103.json" "data/amd/pkt3.json" --sort address --guard REGS > "$tmp/regs.h"
-python3 - "data/amd/gfx103.json" "data/amd/pkt3.json" tests/binary/rdna2/fixtures/oracle.mlir "$tmp/oracle.c" "$tmp/regs.h" <<'PY'
+python3 "$mesa/src/amd/registers/makeregheader.py" "scripts/data/amd/gfx103.json" "scripts/data/amd/pkt3.json" --sort address --guard REGS > "$tmp/regs.h"
+python3 - "scripts/data/amd/gfx103.json" "scripts/data/amd/pkt3.json" tests/binary/rdna2/fixtures/oracle.mlir "$tmp/oracle.c" "$tmp/regs.h" <<'PY'
 import json, random, re, sys
 regs, pkt, mlir, c, header = sys.argv[1:]
 defined = set(re.findall(r'#define\s+(S_\w+)\(x\)', open(header).read()))

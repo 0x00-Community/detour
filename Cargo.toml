@@ -10,8 +10,8 @@ license = "Apache-2.0"
 publish = ["ac", "crates-io"]
 repository = "https://github.com/0x00-Community/detour"
 readme = "README.md"
-# the generator, its genxml and the tests stay in the repository
-exclude = ["tools", "data", "tests", "scripts"]
+# the generators, their Mesa data, the oracles and the tests stay in the repository
+exclude = ["tests", "scripts"]
 
 [lib]
 name = "detour"
@@ -28,7 +28,7 @@ serde = { version = "1", features = ["derive"] }
 libc = "0.2"
 
 [workspace]
-members = ["tools/*"]
+members = ["scripts/agxgen", "scripts/rdna2gen", "scripts/xe3gen"]
 
 [profile.release]
 debug = 1

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate data/apple/agx2-isa.json: Mesa's model of the AGX2 (Apple M1 ..) USC instruction set, as its own
+"""Regenerate scripts/data/apple/agx2-isa.json: Mesa's model of the AGX2 (Apple M1 ..) USC instruction set, as its own
 src/asahi/isa/isa.py parses AGX2.xml (defines, groups and their substitutions applied, operand bits specialized to
 the longest length): every instruction's lengths, length bit, exact bits, modifiers, immediates, destinations and
 sources, and every operand encoding's cases. Bit masks and values are hex strings (up to 96 bits).
@@ -26,7 +26,7 @@ out = {
                       for c in e.cases] for n, e in isa.encodings.items()},
 }
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-with open(os.path.join(root, 'data/apple/agx2-isa.json'), 'w') as f:
+with open(os.path.join(root, 'scripts/data/apple/agx2-isa.json'), 'w') as f:
     json.dump(out, f, indent=0)
     f.write('\n')
 print(len(out['instructions']), 'instructions,', len(out['encodings']), 'operand encodings')

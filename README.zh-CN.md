@@ -34,7 +34,7 @@ detour 是**我们自己的 GPU 驱动用户态**. GL 状态、着色器到机�
 - 🧱 **更多 GPU 后端**: AMD RDNA2、Apple AGX、Apple9 (M3 / M4) 的方言、下降和编码器, 分别对照 llvm-mc、Mesa 和 M4.
 - 🔌 **以插件方式接 mlirformat 和 mlirpass**: `src/dialect` 给 mlirformat 加 GPU 方言 (`MlirOpt::load`), `src/pass`
   给 mlirpass 加下降 (`Passes::with(DetourPasses::add)`), `src/binary` 写出机器码和镜像 (`Binaries`、`Read` / `Write`).
-- 🐧 **内核接口** (`src/kmd`、`src/xe.rs`): DRM render node、BO、VM 绑定、执行队列、syncobj, 走 Linux 的 `xe` 驱动.
+- 🐧 **内核接口** (`src/kmd`, `xe` 驱动在 `src/kmd/xe`): DRM render node、BO、VM 绑定、执行队列、syncobj, 走 Linux 的 `xe` 驱动.
 
 ## 🎯 对照 Mesa 核对
 
@@ -64,11 +64,10 @@ detour 是**我们自己的 GPU 驱动用户态**. GL 状态、着色器到机�
 | `src/pass` | mlirpass 插件: `convert-gpu-to-*`、寄存器分配、等待、命令流、镜像布局、`Xe3Draw`、支持这些 GPU 的 `gpu-module-to-binary` |
 | `src/binary` | 机器码和镜像: 各 GPU 的编码器、按布局表打包记录、写出镜像 |
 | `src/shader.rs`、`src/render.rs` | 工具链 (mlirpass + detour 的 pass) 和执行绘制的设备 |
-| `src/kmd`、`src/xe.rs` | 内核接口和 `xe` |
+| `src/kmd` | 内核接口: DRM、`Gpu` trait、`xe` 驱动 (`src/kmd/xe`) |
 | `examples/` | `compare` (绘制对 Mesa)、`glcalls` (GL 调用对 Mesa)、`gl_link`、`xe_info` |
 | `tests/binary`、`tests/pass` | 编码、下降 |
-| `tools/{xe3gen,rdna2gen,agxgen}`、`data/{intel,amd,apple}` | 方言生成器和它们读的 Mesa 数据 |
-| `scripts/` | `gl_enums.py`、opcode 表, 以及各测试期望值的来源 (`*_oracle.*`、`apple9_check.py`) |
+| `scripts/` | 方言生成器 (`xe3gen`、`rdna2gen`、`agxgen`) 和它们读的 Mesa 数据 (`data/{intel,amd,apple}`)、`gl_enums.py`、opcode 表, 以及各测试期望值的来源 (`*_oracle.*`、`apple9_check.py`) |
 
 ## 🚀 快速开始
 
@@ -90,7 +89,7 @@ cargo run --example glcalls -- ./glcalls
 
 ## 📜 许可证
 
-Apache-2.0. `data/intel/xe3.xml` 来自 Mesa 的 genxml (MIT, Intel).
+Apache-2.0. `scripts/data/intel/xe3.xml` 来自 Mesa 的 genxml (MIT, Intel).
 
 <div align="center">
 

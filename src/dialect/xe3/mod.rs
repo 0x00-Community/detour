@@ -1,6 +1,6 @@
 //! Intel Xe3: the EU instructions (fields as attributes, read back as an `Inst`), their send messages,
-//! the genxml commands, state structs and registers with their layouts (Mesa's genxml, `tools/xe3gen`
-//! from `data/intel/xe3.xml`), kernels.
+//! the genxml commands, state structs and registers with their layouts (Mesa's genxml, `scripts/xe3gen`
+//! from `scripts/data/intel/xe3.xml`), kernels.
 
 mod asm;
 #[path = "cmd.gen.rs"]
