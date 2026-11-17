@@ -1,7 +1,7 @@
 use mlirformat::{Error, MlirOpt};
 use mlirpass::{Body, Ctx, GlslDialect, Interfaces, PassManager, Passes};
 
-use crate::{Xe3Dialect, Xe3Draw, DetourPasses};
+use crate::{DetourPasses, ImageDialect, Xe3Dialect, Xe3Draw};
 
 /// mlirpass's dialects, interfaces and passes: one per device, every program is compiled with it
 pub struct Toolchain<'i> {
@@ -15,6 +15,7 @@ impl Toolchain<'_> {
         let mut opt = MlirOpt::upstream();
         opt.load(GlslDialect);
         opt.load(Xe3Dialect);
+        opt.load(ImageDialect);
         let mut passes = Passes::upstream();
         passes.with(DetourPasses::add);
         Toolchain { opt, interfaces: Interfaces::upstream(), passes }

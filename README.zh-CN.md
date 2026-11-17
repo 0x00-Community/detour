@@ -46,6 +46,7 @@ detour 是**我们自己的 GPU 驱动用户态**. GL 状态、着色器到机�
 | 📞 | GL 调用 (`examples/glcalls`): 纹理、renderbuffer、framebuffer 对象的调用脚本分别在 detour 和 Mesa 上跑 | **203 / 203** 次调用: 每次 `glGetError` 和每个查询值都相同 |
 | 🔣 | 编码 (`tests/binary`) | Xe3 EU 对 gentool、genxml 对 Mesa, RDNA2 对 llvm-mc 和 Mesa 寄存器宏, AGX 对 Mesa AGX2 用例和 `agx_pack`, Apple9 对 M4 跑过的编码: **7 / 7** |
 | 🪜 | 下降 (`tests/pass`) | kernel 对 acgpu (Xe3、RDNA2、AGX)、GLSL 到 Xe3、RDNA2 IB 和 AGX CDM 流对 Mesa、Apple9 kernel 对 M4: **7 / 7** |
+| 🏁 | 和官方驱动比速度 (`examples/bench_opengl`、`examples/bench_vulkan`): 同一批用例分别在 detour 和 Mesa 上跑 (GL ES 对 iris, Vulkan 用同一份 SPIR-V 对 ANV), 每例 100 帧 256×256 | 每帧比 Mesa **慢约 1300 倍** (约 320 ms 对 0.24 ms: 每次绘制都重建整个镜像、BO 和 VM); GL 编译 + 链接慢约 20 倍 (约 117 ms 对 6 ms) |
 
 ## 🎮 支持的 GPU
 
@@ -65,7 +66,7 @@ detour 是**我们自己的 GPU 驱动用户态**. GL 状态、着色器到机�
 | `src/binary` | 机器码和镜像: 各 GPU 的编码器、按布局表打包记录、写出镜像 |
 | `src/shader.rs`、`src/render.rs` | 工具链 (mlirpass + detour 的 pass) 和执行绘制的设备 |
 | `src/kmd` | 内核接口: DRM、`Gpu` trait、`xe` 驱动 (`src/kmd/xe`) |
-| `examples/` | `compare` (绘制对 Mesa)、`glcalls` (GL 调用对 Mesa)、`gl_link`、`xe_info` |
+| `examples/` | `compare` (绘制对 Mesa)、`glcalls` (GL 调用对 Mesa)、`bench_opengl` / `bench_vulkan` (和 Mesa 的 GL ES / Vulkan 比速度; `support/glbench.c`、`support/vkbench.c`)、`gl_link`、`xe_info` |
 | `tests/binary`、`tests/pass` | 编码、下降 |
 | `scripts/` | 方言生成器 (`xe3gen`、`rdna2gen`、`agxgen`) 和它们读的 Mesa 数据 (`data/{intel,amd,apple}`)、`gl_enums.py`、opcode 表, 以及各测试期望值的来源 (`*_oracle.*`、`apple9_check.py`) |
 
@@ -76,11 +77,17 @@ detour 是**我们自己的 GPU 驱动用户态**. GL 状态、着色器到机�
 cargo run --example xe_info
 
 # 🧪 Xe3 编码和下降
-cargo test --test xe3
+cargo test --test binary --test pass
 
 # 🎨 绘制对 Mesa (glrun: mlirpass 的 tests/support/glrun.c)
 cc -O1 -o glrun path/to/mlirpass/tests/support/glrun.c -lEGL -lGL
 cargo run --example compare -- ./glrun
+
+# 🏁 和 Mesa 比速度 (GL ES、Vulkan)
+cc -O2 -o glbench examples/support/glbench.c -lEGL -lGLESv2
+cargo run --release --example bench_opengl -- ./glbench
+cc -O2 -o vkbench examples/support/vkbench.c -lvulkan
+cargo run --release --example bench_vulkan -- ./vkbench
 
 # 📞 GL 调用对 Mesa
 cc -O1 -o glcalls examples/support/glcalls.c -lEGL -lGLESv2
