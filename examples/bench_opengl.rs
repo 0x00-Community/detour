@@ -38,7 +38,7 @@ impl Times {
     }
 
     /// The case on detour
-    fn detour(case: &Case, tools: &Toolchain<'_>, device: &Device, size: u32, frames: u32) -> Result<Times, String> {
+    fn detour(case: &Case, tools: &Toolchain<'_>, device: &Device<'_>, size: u32, frames: u32) -> Result<Times, String> {
         let start = Instant::now();
         let mut gl = case.context(tools, size)?;
         let compile = start.elapsed();
@@ -86,7 +86,8 @@ fn main() {
     let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root).unwrap().filter_map(|e| Some(e.ok()?.path())).filter(|p| p.is_dir()).collect();
     dirs.sort();
     let tools = Toolchain::new();
-    let device = Device::open().expect("an Xe3 GPU");
+    let xe = <detour::Xe as detour::Gpu>::open_first().expect("an Xe3 GPU");
+    let device = Device::new(&xe);
     println!("{frames} frames of {size}×{size} RGBA32F a case; times in ms (detour / mesa), ratio = detour ÷ mesa");
     println!("{:<18} {:>21} {:>8} {:>21} {:>8} {:>21} {:>8}", "case", "compile", "", "first frame", "", "frame (mean)", "");
     for dir in dirs.into_iter().filter(|d| only.is_empty() || only.iter().any(|o| d.ends_with(o))) {

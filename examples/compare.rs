@@ -24,7 +24,7 @@ struct Case {
 }
 
 impl Case {
-    fn detour(&self, tools: &Toolchain<'_>, device: &Device) -> Result<Vec<u8>, String> {
+    fn detour(&self, tools: &Toolchain<'_>, device: &Device<'_>) -> Result<Vec<u8>, String> {
         let mut gl = glcase::Case { dir: self.dir.clone() }.context(tools, SIZE)?;
         gl.viewport(0, 0, SIZE as i32, SIZE as i32);
         gl.clear_color([0.0; 4]);
@@ -42,7 +42,7 @@ impl Case {
     }
 
     /// "ok", or what differs
-    fn run(&self, tools: &Toolchain<'_>, device: &Device, glrun: &Path, out: &Path) -> Result<String, String> {
+    fn run(&self, tools: &Toolchain<'_>, device: &Device<'_>, glrun: &Path, out: &Path) -> Result<String, String> {
         let ours = self.detour(tools, device).map_err(|e| if std::env::var_os("DETOUR_FULL").is_some() { format!("detour: {e}") } else { format!("detour: {}", e.lines().next().unwrap_or("")) })?;
         let theirs = self.mesa(glrun, out).map_err(|e| format!("mesa: {e}"))?;
         let px = |b: &[u8], i: usize| b[i * PIXEL..(i + 1) * PIXEL].chunks(4).map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]])).collect::<Vec<_>>();
@@ -65,7 +65,8 @@ fn main() {
     let mut dirs: Vec<PathBuf> = fs::read_dir(root.join("examples/cases")).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()).collect();
     dirs.sort();
     let tools = Toolchain::new();
-    let device = Device::open().unwrap();
+    let xe = <detour::Xe as detour::Gpu>::open_first().unwrap();
+    let device = Device::new(&xe);
     let mut failed = 0;
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().into_owned();
