@@ -11,6 +11,7 @@ mod kmd;
 mod pass;
 mod render;
 mod shader;
+mod tiling;
 mod vk;
 
 pub use binary::*;
@@ -20,6 +21,7 @@ pub use kmd::*;
 pub use pass::*;
 pub use render::*;
 pub use shader::*;
+pub use tiling::*;
 // gl's names win over the GPU dialects' ops of the same name (`agx.texture`: AgxTexture)
 pub use gl::{Names, Texture};
 

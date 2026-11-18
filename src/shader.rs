@@ -10,8 +10,6 @@ pub struct Toolchain<'i> {
     opt: MlirOpt,
     interfaces: Interfaces<'i>,
     passes: Passes,
-    /// the id the next compiled program takes
-    programs: AtomicU64,
 }
 
 impl Toolchain<'_> {
@@ -22,7 +20,7 @@ impl Toolchain<'_> {
         opt.load(ImageDialect);
         let mut passes = Passes::upstream();
         passes.with(DetourPasses::add);
-        Toolchain { opt, interfaces: Interfaces::upstream(), passes, programs: AtomicU64::new(0) }
+        Toolchain { opt, interfaces: Interfaces::upstream(), passes }
     }
 
     pub fn body(&self) -> Body<'_> {
@@ -40,7 +38,7 @@ impl Toolchain<'_> {
     /// The SPIR-V shaders at the top of `body` compiled by mlirpass for the device's GPU
     pub fn compile<'t>(&'t self, mut body: Body<'t>) -> Result<Compiled<'t>, Error> {
         Xe3Draw::compile(&mut body, &self.passes).map_err(|e| Error(format!("{e}\n{}", self.show(&body))))?;
-        Ok(Compiled { body, id: self.programs.fetch_add(1, Ordering::Relaxed) })
+        Ok(Compiled { body, id: PROGRAMS.fetch_add(1, Ordering::Relaxed) })
     }
 }
 
@@ -50,9 +48,13 @@ impl Default for Toolchain<'_> {
     }
 }
 
+/// The id the next compiled program takes
+static PROGRAMS: AtomicU64 = AtomicU64::new(0);
+
 /// A program's machine code, in the body draws are lowered from
 pub struct Compiled<'t> {
     pub body: Body<'t>,
-    /// which program of its toolchain it is: a device keeps the images of its draws by it
+    /// which program it is in the process (two toolchains' programs never share one): a device keeps the images of
+    /// its draws by it
     pub id: u64,
 }

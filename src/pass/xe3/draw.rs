@@ -154,6 +154,14 @@ impl Genxml {
     }
 }
 
+/// A draw's image and where the second-level batches of its `BATCH` stream start
+pub struct Xe3DrawImage {
+    pub image: Image,
+    pub state: u64,
+    pub primitive: u64,
+    pub flush: u64,
+}
+
 /// A draw on Xe3: the program's kernels (in the module, as the shader pipeline leaves them), the state, the commands
 /// and the memories, as one image
 pub struct Xe3Draw<'b, 'a> {
@@ -208,8 +216,10 @@ impl<'a> Xe3Draw<'_, 'a> {
 
     /// The draw's image, built in `body` (a module `compile` left one vertex and one fragment kernel in)
     /// The image of a draw shaped as `d`, its data still zero (`data` says where it goes): the same for every draw
-    /// of that program, state and data sizes. Its stream `INIT` sets the context up, `BATCH` draws
-    pub fn image(body: &'_ mut Body<'a>, d: &Draw<'_>) -> Result<Image, Error> {
+    /// of that program, state and data sizes. Its stream `INIT` sets the context up; `BATCH` draws, as three
+    /// second-level batches: the draw's state (from its start), the primitive (`primitive`), the flush (`flush`). A
+    /// first-level batch runs the state once, the primitive for each of a run of these draws, then the flush
+    pub fn image(body: &'_ mut Body<'a>, d: &Draw<'_>) -> Result<Xe3DrawImage, Error> {
         let root = body.root;
         let kernels = Kernels::all(body, root, Xe3Kernel::NAME);
         let code = Xe3Draw::memory(body, &ImageMemory::named(Xe3Draw::CODE, MemType::Streaming))?;
@@ -240,7 +250,7 @@ impl<'a> Xe3Draw<'_, 'a> {
         me.put(code, &ImageData { align: Some(FENCE_ALIGN), ..ImageData::zeros(Xe3Draw::FENCE, FENCE_SIZE) });
         me.null_surface();
         let target = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::TARGET, MemType::Streaming))?;
-        me.room(target, &format!("{}_data", Xe3Draw::TARGET), d.target.len());
+        me.room(target, &format!("{}_data", Xe3Draw::TARGET), d.target.size());
         for (i, b) in d.buffers.iter().enumerate() {
             let m = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::vertex_buffer(i), MemType::Streaming))?;
             me.room(m, &format!("vb{i}_data"), b.bytes.len());
@@ -253,10 +263,39 @@ impl<'a> Xe3Draw<'_, 'a> {
         me.context();
         me.batch = batch;
         me.draw(d, &vs, &fs)?;
+        let primitive = me.second_level_end();
+        me.primitive(d);
+        let flush = me.second_level_end();
         me.pc_flush();
         Xe3Batch::end(body, root);
         ImageLayout(&Xe3Image).run(body, root)?;
-        XE3_IMAGE.emit(body, root)
+        let ops = body.block_ops(batch);
+        let bytes = |n: usize| -> u64 { 4 * ops[..n].iter().map(|c| Pack(XE3).template(&body[*c].name, &body[*c].all_attrs()).map_or(0, |t| t.dw.len() as u64)).sum::<u64>() };
+        let (primitive, flush) = (bytes(primitive), bytes(flush));
+        let image = XE3_IMAGE.emit(body, root)?;
+        let start = image.stream_named(Xe3Draw::BATCH).ok_or_else(|| Error(format!("no stream {} in the image", Xe3Draw::BATCH)))?;
+        Ok(Xe3DrawImage { state: start, primitive: start + primitive, flush: start + flush, image })
+    }
+
+    /// The batch so far ended as a second-level batch (MI_BATCH_BUFFER_END, a qword's padding): the number of
+    /// commands before the next one
+    fn second_level_end(&mut self) -> usize {
+        self.cmd(&CmdMiBatchBufferEnd::default());
+        let dw: usize = self.body.block_ops(self.batch).iter().map(|c| Pack(XE3).template(&self.body[*c].name, &self.body[*c].all_attrs()).map_or(0, |t| t.dw.len())).sum();
+        if !dw.is_multiple_of(2) {
+            self.cmd(&CmdMiNoop::default());
+        }
+        self.body.block_ops(self.batch).len()
+    }
+
+    fn primitive(&mut self, d: &Draw<'_>) {
+        self.cmd(&xe3!(Cmd3dprimitiveExtended {
+            vertex_access_type: XE3_SEQUENTIAL,
+            vertex_count_per_instance: d.count,
+            instance_count: d.instances,
+            start_vertex_location: d.first,
+            base_vertex_location: 0u32,
+        }));
     }
 
     fn container(body: &mut Body<'a>, block: BlockId, data: OpData<'a>) -> BlockId {
@@ -377,6 +416,7 @@ impl<'a> Xe3Draw<'_, 'a> {
             width: t.width - 1,
             height: t.height - 1,
             surface_pitch: t.pitch() - 1,
+            tile_mode: if t.tiling == Tiling::Tile4 { XE3_TILE4 } else { 0 },
             mip_tail_start_lod: MIP_TAIL_NONE,
             mocs: MOCS,
             l1_cache_control: XE3_L1CC_WB,
@@ -647,13 +687,6 @@ impl<'a> Xe3Draw<'_, 'a> {
             patch_batch_size_multiplier: VFG_PATCH_MULTIPLIER,
         }));
         self.cmd(&Cmd3dstatePrimitiveReplication::default());
-        self.cmd(&xe3!(Cmd3dprimitiveExtended {
-            vertex_access_type: XE3_SEQUENTIAL,
-            vertex_count_per_instance: d.count,
-            instance_count: d.instances,
-            start_vertex_location: d.first,
-            base_vertex_location: 0u32,
-        }));
         Ok(())
     }
 }

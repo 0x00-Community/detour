@@ -17,7 +17,7 @@ use std::time::{Duration, Instant};
 #[path = "glcase/mod.rs"]
 mod glcase;
 
-use detour::{ColorFormat, ColorTarget, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Toolchain, VertexBuffer, VertexElement, VertexFormat};
+use detour::{ColorFormat, ColorTarget, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
 use glcase::{Case, Resource, VERTICES};
 use mlirformat::Error;
 use mlirpass::{Body, Emit, GlslReader, GlslStage, Shift, SpirvBinary};
@@ -93,8 +93,8 @@ impl Spirv {
         let compile = start.elapsed();
         let bytes: Vec<Vec<u8>> = self.inputs.iter().map(|(_, _, v)| v.iter().flat_map(|f| f.to_le_bytes()).collect()).collect();
         let clear = [0u8; 16];
-        let target = ColorTarget { width: size, height: size, format: ColorFormat::Rgba32Float, load: TargetLoad::Fill(&clear, &[]) };
-        let surface = device.surface(target.len()).map_err(|e| e.0)?;
+        let target = ColorTarget { width: size, height: size, format: ColorFormat::Rgba32Float, tiling: Tiling::Tile4, load: TargetLoad::Fill(&clear, &[]) };
+        let surface = device.surface(&target).map_err(|e| e.0)?;
         let mut elements = Vec::new();
         for (i, (_, n, _)) in self.inputs.iter().enumerate() {
             elements.push(VertexElement { buffer: i as u32, format: VertexFormat::try_from(*n).map_err(|e| e.0)?, offset: 0 });
@@ -118,6 +118,7 @@ impl Spirv {
         for _ in 0..frames {
             let t = Instant::now();
             device.draw(&compiled, &draw, surface).map_err(|e| e.0)?;
+            device.finish(surface).map_err(|e| e.0)?;
             times.push(t.elapsed());
         }
         let rest = &times[1..];
