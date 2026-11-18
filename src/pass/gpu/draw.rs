@@ -84,24 +84,36 @@ pub struct VertexBuffer<'d> {
     pub stride: u32,
 }
 
-/// A linear color target: its size and format, and what it holds before the draw (row 0 is the bottom row of the
-/// viewport's y axis)
+/// A color target: its size, format and layout in memory, and what it holds before the draw (row 0 is the bottom
+/// row of the viewport's y axis; the pixels and clears in `load` are linear)
 #[derive(Clone, Debug)]
 pub struct ColorTarget<'d> {
     pub width: u32,
     pub height: u32,
     pub format: ColorFormat,
+    pub tiling: crate::Tiling,
     pub load: TargetLoad<'d>,
 }
 
 impl ColorTarget<'_> {
-    pub const fn pitch(&self) -> u32 {
+    /// A row's bytes of pixels
+    pub const fn row(&self) -> u32 {
         self.width * self.format.bytes()
     }
 
-    /// Its bytes
+    /// A row's bytes in memory
+    pub const fn pitch(&self) -> u32 {
+        self.tiling.pitch(self.row())
+    }
+
+    /// Its pixels' bytes
     pub const fn len(&self) -> usize {
-        (self.pitch() * self.height) as usize
+        (self.row() * self.height) as usize
+    }
+
+    /// The bytes it takes in memory
+    pub const fn size(&self) -> usize {
+        self.tiling.size(self.row(), self.height)
     }
 }
 
@@ -124,6 +136,22 @@ pub struct TargetClear {
 }
 
 impl TargetClear {
+    /// The clear applied to `memory`, a target `width` pixels wide laid out as `tiling`
+    pub fn apply_laid_out(&self, memory: &mut [u8], width: u32, tiling: crate::Tiling) {
+        let [x0, y0, x1, y1] = self.rect;
+        let size = self.texel.len();
+        let per = size / self.channels.len();
+        let pitch = tiling.pitch(width * size as u32);
+        for y in y0..y1 {
+            for x in x0..x1 {
+                for (c, _) in self.channels.iter().enumerate().filter(|(_, on)| **on) {
+                    let at = tiling.byte(x * size as u32 + (c * per) as u32, y, pitch);
+                    memory[at..at + per].copy_from_slice(&self.texel[c * per..(c + 1) * per]);
+                }
+            }
+        }
+    }
+
     /// The clear applied to `pixels`, a target `width` pixels wide
     pub fn apply(&self, pixels: &mut [u8], width: u32) {
         let [x0, y0, x1, y1] = self.rect;

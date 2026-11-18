@@ -1,5 +1,5 @@
 use mlirformat::Error;
-use crate::{ColorFormat, ColorTarget, CullMode, Draw, DrawPrimitive, Surface, TargetClear, TargetFill, TargetLoad, VertexBuffer, VertexElement, VertexFormat};
+use crate::{ColorFormat, ColorTarget, CullMode, Draw, DrawPrimitive, Surface, TargetClear, TargetFill, TargetLoad, Tiling, VertexBuffer, VertexElement, VertexFormat};
 
 use super::{DEFAULT_UNIFORM_BLOCK, AttribType, Context, Face, GlError, Rect, ShaderType, Storage};
 use crate::Device;
@@ -46,6 +46,8 @@ pub struct DefaultFramebuffer {
     pub width: u32,
     pub height: u32,
     pub format: ColorFormat,
+    /// how its surface is laid out on the GPU (set before the first draw)
+    pub tiling: Tiling,
     pub surface: Option<Surface>,
     base: Base,
     /// cleared rectangles over `base`, in order
@@ -65,7 +67,7 @@ enum Base {
 
 impl DefaultFramebuffer {
     pub fn new(width: u32, height: u32, format: ColorFormat) -> Self {
-        DefaultFramebuffer { width, height, format, surface: None, base: Base::Pixels(vec![0; (width * height * format.bytes()) as usize]), clears: Vec::new() }
+        DefaultFramebuffer { width, height, format, tiling: Tiling::Tile4, surface: None, base: Base::Pixels(vec![0; (width * height * format.bytes()) as usize]), clears: Vec::new() }
     }
 
     /// Its bytes
@@ -135,6 +137,13 @@ impl Context<'_> {
         fb.clears.push(TargetClear { rect, channels, texel });
     }
 
+    /// glFinish: the draws so far done (the clears waiting for a draw stay where they are)
+    pub fn finish(&mut self, device: &Device<'_>) -> Result<(), Error> {
+        self.framebuffer
+            .surface
+            .map_or(Ok(()), |s| device.finish(s))
+    }
+
     /// glDrawArrays into the default framebuffer on `device`. A GL error is recorded (nothing drawn); an error
     /// returned is what detour cannot draw yet, or the device's
     pub fn draw_arrays(&mut self, device: &Device<'_>, mode: DrawMode, first: i32, count: i32) -> Result<(), Error> {
@@ -190,11 +199,11 @@ impl Context<'_> {
             }),
             cull,
             front_ccw: s.front_ccw,
-            target: ColorTarget { width: fb.width, height: fb.height, format: fb.format, load: fb.load() },
+            target: ColorTarget { width: fb.width, height: fb.height, format: fb.format, tiling: fb.tiling, load: fb.load() },
         };
         let surface = match fb.surface {
             Some(s) => s,
-            None => device.surface(fb.len())?,
+            None => device.surface(&draw.target)?,
         };
         device.draw(&linked.compiled, &draw, surface)?;
         let fb = &mut self.framebuffer;

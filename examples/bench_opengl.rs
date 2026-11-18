@@ -49,6 +49,7 @@ impl Times {
             let t = Instant::now();
             gl.clear(ClearMask { color: true, ..Default::default() });
             gl.draw_arrays(device, DrawMode::Triangles, 0, VERTICES).map_err(|e| e.0)?;
+            gl.finish(device).map_err(|e| e.0)?;
             times.push(t.elapsed());
         }
         Ok(Times::of(compile, &times))
