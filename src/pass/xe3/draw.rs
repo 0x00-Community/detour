@@ -667,7 +667,6 @@ impl<'a> Xe3Draw<'_, 'a> {
         }));
         let independent = blend.src[0] != blend.src[1] || blend.dst[0] != blend.dst[1] || blend.equation[0] != blend.equation[1];
         self.state(false, Xe3Draw::BLEND, STATE_ALIGN, &xe3!(StateBlendState {
-            color_dither_enable: true,
             alpha_test_function: ALPHA_TEST_NEVER_USED,
             independent_alpha_blend_enable: independent,
         }));
