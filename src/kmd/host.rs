@@ -28,11 +28,7 @@ macro_rules! hosts {
 
 hosts! {
     X86_64: "x86_64", line 64, flush |p| core::arch::x86_64::_mm_clflush(p), fence core::arch::x86_64::_mm_mfence();
-    Aarch64: "aarch64", line 64, flush |p| core::arch::asm!("dc civac, {}", in(reg) p, options(nostack, preserves_flags)),
-        fence core::arch::asm!("dsb sy", options(nostack, preserves_flags));
 }
 
 #[cfg(target_arch = "x86_64")]
 pub type Native = X86_64;
-#[cfg(target_arch = "aarch64")]
-pub type Native = Aarch64;

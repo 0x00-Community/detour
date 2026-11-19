@@ -63,7 +63,7 @@ impl Binaries {
     /// Every format this crate has
     pub fn builtin() -> Self {
         let mut b = Self::new();
-        b.writes(crate::Apple9Writer).writes(crate::AgxWriter).writes(crate::Rdna2Writer).writes(crate::Xe3Writer);
+        b.writes(crate::Xe3Writer);
         b
     }
 
