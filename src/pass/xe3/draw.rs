@@ -197,12 +197,24 @@ impl Genxml {
     }
 }
 
-/// A draw's image and where the second-level batches of its `BATCH` stream start
+/// A draw's image, where the second-level batches of its `BATCH` stream start, and the commands a device writes
+/// for each draw (`Xe3DrawCommands`)
 pub struct Xe3DrawImage {
     pub image: Image,
     pub state: u64,
-    pub primitive: u64,
     pub flush: u64,
+    pub commands: Xe3DrawCommands,
+}
+
+/// What changes from draw to draw of one image, as templates whose holes a device fills in: the primitive (holes
+/// `count`, `first`, `instances`), the vertex buffers (`vb<i>`: an address, `vb<i>_size`; no dwords when the draw
+/// reads none), a scissor rectangle (`x0`, `y0`, `x1`, `y1`, inclusive) and the pointer to one (`scissor`, in
+/// `Xe3Draw::DYNAMIC`, on `Xe3Draw::SCISSOR_ALIGN`)
+pub struct Xe3DrawCommands {
+    pub primitive: Template,
+    pub vertex_buffers: Template,
+    pub scissor_rect: Template,
+    pub scissor_pointer: Template,
 }
 
 /// A draw on Xe3: the program's kernels (in the module, as the shader pipeline leaves them), the state, the commands
@@ -219,6 +231,12 @@ impl<'a> Xe3Draw<'_, 'a> {
     pub const SHADERS: &'static str = "builtin.module(xevm-attach-target{chip=ptl}, convert-spirv-entry-points, gpu-inline-calls, convert-spirv-cf-to-cf, sroa, mem2reg, lift-cf-to-scf, canonicalize, cse, convert-gpu-to-xe3, xe3-regalloc, xe3-control, xe3-swsb, xe3-branches, xe3-pad)";
     /// The memory holding the color target after the draw
     pub const TARGET: &'static str = "target";
+    /// The memory a device writes state into between draws (scissor rectangles), and its size
+    pub const DYNAMIC: &'static str = "dynamic";
+    pub const DYNAMIC_SIZE: u64 = 64 << 10;
+    /// A scissor rectangle's alignment: 64 bytes. genxml's pointer keeps bits 5 and up, but on Xe3 (Panther Lake) a
+    /// rectangle 32 bytes past a 64-byte boundary is not the one the draw uses
+    pub const SCISSOR_ALIGN: u64 = 64;
     const CODE: &'static str = "code";
     const SURFACES: &'static str = "surfaces";
     /// The stream of the draw: run for every draw
@@ -257,11 +275,12 @@ impl<'a> Xe3Draw<'_, 'a> {
         PassManager::parse(passes, Xe3Draw::SHADERS)?.run(body, root)
     }
 
-    /// The draw's image, built in `body` (a module `compile` left one vertex and one fragment kernel in)
-    /// The image of a draw shaped as `d`, its data still zero (`data` says where it goes): the same for every draw
-    /// of that program, state and data sizes. Its stream `INIT` sets the context up; `BATCH` draws, as three
-    /// second-level batches: the draw's state (from its start), the primitive (`primitive`), the flush (`flush`). A
-    /// first-level batch runs the state once, the primitive for each of a run of these draws, then the flush
+    /// The image of a draw shaped as `d`, built in `body` (a module `compile` left one vertex and one fragment
+    /// kernel in), its uniforms still zero (`data` says where they go): the same for every draw of that program,
+    /// state and uniform sizes, whatever its vertices, counts and scissor. Its stream `INIT` sets the context up;
+    /// `BATCH` is two second-level batches: the draw's state (from its start, the whole target as the scissor) and
+    /// the flush (`flush`). A first-level batch runs the state once, then for each of a run of these draws the
+    /// commands its vertices, scissor and counts need (`commands`), then the flush
     pub fn image(body: &'_ mut Body<'a>, d: &Draw<'_>) -> Result<Xe3DrawImage, Error> {
         let root = body.root;
         let kernels = Kernels::all(body, root, Xe3Kernel::NAME);
@@ -294,10 +313,8 @@ impl<'a> Xe3Draw<'_, 'a> {
         me.null_surface();
         let target = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::TARGET, MemType::Streaming))?;
         me.room(target, &format!("{}_data", Xe3Draw::TARGET), d.target.size());
-        for (i, b) in d.buffers.iter().enumerate() {
-            let m = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::vertex_buffer(i), MemType::Streaming))?;
-            me.room(m, &format!("vb{i}_data"), b.bytes.len());
-        }
+        let dynamic = ImageMemory { size: Some(Xe3Draw::DYNAMIC_SIZE), ..ImageMemory::named(Xe3Draw::DYNAMIC, MemType::Streaming) };
+        Xe3Draw::memory(me.body, &dynamic)?;
         for &(binding, bytes) in &d.uniforms {
             let m = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::uniform_buffer(binding), MemType::Streaming))?;
             me.room(m, &format!("ubo{binding}_data"), bytes.len());
@@ -306,18 +323,65 @@ impl<'a> Xe3Draw<'_, 'a> {
         me.context();
         me.batch = batch;
         me.draw(d, &vs, &fs)?;
-        let primitive = me.second_level_end();
-        me.primitive(d);
         let flush = me.second_level_end();
         me.pc_flush();
         Xe3Batch::end(body, root);
         ImageLayout(&Xe3Image).run(body, root)?;
         let ops = body.block_ops(batch);
-        let bytes = |n: usize| -> u64 { 4 * ops[..n].iter().map(|c| Pack(XE3).template(&body[*c].name, &body[*c].all_attrs()).map_or(0, |t| t.dw.len() as u64)).sum::<u64>() };
-        let (primitive, flush) = (bytes(primitive), bytes(flush));
+        let flush = 4 * ops[..flush].iter().map(|c| Pack(XE3).template(&body[*c].name, &body[*c].all_attrs()).map_or(0, |t| t.dw.len() as u64)).sum::<u64>();
         let image = XE3_IMAGE.emit(body, root)?;
         let start = image.stream_named(Xe3Draw::BATCH).ok_or_else(|| Error(format!("no stream {} in the image", Xe3Draw::BATCH)))?;
-        Ok(Xe3DrawImage { state: start, primitive: start + primitive, flush: start + flush, image })
+        Ok(Xe3DrawImage { state: start, flush: start + flush, image, commands: Xe3Draw::commands(d)? })
+    }
+
+    /// An op's dwords, its symbols left as holes
+    fn template(op: &impl TypedOp) -> Result<Template, Error> {
+        let (data, _) = op.split();
+        Pack(XE3).template(&data.name, &data.all_attrs())
+    }
+
+    /// The commands of `d`'s draws (`Xe3DrawCommands`)
+    fn commands(d: &Draw<'_>) -> Result<Xe3DrawCommands, Error> {
+        let primitive = Xe3Draw::template(&xe3!(Cmd3dprimitiveExtended {
+            vertex_access_type: XE3_SEQUENTIAL,
+            vertex_count_per_instance: A::sym("count"),
+            instance_count: A::sym("instances"),
+            start_vertex_location: A::sym("first"),
+            base_vertex_location: 0u32,
+        }))?;
+        let vertex_buffers = match d.buffers.is_empty() {
+            true => Template::default(),
+            false => {
+                let vbs: Vec<_> = d.buffers.iter().enumerate().map(|(i, b)| {
+                    let state = StateVertexBufferStateFields {
+                        vertex_buffer_index: Some((i as u32).into()),
+                        buffer_pitch: Some(b.stride.into()),
+                        address_modify_enable: Some(true.into()),
+                        mocs: Some(MOCS.into()),
+                        l3_bypass_disable: Some(true.into()),
+                        buffer_starting_address: Some(A::sym(Xe3Draw::vertex_buffer(i)).into()),
+                        buffer_size: Some(A::sym(format!("{}_size", Xe3Draw::vertex_buffer(i))).into()),
+                        ..Default::default()
+                    };
+                    Fields(Cmd3dstateVertexBuffersElement { vertex_buffer_state: Some(Fields(state)) })
+                }).collect();
+                Xe3Draw::template(&xe3!(Cmd3dstateVertexBuffers { elements: vbs }))?
+            }
+        };
+        let scissor_rect = Xe3Draw::template(&xe3!(StateScissorRect {
+            scissor_rectangle_x_min: A::sym("x0"),
+            scissor_rectangle_y_min: A::sym("y0"),
+            scissor_rectangle_x_max: A::sym("x1"),
+            scissor_rectangle_y_max: A::sym("y1"),
+        }))?;
+        let scissor_pointer = Xe3Draw::template(&xe3!(Cmd3dstateScissorStatePointers { scissor_rect_pointer: A::sym("scissor") }))?;
+        Ok(Xe3DrawCommands { primitive, vertex_buffers, scissor_rect, scissor_pointer })
+    }
+
+    /// A draw's scissor as SCISSOR_RECT's inclusive x0, y0, x1, y1 (an empty one: x0 > x1)
+    pub fn scissor(d: &Draw<'_>) -> [u32; 4] {
+        let [sx, sy, sw, sh] = d.scissor.unwrap_or([0, 0, d.target.width, d.target.height]);
+        if sw == 0 || sh == 0 { [1, 1, 0, 0] } else { [sx, sy, sx + sw - 1, sy + sh - 1] }
     }
 
     /// The batch so far ended as a second-level batch (MI_BATCH_BUFFER_END, a qword's padding): the number of
@@ -329,16 +393,6 @@ impl<'a> Xe3Draw<'_, 'a> {
             self.cmd(&CmdMiNoop::default());
         }
         self.body.block_ops(self.batch).len()
-    }
-
-    fn primitive(&mut self, d: &Draw<'_>) {
-        self.cmd(&xe3!(Cmd3dprimitiveExtended {
-            vertex_access_type: XE3_SEQUENTIAL,
-            vertex_count_per_instance: d.count,
-            instance_count: d.instances,
-            start_vertex_location: d.first,
-            base_vertex_location: 0u32,
-        }));
     }
 
     fn container(body: &mut Body<'a>, block: BlockId, data: OpData<'a>) -> BlockId {
@@ -377,7 +431,8 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.put(block, &ImageData::zeros(name, len as u64));
     }
 
-    fn vertex_buffer(i: usize) -> String {
+    /// Vertex buffer `i`'s hole in `Xe3DrawCommands::vertex_buffers` (its size's: with `_size`)
+    pub fn vertex_buffer(i: usize) -> String {
         format!("vb{i}")
     }
 
@@ -385,12 +440,10 @@ impl<'a> Xe3Draw<'_, 'a> {
         format!("ubo{binding}")
     }
 
-    /// Where a draw's data goes: the memory (each alone at its start) and the bytes: the vertex buffers and the
-    /// uniform blocks (the color target is the device's, at `TARGET`)
+    /// Where a draw's uniform blocks go: the memory (each alone at its start) and the bytes (the vertex buffers
+    /// are the device's, at `Xe3DrawCommands::vertex_buffers`; the color target too, at `TARGET`)
     pub fn data<'d>(d: &Draw<'d>) -> Vec<(String, &'d [u8])> {
-        let buffers = d.buffers.iter().enumerate().map(|(i, b)| (Xe3Draw::vertex_buffer(i), b.bytes));
-        let uniforms = d.uniforms.iter().map(|&(binding, bytes)| (Xe3Draw::uniform_buffer(binding), bytes));
-        buffers.chain(uniforms).collect()
+        d.uniforms.iter().map(|&(binding, bytes)| (Xe3Draw::uniform_buffer(binding), bytes)).collect()
     }
 
     fn pc_flush(&mut self) {
@@ -529,8 +582,7 @@ impl<'a> Xe3Draw<'_, 'a> {
             y_min_viewport: y.max(0.0),
             y_max_viewport: (y + h).min(th) - 1.0,
         }));
-        let [sx, sy, sw, sh] = d.scissor.unwrap_or([0, 0, d.target.width, d.target.height]);
-        let (x0, y0, x1, y1) = if sw == 0 || sh == 0 { (1, 1, 0, 0) } else { (sx, sy, sx + sw - 1, sy + sh - 1) };
+        let (x0, y0, x1, y1) = (0, 0, d.target.width - 1, d.target.height - 1);
         self.state(false, Xe3Draw::SCISSOR, STATE_ALIGN, &xe3!(StateScissorRect { scissor_rectangle_x_min: x0, scissor_rectangle_y_min: y0, scissor_rectangle_x_max: x1, scissor_rectangle_y_max: y1 }));
     }
 
@@ -717,20 +769,6 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.cmd(&xe3!(CmdPipeControl { command_streamer_stall_enable: true }));
 
         self.cmd(&xe3!(Cmd3dstateVfTopology { primitive_topology_type: Genxml::primitive(d.primitive) }));
-        let vbs: Vec<_> = d.buffers.iter().enumerate().map(|(i, b)| {
-            let state = StateVertexBufferStateFields {
-                vertex_buffer_index: Some((i as u32).into()),
-                buffer_pitch: Some(b.stride.into()),
-                address_modify_enable: Some(true.into()),
-                mocs: Some(MOCS.into()),
-                l3_bypass_disable: Some(true.into()),
-                buffer_starting_address: Some(A::sym(format!("vb{i}")).into()),
-                buffer_size: Some((b.bytes.len() as u32).into()),
-                ..Default::default()
-            };
-            Fields(Cmd3dstateVertexBuffersElement { vertex_buffer_state: Some(Fields(state)) })
-        }).collect();
-        self.cmd(&xe3!(Cmd3dstateVertexBuffers { elements: vbs }));
         let elements: Vec<_> = d.elements.iter().map(|e| {
             let n = e.format.components();
             let control = |c: u32| Some(Fill::from(if c < n { XE3_VFCOMP_STORE_SRC } else if c < 3 { XE3_VFCOMP_STORE_0 } else { XE3_VFCOMP_STORE_1_FP }));
