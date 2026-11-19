@@ -204,17 +204,34 @@ pub struct Xe3DrawImage {
     pub state: u64,
     pub flush: u64,
     pub commands: Xe3DrawCommands,
+    /// the binding table pool (`SURFACES`): its address, and from which offset in it the device may write
+    pub pool: u64,
+    pub pool_free: u64,
+    /// the null surface's address
+    pub null: u64,
 }
 
 /// What changes from draw to draw of one image, as templates whose holes a device fills in: the primitive (holes
 /// `count`, `first`, `instances`), the vertex buffers (`vb<i>`: an address, `vb<i>_size`; no dwords when the draw
-/// reads none), a scissor rectangle (`x0`, `y0`, `x1`, `y1`, inclusive) and the pointer to one (`scissor`, in
-/// `Xe3Draw::DYNAMIC`, on `Xe3Draw::SCISSOR_ALIGN`)
+/// reads none), a scissor rectangle (`x0`, `y0`, `x1`, `y1`, inclusive) and the pointer to one (`scissor`, below
+/// 4 GiB, on `Xe3Draw::SCISSOR_ALIGN`), the color target's surface state (`target`: its address, `pitch`: a row's
+/// bytes less one), a uniform block's (`ubo`: its address, `ubo_w`, `ubo_h`, `ubo_d`: its size less one, split as
+/// `Xe3Draw::buffer_size` does), the binding table (`rt`, `null`, `ubo<binding>`: surface states' addresses, on
+/// `SURFACE_ALIGN` in the pool) and the pointers to it (`bt`: its offset in the pool; the vertex shader's: no dwords
+/// when it reads no buffers), and the pointers to the viewport states (`cc`, `sf_clip`: `Xe3Draw::viewports`, below
+/// 4 GiB). The color target's size is in its surface state (`width`, `height`, less one)
 pub struct Xe3DrawCommands {
     pub primitive: Template,
     pub vertex_buffers: Template,
     pub scissor_rect: Template,
     pub scissor_pointer: Template,
+    pub target_surface: Template,
+    pub uniform_surface: Template,
+    pub binding_table: Template,
+    pub table_pointers_vs: Template,
+    pub table_pointers_ps: Template,
+    pub viewport_cc: Template,
+    pub viewport_sf_clip: Template,
 }
 
 /// A draw on Xe3: the program's kernels (in the module, as the shader pipeline leaves them), the state, the commands
@@ -229,11 +246,8 @@ pub struct Xe3Draw<'b, 'a> {
 impl<'a> Xe3Draw<'_, 'a> {
     /// SPIR-V vertex and fragment shaders (spirv.module ops at the top of the module) to Xe3 kernels
     pub const SHADERS: &'static str = "builtin.module(xevm-attach-target{chip=ptl}, convert-spirv-entry-points, gpu-inline-calls, convert-spirv-cf-to-cf, sroa, mem2reg, lift-cf-to-scf, canonicalize, cse, convert-gpu-to-xe3, xe3-regalloc, xe3-control, xe3-swsb, xe3-branches, xe3-pad)";
-    /// The memory holding the color target after the draw
-    pub const TARGET: &'static str = "target";
-    /// The memory a device writes state into between draws (scissor rectangles), and its size
-    pub const DYNAMIC: &'static str = "dynamic";
-    pub const DYNAMIC_SIZE: u64 = 64 << 10;
+    /// A surface state's alignment, and a binding table's
+    pub const SURFACE_ALIGN: u64 = SURFACE_ALIGN as u64;
     /// A scissor rectangle's alignment: 64 bytes. genxml's pointer keeps bits 5 and up, but on Xe3 (Panther Lake) a
     /// rectangle 32 bytes past a 64-byte boundary is not the one the draw uses
     pub const SCISSOR_ALIGN: u64 = 64;
@@ -247,7 +261,6 @@ impl<'a> Xe3Draw<'_, 'a> {
     const NULL: &'static str = "null_surface";
     const BT_NULL: &'static str = "bt_null";
     const BT: &'static str = "bt";
-    const RT: &'static str = "rt_surface";
     const VS: &'static str = "vs";
     const FS: &'static str = "fs";
     const CC_VIEWPORT: &'static str = "cc_viewport";
@@ -276,12 +289,13 @@ impl<'a> Xe3Draw<'_, 'a> {
     }
 
     /// The image of a draw shaped as `d`, built in `body` (a module `compile` left one vertex and one fragment
-    /// kernel in), its uniforms still zero (`data` says where they go): the same for every draw of that program,
-    /// state and uniform sizes, whatever its vertices, counts and scissor. Its stream `INIT` sets the context up;
-    /// `BATCH` is two second-level batches: the draw's state (from its start, the whole target as the scissor) and
-    /// the flush (`flush`). A first-level batch runs the state once, then for each of a run of these draws the
-    /// commands its vertices, scissor and counts need (`commands`), then the flush
-    pub fn image(body: &'_ mut Body<'a>, d: &Draw<'_>) -> Result<Xe3DrawImage, Error> {
+    /// kernel in) and laid out from `base` (below 4 GiB): the same for every draw of that program and state,
+    /// whatever its target's memory, vertices, uniforms, counts and scissor. Its stream `INIT` sets the context up;
+    /// `BATCH` is two second-level batches: the draw's state (from its start: the whole target as the scissor, every
+    /// binding table entry the null surface) and the flush (`flush`). A first-level batch runs the state, then for
+    /// each of a run of these draws the commands its target, uniforms, vertices, scissor and counts need
+    /// (`commands`), then a flush
+    pub fn image(body: &'_ mut Body<'a>, d: &Draw<'_>, base: u64) -> Result<Xe3DrawImage, Error> {
         let root = body.root;
         let kernels = Kernels::all(body, root, Xe3Kernel::NAME);
         let code = Xe3Draw::memory(body, &ImageMemory::named(Xe3Draw::CODE, MemType::Streaming))?;
@@ -310,28 +324,31 @@ impl<'a> Xe3Draw<'_, 'a> {
         let (Some(vs), Some(fs)) = (vs, fs) else { return Err(Error("a draw needs a vertex and a fragment kernel".into())) };
         let mut me = Xe3Draw { body, code, surfaces, batch: init };
         me.put(code, &ImageData { align: Some(FENCE_ALIGN), ..ImageData::zeros(Xe3Draw::FENCE, FENCE_SIZE) });
-        me.null_surface();
-        let target = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::TARGET, MemType::Streaming))?;
-        me.room(target, &format!("{}_data", Xe3Draw::TARGET), d.target.size());
-        let dynamic = ImageMemory { size: Some(Xe3Draw::DYNAMIC_SIZE), ..ImageMemory::named(Xe3Draw::DYNAMIC, MemType::Streaming) };
-        Xe3Draw::memory(me.body, &dynamic)?;
-        for &(binding, bytes) in &d.uniforms {
-            let m = Xe3Draw::memory(me.body, &ImageMemory::named(Xe3Draw::uniform_buffer(binding), MemType::Streaming))?;
-            me.room(m, &format!("ubo{binding}_data"), bytes.len());
-        }
+        let null = me.null_surface();
         me.put(batch_memory, &ImageData::zeros("prefetch", CS_PREFETCH));
         me.context();
         me.batch = batch;
-        me.draw(d, &vs, &fs)?;
+        let vs_buffers = me.draw(d, &vs, &fs)?;
         let flush = me.second_level_end();
         me.pc_flush();
         Xe3Batch::end(body, root);
-        ImageLayout(&Xe3Image).run(body, root)?;
+        ImageLayout(&Xe3Image).run_at(body, root, base)?;
         let ops = body.block_ops(batch);
         let flush = 4 * ops[..flush].iter().map(|c| Pack(XE3).template(&body[*c].name, &body[*c].all_attrs()).map_or(0, |t| t.dw.len() as u64)).sum::<u64>();
+        let offset = |o: OpId| body[o].get(ImagePlaced::OFFSET).map(Attrs::as_int).transpose().map(|v| v.unwrap_or(0) as u64);
+        let null = offset(null)?;
+        let mut pool_free = 0;
+        for o in body.block_ops(surfaces) {
+            pool_free = pool_free.max(offset(o)? + Xe3Draw::SURFACE_ALIGN);
+        }
         let image = XE3_IMAGE.emit(body, root)?;
         let start = image.stream_named(Xe3Draw::BATCH).ok_or_else(|| Error(format!("no stream {} in the image", Xe3Draw::BATCH)))?;
-        Ok(Xe3DrawImage { state: start, flush: start + flush, image, commands: Xe3Draw::commands(d)? })
+        let pool = image.segments.iter().find(|s| s.name == Xe3Draw::SURFACES).map(|s| s.addr).ok_or_else(|| Error(format!("no memory {}", Xe3Draw::SURFACES)))?;
+        if pool_free >= u64::from(POOL) / 2 {
+            return Err(Error(format!("the binding table pool's static part takes {pool_free} bytes")));
+        }
+        let commands = Xe3Draw::commands(d, vs_buffers)?;
+        Ok(Xe3DrawImage { state: start, flush: start + flush, image, commands, pool, pool_free: u64::from(POOL) / 2, null: pool + null })
     }
 
     /// An op's dwords, its symbols left as holes
@@ -340,8 +357,70 @@ impl<'a> Xe3Draw<'_, 'a> {
         Pack(XE3).template(&data.name, &data.all_attrs())
     }
 
+    /// The binding table's entries: the color target, then each uniform block at its binding (`None`: the null
+    /// surface)
+    fn entries(d: &Draw<'_>) -> Vec<Option<String>> {
+        let mut entries = vec![Some("rt".to_owned())];
+        for &(binding, _) in &d.uniforms {
+            let at = usize::from(XE3_BUFFER_BTI) + binding as usize;
+            entries.resize(entries.len().max(at + 1), None);
+            entries[at] = Some(Xe3Draw::uniform_buffer(binding));
+        }
+        entries
+    }
+
+    /// A buffer surface's size fields for `size` bytes: its width, height and depth
+    pub fn buffer_size(size: u32) -> [u32; 3] {
+        let n = size.max(1).next_multiple_of(4) - 1;
+        let bits = |shift: u32, width: u32| (n >> shift) & ((1 << width) - 1);
+        [bits(0, BUFFER_WIDTH_BITS), bits(BUFFER_WIDTH_BITS, BUFFER_HEIGHT_BITS), bits(BUFFER_WIDTH_BITS + BUFFER_HEIGHT_BITS, BUFFER_DEPTH_BITS)]
+    }
+
     /// The commands of `d`'s draws (`Xe3DrawCommands`)
-    fn commands(d: &Draw<'_>) -> Result<Xe3DrawCommands, Error> {
+    fn commands(d: &Draw<'_>, vs_buffers: bool) -> Result<Xe3DrawCommands, Error> {
+        let t = &d.target;
+        let target_surface = Xe3Draw::template(&xe3!(StateRenderSurfaceState {
+            surface_type: XE3_SURFTYPE_2D,
+            surface_format: SurfaceFormat::color(t.format),
+            surface_horizontal_alignment: HALIGN_128B,
+            surface_vertical_alignment: VALIGN_4,
+            width: A::sym("width"),
+            height: A::sym("height"),
+            surface_pitch: A::sym("pitch"),
+            tile_mode: if t.tiling == Tiling::Tile4 { XE3_TILE4 } else { 0 },
+            mip_tail_start_lod: MIP_TAIL_NONE,
+            mocs: MOCS,
+            l1_cache_control: XE3_L1CC_WB,
+            shader_channel_select_red: SCS[0],
+            shader_channel_select_green: SCS[1],
+            shader_channel_select_blue: SCS[2],
+            shader_channel_select_alpha: SCS[3],
+            surface_base_address: A::sym("target"),
+        }))?;
+        let uniform_surface = Xe3Draw::template(&xe3!(StateRenderSurfaceState {
+            surface_type: XE3_SURFTYPE_BUFFER,
+            surface_format: SurfaceFormat::RAW,
+            surface_horizontal_alignment: HALIGN_128B,
+            surface_vertical_alignment: VALIGN_4,
+            width: A::sym("ubo_w"),
+            height: A::sym("ubo_h"),
+            depth: A::sym("ubo_d"),
+            surface_pitch: 0u32,
+            mocs: MOCS,
+            l1_cache_control: XE3_L1CC_WB,
+            surface_base_address: A::sym("ubo"),
+        }))?;
+        let mut binding_table = Template::default();
+        for e in Xe3Draw::entries(d) {
+            binding_table.extend(&Xe3Draw::template(&xe3!(StateBindingTableState { surface_state_pointer: A::sym(e.as_deref().unwrap_or("null")) }))?);
+        }
+        let table_pointers_vs = match vs_buffers {
+            true => Xe3Draw::template(&xe3!(Cmd3dstateBindingTablePointersVs { pointer_to_vs_binding_table: A::sym("bt") }))?,
+            false => Template::default(),
+        };
+        let table_pointers_ps = Xe3Draw::template(&xe3!(Cmd3dstateBindingTablePointersPs { pointer_to_ps_binding_table: A::sym("bt") }))?;
+        let viewport_cc = Xe3Draw::template(&xe3!(Cmd3dstateViewportStatePointersCc { cc_viewport_pointer: A::sym("cc") }))?;
+        let viewport_sf_clip = Xe3Draw::template(&xe3!(Cmd3dstateViewportStatePointersSfClip { sf_clip_viewport_pointer: A::sym("sf_clip") }))?;
         let primitive = Xe3Draw::template(&xe3!(Cmd3dprimitiveExtended {
             vertex_access_type: XE3_SEQUENTIAL,
             vertex_count_per_instance: A::sym("count"),
@@ -375,7 +454,19 @@ impl<'a> Xe3Draw<'_, 'a> {
             scissor_rectangle_y_max: A::sym("y1"),
         }))?;
         let scissor_pointer = Xe3Draw::template(&xe3!(Cmd3dstateScissorStatePointers { scissor_rect_pointer: A::sym("scissor") }))?;
-        Ok(Xe3DrawCommands { primitive, vertex_buffers, scissor_rect, scissor_pointer })
+        Ok(Xe3DrawCommands {
+            primitive,
+            vertex_buffers,
+            scissor_rect,
+            scissor_pointer,
+            target_surface,
+            uniform_surface,
+            binding_table,
+            table_pointers_vs,
+            table_pointers_ps,
+            viewport_cc,
+            viewport_sf_clip,
+        })
     }
 
     /// A draw's scissor as SCISSOR_RECT's inclusive x0, y0, x1, y1 (an empty one: x0 > x1)
@@ -420,15 +511,11 @@ impl<'a> Xe3Draw<'_, 'a> {
     }
 
     /// A state placed under `name`, aligned to `align` bytes, in the pool (`surfaces`) or with the code
-    fn state(&mut self, surfaces: bool, name: &str, align: u32, op: &impl TypedOp) {
+    fn state(&mut self, surfaces: bool, name: &str, align: u32, op: &impl TypedOp) -> OpId {
         let o = self.put(if surfaces { self.surfaces } else { self.code }, op);
         self.body[o].set(Symbol::ATTR, Attribute::str(name));
         self.body[o].set(ImagePlaced::ALIGN, A::from(align).into());
-    }
-
-    /// Room for `len` bytes of a draw's data, alone in its memory: the device writes them there
-    fn room(&mut self, block: BlockId, name: &str, len: usize) {
-        self.put(block, &ImageData::zeros(name, len as u64));
+        o
     }
 
     /// Vertex buffer `i`'s hole in `Xe3DrawCommands::vertex_buffers` (its size's: with `_size`)
@@ -436,14 +523,9 @@ impl<'a> Xe3Draw<'_, 'a> {
         format!("vb{i}")
     }
 
-    fn uniform_buffer(binding: u32) -> String {
+    /// Uniform block `binding`'s hole in `Xe3DrawCommands::binding_table`
+    pub fn uniform_buffer(binding: u32) -> String {
         format!("ubo{binding}")
-    }
-
-    /// Where a draw's uniform blocks go: the memory (each alone at its start) and the bytes (the vertex buffers
-    /// are the device's, at `Xe3DrawCommands::vertex_buffers`; the color target too, at `TARGET`)
-    pub fn data<'d>(d: &Draw<'d>) -> Vec<(String, &'d [u8])> {
-        d.uniforms.iter().map(|&(binding, bytes)| (Xe3Draw::uniform_buffer(binding), bytes)).collect()
     }
 
     fn pc_flush(&mut self) {
@@ -503,55 +585,17 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.pc_flush();
     }
 
-    fn surface(&mut self, name: &str, base: A, t: &ColorTarget<'_>) {
-        self.state(true, name, SURFACE_ALIGN, &xe3!(StateRenderSurfaceState {
-            surface_type: XE3_SURFTYPE_2D,
-            surface_format: SurfaceFormat::color(t.format),
-            surface_horizontal_alignment: HALIGN_128B,
-            surface_vertical_alignment: VALIGN_4,
-            width: t.width - 1,
-            height: t.height - 1,
-            surface_pitch: t.pitch() - 1,
-            tile_mode: if t.tiling == Tiling::Tile4 { XE3_TILE4 } else { 0 },
-            mip_tail_start_lod: MIP_TAIL_NONE,
-            mocs: MOCS,
-            l1_cache_control: XE3_L1CC_WB,
-            shader_channel_select_red: SCS[0],
-            shader_channel_select_green: SCS[1],
-            shader_channel_select_blue: SCS[2],
-            shader_channel_select_alpha: SCS[3],
-            surface_base_address: base,
-        }));
-    }
-
-    /// A raw buffer surface of `size` bytes
-    fn buffer_surface(&mut self, name: &str, base: A, size: u32) {
-        let n = size.max(1).next_multiple_of(4) - 1;
-        let bits = |shift: u32, width: u32| (n >> shift) & ((1 << width) - 1);
-        self.state(true, name, SURFACE_ALIGN, &xe3!(StateRenderSurfaceState {
-            surface_type: XE3_SURFTYPE_BUFFER,
-            surface_format: SurfaceFormat::RAW,
-            surface_horizontal_alignment: HALIGN_128B,
-            surface_vertical_alignment: VALIGN_4,
-            width: bits(0, BUFFER_WIDTH_BITS),
-            height: bits(BUFFER_WIDTH_BITS, BUFFER_HEIGHT_BITS),
-            depth: bits(BUFFER_WIDTH_BITS + BUFFER_HEIGHT_BITS, BUFFER_DEPTH_BITS),
-            surface_pitch: 0u32,
-            mocs: MOCS,
-            l1_cache_control: XE3_L1CC_WB,
-            surface_base_address: base,
-        }));
-    }
-
-    fn null_surface(&mut self) {
-        self.state(true, Xe3Draw::NULL, SURFACE_ALIGN, &xe3!(StateRenderSurfaceState { surface_type: XE3_SURFTYPE_NULL, surface_format: SurfaceFormat::R32_UINT, mocs: MOCS }));
+    /// The null surface, and a binding table of it alone: the null surface's op
+    fn null_surface(&mut self) -> OpId {
+        let null = self.state(true, Xe3Draw::NULL, SURFACE_ALIGN, &xe3!(StateRenderSurfaceState { surface_type: XE3_SURFTYPE_NULL, surface_format: SurfaceFormat::R32_UINT, mocs: MOCS }));
         self.state(true, Xe3Draw::BT_NULL, SURFACE_ALIGN, &xe3!(StateBindingTableState { surface_state_pointer: A::sym(Xe3Draw::NULL) }));
+        null
     }
 
-    /// The binding table: entry i points at surface `entries[i]` (the null surface where None)
-    fn binding_table(&mut self, entries: &[Option<String>]) {
-        for (i, e) in entries.iter().enumerate() {
-            let s = xe3!(StateBindingTableState { surface_state_pointer: A::sym(e.as_deref().unwrap_or(Xe3Draw::NULL)) });
+    /// A binding table of `entries` entries, each the null surface (a draw's commands bind its own)
+    fn binding_table(&mut self, entries: usize) {
+        for i in 0..entries {
+            let s = xe3!(StateBindingTableState { surface_state_pointer: A::sym(Xe3Draw::NULL) });
             if i == 0 {
                 self.state(true, Xe3Draw::BT, SURFACE_ALIGN, &s);
             } else {
@@ -561,12 +605,13 @@ impl<'a> Xe3Draw<'_, 'a> {
         }
     }
 
-    fn viewport(&mut self, d: &Draw<'_>) {
+    /// A draw's viewport states: CC_VIEWPORT and SF_CLIP_VIEWPORT
+    fn viewport_states(d: &Draw<'_>) -> (StateCcViewport, StateSfClipViewport) {
         let [x, y, w, h] = d.viewport;
         let [near, far] = d.depth_range;
         let (tw, th) = (d.target.width as f32, d.target.height as f32);
-        self.state(false, Xe3Draw::CC_VIEWPORT, CC_VIEWPORT_ALIGN, &xe3!(StateCcViewport { minimum_depth: near.min(far), maximum_depth: near.max(far) }));
-        self.state(false, Xe3Draw::SF_CLIP_VIEWPORT, STATE_ALIGN, &xe3!(StateSfClipViewport {
+        let cc = xe3!(StateCcViewport { minimum_depth: near.min(far), maximum_depth: near.max(far) });
+        let sf_clip = xe3!(StateSfClipViewport {
             viewport_matrix_element_m00: w / 2.0,
             viewport_matrix_element_m11: h / 2.0,
             viewport_matrix_element_m22: far - near,
@@ -581,12 +626,27 @@ impl<'a> Xe3Draw<'_, 'a> {
             x_max_viewport: (x + w).min(tw) - 1.0,
             y_min_viewport: y.max(0.0),
             y_max_viewport: (y + h).min(th) - 1.0,
-        }));
+        });
+        (cc, sf_clip)
+    }
+
+    /// A draw's viewport states' dwords, for `Xe3DrawCommands::viewport_cc` (on 32 bytes) and `viewport_sf_clip` (on
+    /// 64)
+    pub fn viewports(d: &Draw<'_>) -> Result<[Vec<u32>; 2], Error> {
+        let (cc, sf_clip) = Xe3Draw::viewport_states(d);
+        Ok([Xe3Draw::template(&cc)?.dw, Xe3Draw::template(&sf_clip)?.dw])
+    }
+
+    fn viewport(&mut self, d: &Draw<'_>) {
+        let (cc, sf_clip) = Xe3Draw::viewport_states(d);
+        self.state(false, Xe3Draw::CC_VIEWPORT, CC_VIEWPORT_ALIGN, &cc);
+        self.state(false, Xe3Draw::SF_CLIP_VIEWPORT, STATE_ALIGN, &sf_clip);
         let (x0, y0, x1, y1) = (0, 0, d.target.width - 1, d.target.height - 1);
         self.state(false, Xe3Draw::SCISSOR, STATE_ALIGN, &xe3!(StateScissorRect { scissor_rectangle_x_min: x0, scissor_rectangle_y_min: y0, scissor_rectangle_x_max: x1, scissor_rectangle_y_max: y1 }));
     }
 
-    fn draw(&mut self, d: &Draw<'_>, vh: &Xe3Kernel<'_>, fh: &Xe3Kernel<'_>) -> Result<(), Error> {
+    /// The draw's state: whether the vertex shader reads buffers (and its binding table is the draw's)
+    fn draw(&mut self, d: &Draw<'_>, vh: &Xe3Kernel<'_>, fh: &Xe3Kernel<'_>) -> Result<bool, Error> {
         let inputs = vh.inputs.unwrap_or(0);
         let varyings = vh.varyings.unwrap_or(0);
         if inputs as usize != d.elements.len() {
@@ -632,17 +692,9 @@ impl<'a> Xe3Draw<'_, 'a> {
         }));
         self.body[entry].set(ImagePlaced::ALIGN, A::from(ENTRY_ALIGN).into());
 
-        self.surface(Xe3Draw::RT, A::sym(Xe3Draw::TARGET), &d.target);
-        let mut entries = vec![Some(Xe3Draw::RT.to_owned())];
-        for &(binding, bytes) in &d.uniforms {
-            let surface = format!("ubo{binding}_surface");
-            self.buffer_surface(&surface, A::sym(format!("ubo{binding}")), bytes.len() as u32);
-            let at = usize::from(XE3_BUFFER_BTI) + binding as usize;
-            entries.resize(entries.len().max(at + 1), None);
-            entries[at] = Some(surface);
-        }
-        let table = entries.len() as u32;
-        self.binding_table(&entries);
+        let entries = Xe3Draw::entries(d).len();
+        let table = entries as u32;
+        self.binding_table(entries);
         let bt = || A::within(Xe3Draw::SURFACES, Xe3Draw::BT);
         let null = || A::within(Xe3Draw::SURFACES, Xe3Draw::BT_NULL);
         let vs_buffers = vh.buffers.unwrap_or(0) > 0;
@@ -802,6 +854,6 @@ impl<'a> Xe3Draw<'_, 'a> {
             patch_batch_size_multiplier: VFG_PATCH_MULTIPLIER,
         }));
         self.cmd(&Cmd3dstatePrimitiveReplication::default());
-        Ok(())
+        Ok(vs_buffers)
     }
 }

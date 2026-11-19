@@ -183,10 +183,14 @@ pub struct TargetClear {
 impl TargetClear {
     /// The clear applied to `memory`, a target `width` pixels wide laid out as `tiling`
     pub fn apply_laid_out(&self, memory: &mut [u8], width: u32, tiling: crate::Tiling) {
+        self.apply_pitched(memory, tiling.pitch(width * self.texel.len() as u32), tiling);
+    }
+
+    /// The clear applied to `memory`, laid out as `tiling` with rows `pitch` bytes apart
+    pub fn apply_pitched(&self, memory: &mut [u8], pitch: u32, tiling: crate::Tiling) {
         let [x0, y0, x1, y1] = self.rect;
         let size = self.texel.len();
         let per = size / self.channels.len();
-        let pitch = tiling.pitch(width * size as u32);
         for y in y0..y1 {
             for x in x0..x1 {
                 for (c, _) in self.channels.iter().enumerate().filter(|(_, on)| **on) {

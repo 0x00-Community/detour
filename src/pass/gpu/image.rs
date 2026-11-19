@@ -84,13 +84,18 @@ impl<T: ImageTarget> ImageLayout<'_, T> {
     }
 
     pub fn run(&self, body: &mut Body<'_>, op: OpId) -> Result<(), Error> {
+        self.run_at(body, op, T::BASE)
+    }
+
+    /// The image laid out from `base` instead of the target's base (each memory still on its alignment)
+    pub fn run_at(&self, body: &mut Body<'_>, op: OpId, base: u64) -> Result<(), Error> {
         let sizes = self.sizes(body, op)?;
         let mut quiet = Quiet;
         let mut rw = Rewriter::new(body, &mut quiet);
         let memories = ImageLayout::<T>::memories(rw.body, op);
         let heads = memories.iter().map(|m| rw.body.head::<Memory>(*m)).collect::<Result<Vec<_>, _>>()?;
         let mut places: Vec<(String, String, u64, u64)> = Vec::new();
-        let mut at = T::BASE;
+        let mut at = base;
         for ((&m, mut head), sizes) in memories.iter().zip(heads).zip(sizes) {
             let name = Symbol::defined(&head.sym_name)?.to_owned();
             let align = head.align.unwrap_or(T::PAGE).max(T::PAGE);
