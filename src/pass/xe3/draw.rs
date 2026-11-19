@@ -277,7 +277,13 @@ impl<'a> Xe3Draw<'_, 'a> {
         let top = body.top_block(root);
         let modules: Vec<OpId> = body.ops(top).filter(|&m| &*body[m].name == "spirv.module").collect();
         body[root].attributes.push(mlirformat::NamedAttr { name: "gpu.container_module".into(), value: None });
-        let shaders = body.create(OpData::build("gpu.module").with("sym_name", Attribute::str(Xe3Draw::SHADER_MODULE)), &[]);
+        let mut data = OpData::build("gpu.module").with("sym_name", Attribute::str(Xe3Draw::SHADER_MODULE));
+        for &m in &modules {
+            if let Some((stage, names)) = Xe3Draw::builtins(body, m) {
+                data.set(&GpuToXe3::builtins_attr(stage), Attribute::str(&names.join(",")));
+            }
+        }
+        let shaders = body.create(data, &[]);
         let region = body.add_region(shaders);
         let block = body.add_block(region, &[]);
         body.insert(shaders, top, None);
@@ -286,6 +292,30 @@ impl<'a> Xe3Draw<'_, 'a> {
             body.insert(m, block, None);
         }
         PassManager::parse(passes, Xe3Draw::SHADERS)?.run(body, root)
+    }
+
+    /// A spirv.module's stage and the built-in inputs of its entry point, in the order convert-spirv-entry-points
+    /// gives them its function's first arguments (they have no location: they sort first, in interface order)
+    fn builtins(body: &Body<'a>, module: OpId) -> Option<(ShaderStage, Vec<String>)> {
+        let top = body.top_block(module);
+        let entry = body.ops(top).find(|&e| &*body[e].name == "spirv.EntryPoint")?;
+        let stage = match body[entry].get("execution_model")?.to_string() {
+            m if m.contains("Vertex") => ShaderStage::Vertex,
+            m if m.contains("Fragment") => ShaderStage::Fragment,
+            _ => return None,
+        };
+        let Some(Attribute::Array(interface)) = body[entry].get("interface") else { return None };
+        let mut names = Vec::new();
+        for i in interface {
+            let sym = i.to_string();
+            let sym = sym.trim_start_matches('@').trim_matches('"');
+            let var = body.ops(top).find(|&g| &*body[g].name == "spirv.GlobalVariable" && body[g].get_str("sym_name") == Some(sym))?;
+            let input = body[var].get("type").is_some_and(|t| t.to_string().contains(", Input>"));
+            if let (true, Some(Attribute::Str { lit, .. })) = (input, body[var].get("built_in")) {
+                names.push(lit.to_string());
+            }
+        }
+        (!names.is_empty()).then_some((stage, names))
     }
 
     /// The image of a draw shaped as `d`, built in `body` (a module `compile` left one vertex and one fragment
@@ -427,6 +457,8 @@ impl<'a> Xe3Draw<'_, 'a> {
             instance_count: A::sym("instances"),
             start_vertex_location: A::sym("first"),
             base_vertex_location: 0u32,
+            extended_parameters_present: true,
+            extended_parameter_0: A::sym("first"),
         }))?;
         let vertex_buffers = match d.buffers.is_empty() {
             true => Template::default(),
@@ -648,6 +680,8 @@ impl<'a> Xe3Draw<'_, 'a> {
     /// The draw's state: whether the vertex shader reads buffers (and its binding table is the draw's)
     fn draw(&mut self, d: &Draw<'_>, vh: &Xe3Kernel<'_>, fh: &Xe3Kernel<'_>) -> Result<bool, Error> {
         let inputs = vh.inputs.unwrap_or(0);
+        let system = vh.system.unwrap_or(0);
+        let fetched = inputs + u32::from(system != 0);
         let varyings = vh.varyings.unwrap_or(0);
         if inputs as usize != d.elements.len() {
             return Err(Error(format!("the vertex shader reads {inputs} inputs, the draw gives {}", d.elements.len())));
@@ -701,7 +735,7 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.cmd(&xe3!(Cmd3dstateViewportStatePointersCc { cc_viewport_pointer: A::sym(Xe3Draw::CC_VIEWPORT) }));
         self.cmd(&xe3!(Cmd3dstateViewportStatePointersSfClip { sf_clip_viewport_pointer: A::sym(Xe3Draw::SF_CLIP_VIEWPORT) }));
         self.cmd(&xe3!(Cmd3dstateScissorStatePointers { scissor_rect_pointer: A::sym(Xe3Draw::SCISSOR) }));
-        let units = inputs.max(2 + varyings).div_ceil(4).max(1);
+        let units = fetched.max(2 + varyings).div_ceil(4).max(1);
         let entries_urb = URB_SPACE / units / URB_ENTRY_GRANULE * URB_ENTRY_GRANULE;
         self.cmd(&xe3!(Cmd3dstateUrbAllocVs {
             vs_urb_entry_allocation_size: units - 1,
@@ -728,7 +762,7 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.cmd(&xe3!(Cmd3dstateVs {
             kernel_start_pointer: A::sym(Xe3Draw::VS),
             registers_per_thread: REGISTERS_PER_THREAD,
-            vertex_urb_entry_read_length: inputs.div_ceil(2).max(1),
+            vertex_urb_entry_read_length: fetched.div_ceil(2).max(1),
             binding_table_entry_count: if vs_buffers { table } else { 0 },
             dispatch_grf_start_register_for_urb_data: u32::from(XE3_VS_ATTR_GRF),
             enable: true,
@@ -820,7 +854,7 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.cmd(&xe3!(CmdPipeControl { command_streamer_stall_enable: true }));
 
         self.cmd(&xe3!(Cmd3dstateVfTopology { primitive_topology_type: Genxml::primitive(d.primitive) }));
-        let elements: Vec<_> = d.elements.iter().map(|e| {
+        let mut elements: Vec<_> = d.elements.iter().map(|e| {
             let n = e.format.components();
             let control = |c: u32| Some(Fill::from(if c < n { XE3_VFCOMP_STORE_SRC } else if c < 3 { XE3_VFCOMP_STORE_0 } else { XE3_VFCOMP_STORE_1_FP }));
             let state = StateVertexElementStateFields {
@@ -836,12 +870,35 @@ impl<'a> Xe3Draw<'_, 'a> {
             };
             Fields(Cmd3dstateVertexElementsElement { element: Some(Fields(state)) })
         }).collect();
+        if system != 0 {
+            // the input after the attributes: zeros the vertex fetcher writes the vertex and instance index into
+            let zero = || Some(Fill::from(XE3_VFCOMP_STORE_0));
+            let state = StateVertexElementStateFields {
+                vertex_buffer_index: Some(0u32.into()),
+                source_element_format: Some(SurfaceFormat::R32G32B32A32_FLOAT.into()),
+                valid: Some(true.into()),
+                component_0_control: zero(),
+                component_1_control: zero(),
+                component_2_control: zero(),
+                component_3_control: zero(),
+                ..Default::default()
+            };
+            elements.push(Fields(Cmd3dstateVertexElementsElement { element: Some(Fields(state)) }));
+        }
         self.cmd(&xe3!(Cmd3dstateVertexElements { elements: elements }));
-        for i in 0..d.elements.len() as u32 {
+        for i in 0..fetched {
             self.cmd(&xe3!(Cmd3dstateVfInstancing { vertex_element_index: i, instancing_enable: false, instance_data_step_rate: 0u32 }));
         }
-        self.cmd(&Cmd3dstateVfSgvs::default());
-        self.cmd(&Cmd3dstateVfSgvs2::default());
+        self.cmd(&xe3!(Cmd3dstateVfSgvs {
+            vertexid_enable: system & 1 != 0,
+            vertexid_component_number: 0u32,
+            vertexid_element_offset: inputs,
+            instanceid_enable: system & 2 != 0,
+            instanceid_component_number: 1u32,
+            instanceid_element_offset: inputs,
+        }));
+        // the vertex fetcher's VertexID counts from 0: the vertex index adds the first vertex (extended parameter 0)
+        self.cmd(&xe3!(Cmd3dstateVfSgvs2 { xp0_enable: system & 1 != 0, xp0_source_select: XE3_XP0_PARAMETER, xp0_component_number: 2u32, xp0_element_offset: inputs }));
         self.cmd(&xe3!(Cmd3dstateVfStatistics { statistics_enable: true }));
         self.cmd(&xe3!(Cmd3dstateVf { geometry_distribution_enable: true }));
         self.cmd(&xe3!(Cmd3dstateVfg {
