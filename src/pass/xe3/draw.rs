@@ -775,7 +775,7 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.cmd(&xe3!(Cmd3dstateRaster {
             viewport_z_near_clip_test_enable: true,
             scissor_rectangle_enable: true,
-            front_winding: u32::from(d.front_ccw),
+            front_winding: u32::from(!d.front_ccw),
             cull_mode: Genxml::cull(d.cull),
             viewport_z_far_clip_test_enable: true,
         }));
