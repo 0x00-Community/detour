@@ -1,17 +1,17 @@
 [package]
 # detour is taken on crates.io (a function-hooking library): the package is detour-gpu, the library is still detour
 name = "detour-gpu"
-description = "detour: a GPU userspace driver in Rust over mlirpass: OpenGL ES (src/gl), Vulkan (src/vk), Direct3D 11 and 12 to come; its GPUs' dialects (src/dialect), lowerings (src/pass) and machine code (src/binary)"
 version = "0.2.0"
 edition = "2024"
 # mlirformat's (0.6 onwards) `if let` guards (rust-toolchain.toml pins it here; a git dependent like acde-base reads this)
 rust-version = "1.96"
-license = "Apache-2.0"
-publish = ["ac", "crates-io"]
-repository = "https://github.com/0x00-Community/detour"
+description = "detour: a GPU userspace driver in Rust over mlirpass: OpenGL ES (src/gl), Vulkan (src/vk), Direct3D 11 and 12 to come; its GPUs' dialects (src/dialect), lowerings (src/pass) and machine code (src/binary)"
 readme = "README.md"
+repository = "https://github.com/0x00-Community/detour"
+license = "Apache-2.0"
 # the generators, their Mesa data, the oracles and the tests stay in the repository
 exclude = ["tests", "scripts"]
+publish = ["ac", "crates-io"]
 
 [lib]
 name = "detour"
@@ -19,19 +19,15 @@ path = "src/lib.rs"
 
 [dependencies]
 # mlirformat and mlirpass from crates.io: the same mlirformat for both
-mlirformat = "0.9.0"
+mlirformat = "0"
 # GLSL source and SPIR-V (target.glsl, target.spirv), and the upstream dialects the GPU lowerings start from
-mlirpass = { version = "0.13.1", default-features = false, features = ["std", "all-dialects", "target.glsl"] }
-libm = "0.2"
-moremath = { version = "0.2.1", default-features = false, features = ["alloc"] }
-serde = { version = "1", features = ["derive"] }
+mlirpass = { version = "0", default-features = false, features = ["all-dialects", "std", "target.glsl"] }
+moremath = { version = "0", default-features = false, features = ["alloc"] }
 rustix = { version = "1", features = ["fs", "mm", "time"] }
+serde = { version = "1", features = ["derive"] }
 
 [workspace]
 members = ["scripts/agxgen", "scripts/rdna2gen", "scripts/xe3gen"]
 
 [profile.release]
 debug = 1
-
-
-
