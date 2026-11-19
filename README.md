@@ -31,6 +31,8 @@ builds the command streams and submits them **through the kernel driver's ioctls
 - 🪟 **Direct3D 11 and 12**: to come, on the same backend (shaders through SPIR-V like GL's and Vulkan's).
 - 🔵 **Intel Xe3**: the xe3 dialect (EU instructions, genxml commands and states), SPIR-V and GPU kernels lowered to
   Xe3 machine code, register allocation, scoreboard, a draw's image.
+- 🔴 **AMD RDNA2** (gfx1036): the rdna2 dialect (GFX10 instructions, registers, PM4), GPU kernels lowered to RDNA2
+  machine code and indirect buffers, checked against llvm-mc and Mesa; the `amdgpu` kernel interface is next.
 - 🔌 **On mlirformat and mlirpass as plugins**: `src/dialect` adds the GPU dialects to mlirformat (`MlirOpt::load`),
   `src/pass` adds the lowerings to mlirpass (`Passes::with(DetourPasses::add)`), `src/binary` writes machine code and
   images (`Binaries`, `Read` / `Write`).
@@ -45,8 +47,8 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | --- | --- | --- |
 | 🎨 | Draws (`examples/compare`): the same GLSL and vertices through detour on Xe3 and through Mesa, a 64×64 RGBA32F target | 6 of 10 cases **byte for byte** (triangle, uniforms in both stages, vector `?:`, `\|\|`, component stores); the rest wait for Mesa's NIR math (`mod`, integer division, GLSL built-ins, Mesa's value-changing NIR rewrites) |
 | 📞 | GL calls (`examples/glcalls`): scripts of textures, renderbuffers and framebuffer objects run on detour and on Mesa | **203 / 203** calls: every `glGetError` and every queried value the same |
-| 🔣 | Encodings (`tests/binary`) | Xe3 EU vs gentool and genxml vs Mesa: **2 / 2** |
-| 🪜 | Lowerings (`tests/pass`) | Xe3 kernels as acgpu compiled them, GLSL reaching Xe3: **2 / 2** |
+| 🔣 | Encodings (`tests/binary`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc and Mesa's registers: **4 / 4** |
+| 🪜 | Lowerings (`tests/pass`) | kernels as acgpu compiled them (Xe3, RDNA2), GLSL reaching Xe3, an RDNA2 IB as Mesa writes it: **4 / 4** |
 | 🏁 | Speed against the official drivers (`examples/bench_opengl`, `examples/bench_vulkan`): the same cases on detour and on Mesa (iris for GL ES, ANV for Vulkan with the same SPIR-V), 100 frames of 256×256 a case | a frame takes **~2×** Mesa's (GL ~0.24 ms against ~0.11 ms, Vulkan path ~0.22 against ~0.10: images resident, the framebuffer on the GPU, the context set up once); GL compile + link about as fast (~5 ms against ~5) |
 
 ## 🎮 GPUs
@@ -54,8 +56,9 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | GPU | Kernel driver | Status |
 | --- | --- | --- |
 | 🔵 **Intel Xe3** (Panther Lake, PCI 8086:b0a0) | `xe` | GL ES 3.0 draws in progress (above) |
+| 🔴 **AMD RDNA2** (gfx1036, Granite Ridge Radeon 610M, PCI 1002:13c0) | `amdgpu` | dialect, lowering and PM4 checked against llvm-mc and Mesa; no kernel interface or draws yet |
 
-Xe3 integrated graphics on x86_64 Linux is the only GPU detour drives. There is no fallback: no CPU
+detour drives these integrated GPUs on x86_64 Linux and nothing else. There is no fallback: no CPU
 rasterizer and no hand-off to the system's Vulkan or GL driver.
 
 ## 🗂️ Layout
@@ -65,14 +68,14 @@ rasterizer and no hand-off to the system's Vulkan or GL driver.
 | `src/gl` | GL ES 3.0: context, buffers, vertex arrays, shaders and programs (default uniform block), textures, renderbuffers, framebuffers, GLenums (`enums.gen.rs` from `GLES3/gl3.h`) |
 | `src/vk` | Vulkan (to come) |
 | — | Direct3D 11 and 12 (to come) |
-| `src/dialect` | mlirformat plugins: the `xe3` and `image` dialects |
-| `src/pass` | mlirpass plugins: `convert-gpu-to-*`, register allocation, waits, command streams, image layout, `Xe3Draw`, `gpu-module-to-binary` for SPIR-V |
+| `src/dialect` | mlirformat plugins: the `xe3`, `rdna2` and `image` dialects |
+| `src/pass` | mlirpass plugins: `convert-gpu-to-*`, register allocation, waits, command streams, image layout, `Xe3Draw`, `gpu-module-to-binary` for SPIR-V and RDNA2 |
 | `src/binary` | machine code and images: each GPU's encoder, records packed by layout tables, image writing |
 | `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + detour's passes) and the device a draw runs on |
 | `src/kmd` | the kernel interface: DRM, the `Gpu` trait, and the `xe` driver (`src/kmd/xe`) |
 | `examples/` | `compare` (draws vs Mesa), `glcalls` (GL calls vs Mesa), `bench_opengl` / `bench_vulkan` (speed vs Mesa's GL ES / Vulkan; `support/glbench.c`, `support/vkbench.c`), `gl_link`, `xe_info` |
 | `tests/binary`, `tests/pass` | encodings, and lowerings |
-| `scripts/` | the dialect's generator (`xe3gen`) and the Mesa data it reads (`data/intel`), `gl_enums.py`, and the oracle the tests' expected bytes come from (`xe3_eu_oracle.sh`) |
+| `scripts/` | the dialects' generators (`xe3gen`, `rdna2gen`) and the Mesa data they read (`data/{intel,amd}`), `gl_enums.py`, opcode tables, and the oracles each test's expected bytes come from (`*_oracle.*`) |
 
 ## 🚀 Quick start
 

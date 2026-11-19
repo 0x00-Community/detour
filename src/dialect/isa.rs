@@ -1,4 +1,4 @@
-//! What the GPU instruction-set dialect (`xe3`) is built from: register types
+//! What the GPU instruction-set dialects (`rdna2`, `xe3`) share: register types
 //! (`!xe3.grf<u32>`), the stage a kernel runs as, their op tables, and `attr_ops!`, which declares
 //! instruction ops whose fields are attributes.
 
