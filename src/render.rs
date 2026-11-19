@@ -43,6 +43,8 @@ const VERTEX_ADDR: u64 = 1 << 36;
 const VERTEX_SPAN: u64 = 1 << 32;
 const RING_MIN: usize = 1 << 20;
 const RING_ALIGN: usize = 64;
+/// Bytes a ring compares with the last it was given (more: written again, not compared nor kept)
+const RING_HELD: usize = 64 << 10;
 /// Where surface slot i is mapped (`SURFACE_ADDR + i * SURFACE_SPAN`): a surface takes at most a span
 const SURFACE_ADDR: u64 = 1 << 40;
 const SURFACE_SPAN: u64 = 1 << 30;
@@ -113,13 +115,25 @@ struct Ring<'x> {
     /// the bytes the ring holds (its memory past them mapped too: `GUARD`)
     size: usize,
     at: usize,
-    /// where the last bytes written start, and them
+    /// where the batch being recorded started writing, and the room the next start wants: twice what a batch
+    /// that did not fit asked for, so a frame's draws fit and it starts over at most once a frame
+    mark: usize,
+    want: usize,
+    /// where writing stops: `size`, or below a batch maybe still running after the ring started over at a frame's
+    /// end (`State::submit`)
+    limit: usize,
+    /// where the last bytes written start, and them (`RING_HELD` at most)
     last: Option<(usize, Vec<u8>)>,
 }
 
 impl<'x> Ring<'x> {
     fn new(addr: u64) -> Ring<'x> {
-        Ring { bo: None, addr, size: 0, at: 0, last: None }
+        Ring { bo: None, addr, size: 0, at: 0, mark: 0, want: 0, limit: 0, last: None }
+    }
+
+    /// The batch being recorded did not fit, `len` more bytes asked for: the next start makes room for twice it
+    fn outgrown(&mut self, len: usize) {
+        self.want = self.want.max(2 * (self.at - self.mark.min(self.at) + len + RING_ALIGN));
     }
 
     fn held(&self, bytes: &[u8]) -> Option<usize> {
@@ -133,12 +147,14 @@ impl<'x> Ring<'x> {
 
     /// Whether `bytes` are in place already, or fit after the last
     fn fits(&self, bytes: &[u8]) -> bool {
-        self.held(bytes).is_some() || Ring::after(self.at, [bytes.len()].into_iter()) <= self.size
+        self.held(bytes).is_some() || Ring::after(self.at, [bytes.len()].into_iter()) <= self.limit
     }
 
-    /// The ring from its start, with room for `len` bytes (nothing reading it)
+    /// The ring from its start, with room for `len` bytes and what it wants (nothing reading it)
     fn restart(&mut self, xe: &'x Xe, vm: &XeVm<'x>, len: usize) -> Result<(), Error> {
-        (self.at, self.last) = (0, None);
+        let len = len.max(self.want);
+        (self.at, self.mark, self.want, self.last) = (0, 0, 0, None);
+        self.limit = self.size;
         if len <= self.size {
             return Ok(());
         }
@@ -149,7 +165,7 @@ impl<'x> Ring<'x> {
         }
         let bo = xe.bo((bytes, Caching::WriteCombined).into()).map_err(io)?;
         bind(xe, vm, &bo, 0, self.addr, bytes, MemType::Streaming)?;
-        (self.bo, self.size) = (Some(bo), size);
+        (self.bo, self.size, self.limit) = (Some(bo), size, size);
         Ok(())
     }
 
@@ -166,6 +182,7 @@ impl<'x> Ring<'x> {
         bo.bytes().map_err(io)?[at..at + bytes.len()].copy_from_slice(bytes);
         self.at = at + bytes.len();
         match &mut self.last {
+            _ if bytes.len() > RING_HELD => self.last = None,
             Some((held, b)) => {
                 *held = at;
                 b.clear();
@@ -529,7 +546,33 @@ impl<'x> State<'x> {
                 t.fence = Some(done.clone());
             }
         }
-        self.last = Some(done);
+        let previous = self.last.replace(done);
+        self.wrap(previous)
+    }
+
+    /// After a batch went to the GPU, the vertex and uniform rings: when one has less room left than the batch took,
+    /// each starts over below where the batch began (what the batches before it read, done once the last of them
+    /// is), so the next frame's draws need not wait; a ring that started over so lets its writes past that again
+    /// once the batch before this one is done
+    fn wrap(&mut self, previous: Option<Rc<Syncobj<'x>>>) -> Result<(), Error> {
+        let rings = || self.vertices.iter().chain([&self.uniforms]);
+        let limited = rings().any(|r| r.limit < r.size);
+        let short = rings().any(|r| r.at - r.mark > r.limit.max(r.at) - r.at);
+        if (limited || short)
+            && let Some(p) = &previous
+        {
+            wait(p, "a draw")?;
+        }
+        for r in self.vertices.iter_mut().chain([&mut self.uniforms]) {
+            r.limit = r.size;
+            if short {
+                (r.limit, r.at, r.last) = (r.mark, 0, None);
+            }
+            r.mark = r.at;
+        }
+        if short {
+            self.held.clear();
+        }
         Ok(())
     }
 
@@ -613,6 +656,15 @@ impl<'x> State<'x> {
         let fresh = d.uniforms.iter().filter(|(b, bytes)| !self.held.iter().any(|(h, _, held)| h == b && held == bytes)).map(|(_, bytes)| bytes.len());
         let uniforms = Ring::after(self.uniforms.at, fresh) <= self.uniforms.size;
         calls && dynamic && pool && vertices && uniforms
+    }
+
+    /// Draw `d` did not fit in the batch being recorded: each ring wants room for twice the batch with it
+    fn outgrown(&mut self, d: &Draw<'_>) {
+        for (r, b) in self.vertices.iter_mut().zip(&d.buffers) {
+            r.outgrown(b.bytes.len());
+        }
+        let uniforms = Ring::after(0, d.uniforms.iter().map(|(_, b)| b.len()));
+        self.uniforms.outgrown(uniforms);
     }
 
     /// Every ring from its start, with room for draw `d` (nothing running)
@@ -882,6 +934,7 @@ impl<'x> Device<'x> {
         let i = st.shape(program, d)?;
         st.load(s, &d.target.load)?;
         if !st.fits(i, d) {
+            st.outgrown(d);
             st.settle()?;
             st.restart(d)?;
         }
