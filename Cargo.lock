@@ -281,6 +281,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rdna2gen"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "roxmltree"
 version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
