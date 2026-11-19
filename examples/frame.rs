@@ -31,6 +31,9 @@ const SIZE: u32 = GRID * CELL;
 const FLOATS: usize = 6;
 /// The bytes after each row of an imported buffer (acdes pads its canvases' rows so), and what they hold
 const PAD: u32 = 64;
+/// The heavy frame: draws of 2 MiB of vertices each, as many as acdes's text-heavy desktop makes
+const HEAVY: usize = 2 << 20;
+const HEAVY_DRAWS: u32 = 12;
 const PADDING: u8 = 0xab;
 /// struct udmabuf_create, UDMABUF_CREATE, UDMABUF_FLAGS_CLOEXEC
 #[repr(C)]
@@ -179,6 +182,50 @@ fn udmabuf(size: usize) -> Option<(OwnedFd, &'static mut [u8])> {
     Some((unsafe { OwnedFd::from_raw_fd(fd) }, unsafe { std::slice::from_raw_parts_mut(map.cast(), size) }))
 }
 
+/// Draws of `HEAVY` bytes of vertices each (a cell's quad over and over), `HEAVY_DRAWS` a frame, into `surface`:
+/// the time recording a frame takes and the time its fence then takes, a frame
+fn heavy(xe: &Xe, device: &Device<'_>, program: &Compiled<'_>, surface: Surface, frames: u32) -> (f64, f64) {
+    let mut floats = Vec::new();
+    let mut bytes: Vec<Vec<u8>> = Vec::new();
+    for k in 0..HEAVY_DRAWS {
+        floats.clear();
+        let (x, y) = (k % GRID * CELL, k / GRID * CELL);
+        while floats.len() * 4 < HEAVY {
+            quad(&mut floats, [x, y, x + CELL, y + CELL], color(k));
+        }
+        bytes.push(floats.iter().flat_map(|f| f.to_le_bytes()).collect());
+    }
+    let (mut record, mut fence) = (0.0, 0.0);
+    for _ in 0..frames {
+        let started = Instant::now();
+        for b in &bytes {
+            let d = Draw {
+                buffers: vec![VertexBuffer { bytes: b, stride: (FLOATS * 4) as u32 }],
+                elements: vec![VertexElement { buffer: 0, format: VertexFormat::Float32x2, offset: 0 }, VertexElement { buffer: 0, format: VertexFormat::Float32x4, offset: 8 }],
+                uniforms: Vec::new(),
+                primitive: DrawPrimitive::Triangles,
+                first: 0,
+                count: (b.len() / (FLOATS * 4)) as u32,
+                instances: 1,
+                viewport: [0.0, 0.0, SIZE as f32, SIZE as f32],
+                depth_range: [0.0, 1.0],
+                scissor: None,
+                cull: CullMode::None,
+                front_ccw: true,
+                blend: None,
+                color_mask: [true; 4],
+                target: target(Tiling::Linear, TargetLoad::Keep(&[])),
+            };
+            device.draw(program, &d, surface).unwrap();
+        }
+        let recorded = Instant::now();
+        done(xe, device.fence(surface).unwrap());
+        record += (recorded - started).as_secs_f64();
+        fence += recorded.elapsed().as_secs_f64();
+    }
+    (record * 1e3 / f64::from(frames), fence * 1e3 / f64::from(frames))
+}
+
 /// Draws into dma-buf `fd` imported, `frames` frames, checked through `memory` (the exporter's)
 fn imported(xe: &Xe, device: &Device<'_>, programs: &[Compiled<'_>; 2], what: &str, fd: BorrowedFd<'_>, memory: &mut dyn FnMut() -> Vec<u8>, frames: u32) {
     let pitch = SIZE * 4 + PAD;
@@ -194,6 +241,14 @@ fn imported(xe: &Xe, device: &Device<'_>, programs: &[Compiled<'_>; 2], what: &s
     let each = started.elapsed().as_secs_f64() * 1e3 / f64::from(frames);
     check(&memory(), pitch, true).unwrap_or_else(|e| panic!("{what}: {e}"));
     println!("{what}: every cell right, the row padding kept; {each:.2} ms a frame (fenced, nothing read back)");
+    let (record, fence) = heavy(xe, device, &programs[0], surface, frames);
+    let memory = memory();
+    for k in 0..HEAVY_DRAWS {
+        let (x, y) = (k % GRID * CELL + CELL / 2, k / GRID * CELL + CELL / 2);
+        let at = (y * pitch + x * 4) as usize;
+        assert_eq!(memory[at..at + 4], color(k), "{what}: heavy cell {k}");
+    }
+    println!("{what}, {HEAVY_DRAWS} draws of {} MiB of vertices a frame: recorded in {record:.2} ms, then {fence:.2} ms till its fence", HEAVY >> 20);
     device.free(surface).unwrap();
 }
 
