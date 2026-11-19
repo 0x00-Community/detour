@@ -20,6 +20,7 @@ impl DetourPasses {
             .register::<ConvertGpuToRdna2>()
             .register::<ConvertGpuToXe3>()
             .register::<GpuInlineCalls>()
+            .register::<GpuLocalArrays>()
             .register::<GpuModuleToBinary>()
             .register::<Rdna2Layout>()
             .register::<Rdna2Pad>()
