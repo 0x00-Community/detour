@@ -1,11 +1,9 @@
 #![allow(non_camel_case_types)]
 #![allow(dead_code, reason = "mirrors the uAPI headers, used or not")]
 
-use std::ffi::c_ulong;
+use rustix::ioctl::{Opcode, opcode};
 
-use crate::Ioctl;
-
-const DRM_COMMAND_BASE: c_ulong = Ioctl::COMMAND_BASE;
+use crate::{DRM_COMMAND_BASE, DRM_IOCTL_BASE};
 
 pub const DRM_XE_ENGINE_CLASS_RENDER: u16 = 0;
 pub const DRM_XE_ENGINE_CLASS_COPY: u16 = 1;
@@ -283,16 +281,16 @@ pub struct drm_xe_exec {
     pub reserved: [u64; 2],
 }
 
-pub const DRM_IOCTL_XE_DEVICE_QUERY: c_ulong = Ioctl::wr::<drm_xe_device_query>(DRM_COMMAND_BASE);
-pub const DRM_IOCTL_XE_GEM_CREATE: c_ulong = Ioctl::wr::<drm_xe_gem_create>(DRM_COMMAND_BASE + 0x01);
-pub const DRM_IOCTL_XE_GEM_MMAP_OFFSET: c_ulong = Ioctl::wr::<drm_xe_gem_mmap_offset>(DRM_COMMAND_BASE + 0x02);
-pub const DRM_IOCTL_XE_VM_CREATE: c_ulong = Ioctl::wr::<drm_xe_vm_create>(DRM_COMMAND_BASE + 0x03);
-pub const DRM_IOCTL_XE_VM_DESTROY: c_ulong = Ioctl::w::<drm_xe_vm_destroy>(DRM_COMMAND_BASE + 0x04);
-pub const DRM_IOCTL_XE_VM_BIND: c_ulong = Ioctl::w::<drm_xe_vm_bind>(DRM_COMMAND_BASE + 0x05);
-pub const DRM_IOCTL_XE_EXEC_QUEUE_CREATE: c_ulong = Ioctl::wr::<drm_xe_exec_queue_create>(DRM_COMMAND_BASE + 0x06);
-pub const DRM_IOCTL_XE_EXEC_QUEUE_DESTROY: c_ulong = Ioctl::w::<drm_xe_exec_queue_destroy>(DRM_COMMAND_BASE + 0x07);
-pub const DRM_IOCTL_XE_EXEC_QUEUE_GET_PROPERTY: c_ulong = Ioctl::wr::<drm_xe_exec_queue_get_property>(DRM_COMMAND_BASE + 0x08);
-pub const DRM_IOCTL_XE_EXEC: c_ulong = Ioctl::w::<drm_xe_exec>(DRM_COMMAND_BASE + 0x09);
+pub const DRM_IOCTL_XE_DEVICE_QUERY: Opcode = opcode::read_write::<drm_xe_device_query>(DRM_IOCTL_BASE, DRM_COMMAND_BASE);
+pub const DRM_IOCTL_XE_GEM_CREATE: Opcode = opcode::read_write::<drm_xe_gem_create>(DRM_IOCTL_BASE, DRM_COMMAND_BASE + 0x01);
+pub const DRM_IOCTL_XE_GEM_MMAP_OFFSET: Opcode = opcode::read_write::<drm_xe_gem_mmap_offset>(DRM_IOCTL_BASE, DRM_COMMAND_BASE + 0x02);
+pub const DRM_IOCTL_XE_VM_CREATE: Opcode = opcode::read_write::<drm_xe_vm_create>(DRM_IOCTL_BASE, DRM_COMMAND_BASE + 0x03);
+pub const DRM_IOCTL_XE_VM_DESTROY: Opcode = opcode::write::<drm_xe_vm_destroy>(DRM_IOCTL_BASE, DRM_COMMAND_BASE + 0x04);
+pub const DRM_IOCTL_XE_VM_BIND: Opcode = opcode::write::<drm_xe_vm_bind>(DRM_IOCTL_BASE, DRM_COMMAND_BASE + 0x05);
+pub const DRM_IOCTL_XE_EXEC_QUEUE_CREATE: Opcode = opcode::read_write::<drm_xe_exec_queue_create>(DRM_IOCTL_BASE, DRM_COMMAND_BASE + 0x06);
+pub const DRM_IOCTL_XE_EXEC_QUEUE_DESTROY: Opcode = opcode::write::<drm_xe_exec_queue_destroy>(DRM_IOCTL_BASE, DRM_COMMAND_BASE + 0x07);
+pub const DRM_IOCTL_XE_EXEC_QUEUE_GET_PROPERTY: Opcode = opcode::read_write::<drm_xe_exec_queue_get_property>(DRM_IOCTL_BASE, DRM_COMMAND_BASE + 0x08);
+pub const DRM_IOCTL_XE_EXEC: Opcode = opcode::write::<drm_xe_exec>(DRM_IOCTL_BASE, DRM_COMMAND_BASE + 0x09);
 
 #[cfg(test)]
 mod tests {

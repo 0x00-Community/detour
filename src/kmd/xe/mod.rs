@@ -1,6 +1,6 @@
 mod sys;
 
-use std::ffi::c_ulong;
+use rustix::ioctl::Opcode;
 use std::io;
 use std::os::fd::{BorrowedFd, OwnedFd};
 use std::path::Path;
@@ -10,12 +10,12 @@ use crate::{BoDesc, Caching, DeviceInfo, Engine, Gpu, Map, MemType, Node, Result
 pub use sys::drm_xe_engine_class_instance as EngineInstance;
 
 trait XeNode {
-    fn xe<T>(&self, request: c_ulong, arg: &mut T) -> Result<()>;
+    fn xe<T>(&self, request: Opcode, arg: &mut T) -> Result<()>;
     fn query(&self, kind: u32) -> Result<Query>;
 }
 
 impl XeNode for Node {
-    fn xe<T>(&self, request: c_ulong, arg: &mut T) -> Result<()> {
+    fn xe<T>(&self, request: Opcode, arg: &mut T) -> Result<()> {
         unsafe { self.ioctl(request, arg) }
     }
 

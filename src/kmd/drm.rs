@@ -1,30 +1,51 @@
 #![allow(non_camel_case_types)]
 
-use std::ffi::{c_char, c_int, c_ulong, c_void};
+use std::ffi::{c_char, c_int, c_void};
 use std::fs::OpenOptions;
 use std::io;
-use std::os::fd::{AsRawFd, BorrowedFd, FromRawFd, OwnedFd};
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use rustix::fs::{OFlags, SeekFrom};
+use rustix::io::Errno;
+use rustix::ioctl::{Ioctl, IoctlOutput, Opcode, opcode};
+use rustix::mm::{MapFlags, ProtFlags};
+use rustix::time::ClockId;
+
 use super::{Fence, Result};
 
-pub struct Ioctl;
+pub const DRM_IOCTL_BASE: u8 = b'd';
+pub const DRM_COMMAND_BASE: u8 = 0x40;
 
-impl Ioctl {
-    pub const COMMAND_BASE: c_ulong = 0x40;
-    const WRITE: c_ulong = 1;
-    const READ: c_ulong = 2;
+struct Call<'a, T> {
+    request: Opcode,
+    arg: &'a mut T,
+}
 
-    const fn ioc<T>(dir: c_ulong, ty: u8, nr: c_ulong) -> c_ulong {
-        (dir << 30) | ((size_of::<T>() as c_ulong) << 16) | ((ty as c_ulong) << 8) | nr
+unsafe impl<T> Ioctl for Call<'_, T> {
+    type Output = ();
+    const IS_MUTATING: bool = true;
+
+    fn opcode(&self) -> Opcode {
+        self.request
     }
-    pub const fn w<T>(nr: c_ulong) -> c_ulong {
-        Self::ioc::<T>(Self::WRITE, b'd', nr)
+
+    fn as_ptr(&mut self) -> *mut c_void {
+        (self.arg as *mut T).cast()
     }
-    pub const fn wr<T>(nr: c_ulong) -> c_ulong {
-        Self::ioc::<T>(Self::READ | Self::WRITE, b'd', nr)
+
+    unsafe fn output_from_ptr(_: IoctlOutput, _: *mut c_void) -> rustix::io::Result<()> {
+        Ok(())
+    }
+}
+
+unsafe fn call<T>(fd: BorrowedFd<'_>, request: Opcode, arg: &mut T) -> rustix::io::Result<()> {
+    loop {
+        match unsafe { rustix::ioctl::ioctl(fd, Call { request, arg: &mut *arg }) } {
+            Err(Errno::INTR | Errno::AGAIN) => continue,
+            r => return r,
+        }
     }
 }
 
@@ -115,19 +136,19 @@ const DRM_SYNCOBJ_CREATE_SIGNALED: u32 = 1 << 0;
 const DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL: u32 = 1 << 0;
 const DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT: u32 = 1 << 1;
 const DRM_SYNCOBJ_HANDLE_TO_FD_FLAGS_EXPORT_SYNC_FILE: u32 = 1 << 0;
-const DRM_CLOEXEC: u32 = libc::O_CLOEXEC as u32;
-const DRM_RDWR: u32 = libc::O_RDWR as u32;
+const DRM_CLOEXEC: u32 = OFlags::CLOEXEC.bits();
+const DRM_RDWR: u32 = OFlags::RDWR.bits();
 
-const DRM_IOCTL_VERSION: c_ulong = Ioctl::wr::<drm_version>(0x00);
-const DRM_IOCTL_GEM_CLOSE: c_ulong = Ioctl::w::<drm_gem_close>(0x09);
-const DRM_IOCTL_PRIME_HANDLE_TO_FD: c_ulong = Ioctl::wr::<drm_prime_handle>(0x2d);
-const DRM_IOCTL_PRIME_FD_TO_HANDLE: c_ulong = Ioctl::wr::<drm_prime_handle>(0x2e);
-const DRM_IOCTL_SYNCOBJ_CREATE: c_ulong = Ioctl::wr::<drm_syncobj_create>(0xbf);
-const DRM_IOCTL_SYNCOBJ_DESTROY: c_ulong = Ioctl::wr::<drm_syncobj_destroy>(0xc0);
-const DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD: c_ulong = Ioctl::wr::<drm_syncobj_handle>(0xc1);
-const DRM_IOCTL_SYNCOBJ_WAIT: c_ulong = Ioctl::wr::<drm_syncobj_wait>(0xc3);
-const DRM_IOCTL_SYNCOBJ_SIGNAL: c_ulong = Ioctl::wr::<drm_syncobj_array>(0xc5);
-const SYNC_IOC_FILE_INFO: c_ulong = Ioctl::ioc::<sync_file_info>(Ioctl::READ | Ioctl::WRITE, b'>', 4);
+const DRM_IOCTL_VERSION: Opcode = opcode::read_write::<drm_version>(DRM_IOCTL_BASE, 0x00);
+const DRM_IOCTL_GEM_CLOSE: Opcode = opcode::write::<drm_gem_close>(DRM_IOCTL_BASE, 0x09);
+const DRM_IOCTL_PRIME_HANDLE_TO_FD: Opcode = opcode::read_write::<drm_prime_handle>(DRM_IOCTL_BASE, 0x2d);
+const DRM_IOCTL_PRIME_FD_TO_HANDLE: Opcode = opcode::read_write::<drm_prime_handle>(DRM_IOCTL_BASE, 0x2e);
+const DRM_IOCTL_SYNCOBJ_CREATE: Opcode = opcode::read_write::<drm_syncobj_create>(DRM_IOCTL_BASE, 0xbf);
+const DRM_IOCTL_SYNCOBJ_DESTROY: Opcode = opcode::read_write::<drm_syncobj_destroy>(DRM_IOCTL_BASE, 0xc0);
+const DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD: Opcode = opcode::read_write::<drm_syncobj_handle>(DRM_IOCTL_BASE, 0xc1);
+const DRM_IOCTL_SYNCOBJ_WAIT: Opcode = opcode::read_write::<drm_syncobj_wait>(DRM_IOCTL_BASE, 0xc3);
+const DRM_IOCTL_SYNCOBJ_SIGNAL: Opcode = opcode::read_write::<drm_syncobj_array>(DRM_IOCTL_BASE, 0xc5);
+const SYNC_IOC_FILE_INFO: Opcode = opcode::read_write::<sync_file_info>(b'>', 4);
 
 pub struct Node {
     fd: OwnedFd,
@@ -136,7 +157,7 @@ pub struct Node {
 
 impl Node {
     fn open(path: &Path) -> Result<Node> {
-        let file = OpenOptions::new().read(true).write(true).custom_flags(libc::O_CLOEXEC).open(path)?;
+        let file = OpenOptions::new().read(true).write(true).open(path)?;
         Ok(Node { fd: file.into(), path: path.to_owned() })
     }
 
@@ -165,17 +186,10 @@ impl Node {
         &self.path
     }
 
-    pub unsafe fn ioctl<T>(&self, request: c_ulong, arg: &mut T) -> Result<()> {
-        loop {
-            let r = unsafe { libc::ioctl(self.fd.as_raw_fd(), request as _, arg as *mut T as *mut c_void) };
-            if r != -1 {
-                return Ok(());
-            }
-            let e = io::Error::last_os_error();
-            if !matches!(e.raw_os_error(), Some(libc::EINTR | libc::EAGAIN)) {
-                return Err(e);
-            }
-        }
+    /// # Safety
+    /// `request` must be an ioctl of this node whose argument is a `T`, and every pointer inside `arg` valid for it
+    pub unsafe fn ioctl<T>(&self, request: Opcode, arg: &mut T) -> Result<()> {
+        Ok(unsafe { call(self.fd.as_fd(), request, arg) }?)
     }
 
     pub fn driver(&self) -> Result<String> {
@@ -206,22 +220,14 @@ impl Node {
     }
 
     pub fn import(&self, fd: BorrowedFd<'_>) -> Result<(u32, u64)> {
-        let end = unsafe { libc::lseek(fd.as_raw_fd(), 0, libc::SEEK_END) };
-        if end < 0 {
-            return Err(io::Error::last_os_error());
-        }
+        let end = rustix::fs::seek(fd, SeekFrom::End(0))?;
         let mut p = drm_prime_handle { handle: 0, flags: 0, fd: fd.as_raw_fd() };
         unsafe { self.ioctl(DRM_IOCTL_PRIME_FD_TO_HANDLE, &mut p) }?;
-        Ok((p.handle, end as u64))
+        Ok((p.handle, end))
     }
 
     pub fn map(&self, offset: u64, len: usize) -> Result<Map> {
-        let p = unsafe {
-            libc::mmap(std::ptr::null_mut(), len, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED, self.fd.as_raw_fd(), offset as libc::off_t)
-        };
-        if p == libc::MAP_FAILED {
-            return Err(io::Error::last_os_error());
-        }
+        let p = unsafe { rustix::mm::mmap(std::ptr::null_mut(), len, ProtFlags::READ | ProtFlags::WRITE, MapFlags::SHARED, &self.fd, offset) }?;
         Ok(Map { ptr: p.cast(), len })
     }
 
@@ -245,7 +251,7 @@ impl Map {
 
 impl Drop for Map {
     fn drop(&mut self) {
-        unsafe { libc::munmap(self.ptr.cast(), self.len) };
+        let _ = unsafe { rustix::mm::munmap(self.ptr.cast(), self.len) };
     }
 }
 
@@ -268,18 +274,14 @@ impl Syncobj<'_> {
     pub fn status(&self) -> Result<i32> {
         let file = self.export()?;
         let mut info = sync_file_info::default();
-        let r = unsafe { libc::ioctl(file.as_raw_fd(), SYNC_IOC_FILE_INFO as _, &mut info as *mut sync_file_info as *mut c_void) };
-        if r == -1 {
-            return Err(io::Error::last_os_error());
-        }
+        unsafe { call(file.as_fd(), SYNC_IOC_FILE_INFO, &mut info) }?;
         Ok(info.status)
     }
 }
 
 impl Fence for Syncobj<'_> {
     fn wait(&self, timeout: Duration) -> Result<bool> {
-        let mut now = libc::timespec { tv_sec: 0, tv_nsec: 0 };
-        unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut now) };
+        let now = rustix::time::clock_gettime(ClockId::Monotonic);
         let deadline = (now.tv_sec * 1_000_000_000 + now.tv_nsec).saturating_add(timeout.as_nanos() as i64);
         let handles = [self.handle];
         let mut w = drm_syncobj_wait {
@@ -289,10 +291,10 @@ impl Fence for Syncobj<'_> {
             flags: DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL | DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT,
             ..Default::default()
         };
-        match unsafe { self.node.ioctl(DRM_IOCTL_SYNCOBJ_WAIT, &mut w) } {
+        match unsafe { call(self.node.fd.as_fd(), DRM_IOCTL_SYNCOBJ_WAIT, &mut w) } {
             Ok(()) => Ok(true),
-            Err(e) if e.raw_os_error() == Some(libc::ETIME) => Ok(false),
-            Err(e) => Err(e),
+            Err(Errno::TIME) => Ok(false),
+            Err(e) => Err(e.into()),
         }
     }
 
