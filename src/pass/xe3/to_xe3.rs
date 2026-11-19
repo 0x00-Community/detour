@@ -34,7 +34,7 @@ pub const XE3_SIMD: u8 = 16;
 
 pub const XE3_VS_ATTR_GRF: u8 = 2;
 
-pub const XE3_MAX_VARYINGS: usize = 2;
+pub const XE3_MAX_VARYINGS: usize = 16;
 
 pub const XE3_MAX_TARGETS: usize = 8;
 
