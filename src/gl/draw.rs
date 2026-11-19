@@ -199,6 +199,8 @@ impl Context<'_> {
             }),
             cull,
             front_ccw: s.front_ccw,
+            blend: s.blend.then_some(s.blending),
+            color_mask: s.color_mask,
             target: ColorTarget { width: fb.width, height: fb.height, format: fb.format, tiling: fb.tiling, load: fb.load() },
         };
         let surface = match fb.surface {

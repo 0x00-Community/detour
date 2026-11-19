@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use mlirformat::Error;
 
+use crate::{BlendEquation, BlendFactor};
+
 use super::{GlslPipelines, Attrib, Buffer, BufferTarget, Capability, GlError, GlResult, Linked, Names, Program, Shader, ShaderType, State, Usage, UniformValue, VertexArray};
 use super::{ColorBuffer, DefaultFramebuffer, Framebuffer, MAX_COMBINED_TEXTURE_IMAGE_UNITS, Renderbuffer, Texture, TextureTarget, Unpack};
 use crate::ColorFormat;
@@ -371,5 +373,36 @@ impl<'t> Context<'t> {
 
     pub fn clear_color(&mut self, rgba: [f32; 4]) {
         self.state.clear_color = rgba.map(|c| c.clamp(0.0, 1.0));
+    }
+
+    /// glBlendFunc
+    pub fn blend_func(&mut self, src: BlendFactor, dst: BlendFactor) {
+        self.blend_func_separate(src, dst, src, dst);
+    }
+
+    /// glBlendFuncSeparate
+    pub fn blend_func_separate(&mut self, src_rgb: BlendFactor, dst_rgb: BlendFactor, src_alpha: BlendFactor, dst_alpha: BlendFactor) {
+        self.state.blending.src = [src_rgb, src_alpha];
+        self.state.blending.dst = [dst_rgb, dst_alpha];
+    }
+
+    /// glBlendEquation
+    pub fn blend_equation(&mut self, mode: BlendEquation) {
+        self.blend_equation_separate(mode, mode);
+    }
+
+    /// glBlendEquationSeparate
+    pub fn blend_equation_separate(&mut self, rgb: BlendEquation, alpha: BlendEquation) {
+        self.state.blending.equation = [rgb, alpha];
+    }
+
+    /// glBlendColor
+    pub fn blend_color(&mut self, rgba: [f32; 4]) {
+        self.state.blending.color = rgba.map(|c| c.clamp(0.0, 1.0));
+    }
+
+    /// glColorMask
+    pub fn color_mask(&mut self, red: bool, green: bool, blue: bool, alpha: bool) {
+        self.state.color_mask = [red, green, blue, alpha];
     }
 }

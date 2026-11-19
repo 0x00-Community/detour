@@ -1,3 +1,5 @@
+use crate::Blend;
+
 /// glEnable / glDisable capabilities (GL ES 3.0)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Capability {
@@ -20,51 +22,6 @@ pub struct Rect {
     pub y: i32,
     pub width: u32,
     pub height: u32,
-}
-
-/// glBlendFunc factors
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BlendFactor {
-    Zero,
-    One,
-    SrcColor,
-    OneMinusSrcColor,
-    DstColor,
-    OneMinusDstColor,
-    SrcAlpha,
-    OneMinusSrcAlpha,
-    DstAlpha,
-    OneMinusDstAlpha,
-    ConstantColor,
-    OneMinusConstantColor,
-    ConstantAlpha,
-    OneMinusConstantAlpha,
-    SrcAlphaSaturate,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum BlendEquation {
-    #[default]
-    Add,
-    Subtract,
-    ReverseSubtract,
-    Min,
-    Max,
-}
-
-/// RGB and alpha each
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Blend {
-    pub src: [BlendFactor; 2],
-    pub dst: [BlendFactor; 2],
-    pub equation: [BlendEquation; 2],
-    pub color: [f32; 4],
-}
-
-impl Default for Blend {
-    fn default() -> Self {
-        Blend { src: [BlendFactor::One; 2], dst: [BlendFactor::Zero; 2], equation: [BlendEquation::Add; 2], color: [0.0; 4] }
-    }
 }
 
 /// Depth and stencil comparisons
