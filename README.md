@@ -47,6 +47,7 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | --- | --- | --- |
 | 🎨 | Draws (`examples/compare`): the same GLSL and vertices through detour on Xe3 and through Mesa, a 64×64 RGBA32F target | 6 of 10 cases **byte for byte** (triangle, uniforms in both stages, vector `?:`, `\|\|`, component stores); the rest wait for Mesa's NIR math (`mod`, integer division, GLSL built-ins, Mesa's value-changing NIR rewrites) |
 | 📞 | GL calls (`examples/glcalls`): scripts of textures, renderbuffers and framebuffer objects run on detour and on Mesa | **203 / 203** calls: every `glGetError` and every queried value the same |
+| ✅ | Correctness (`examples/correct`): draws through `Device::draw` against a CPU reference (pixel centres, 8-bit sub-pixel snapping, the top-left rule, GL ES blending, Vulkan's precision for shader math) and against Mesa on the same GPU: coverage, shared edges, thin, degenerate and huge triangles, strips, first / count, culling, scissors, viewports, instancing, every blend factor and equation, the color mask, vertex formats and strides, interpolation, std140 blocks, built-ins, 15 varyings, local arrays, 20 math functions with NaN, infinities and denormals | **752 / 752** cases: fixed function **byte for byte as Mesa**; the f32 reference ±1 only where Xe3 blends or rounds to unorm8 (Mesa the same) |
 | 🔣 | Encodings (`tests/binary`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc and Mesa's registers: **4 / 4** |
 | 🪜 | Lowerings (`tests/pass`) | kernels as acgpu compiled them (Xe3, RDNA2), GLSL reaching Xe3, an RDNA2 IB as Mesa writes it: **4 / 4** |
 | 🏁 | Speed against the official drivers (`examples/bench_opengl`, `examples/bench_vulkan`): the same cases on detour and on Mesa (iris for GL ES, ANV for Vulkan with the same SPIR-V), 100 frames of 256×256 a case | a frame takes **~2×** Mesa's (GL ~0.24 ms against ~0.11 ms, Vulkan path ~0.22 against ~0.10: images resident, the framebuffer on the GPU, the context set up once); GL compile + link about as fast (~5 ms against ~5) |
@@ -73,7 +74,7 @@ rasterizer and no hand-off to the system's Vulkan or GL driver.
 | `src/binary` | machine code and images: each GPU's encoder, records packed by layout tables, image writing |
 | `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + detour's passes) and the device a draw runs on |
 | `src/kmd` | the kernel interface: DRM, the `Gpu` trait, and the `xe` driver (`src/kmd/xe`) |
-| `examples/` | `compare` (draws vs Mesa), `glcalls` (GL calls vs Mesa), `bench_opengl` / `bench_vulkan` (speed vs Mesa's GL ES / Vulkan; `support/glbench.c`, `support/vkbench.c`), `gl_link`, `xe_info` |
+| `examples/` | `compare` (draws vs Mesa), `glcalls` (GL calls vs Mesa), `bench_opengl` / `bench_vulkan` (speed vs Mesa's GL ES / Vulkan; `support/glbench.c`, `support/vkbench.c`), `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `gl_link`, `xe_info` |
 | `tests/binary`, `tests/pass` | encodings, and lowerings |
 | `scripts/` | the dialects' generators (`xe3gen`, `rdna2gen`) and the Mesa data they read (`data/{intel,amd}`), `gl_enums.py`, opcode tables, and the oracles each test's expected bytes come from (`*_oracle.*`) |
 
@@ -95,6 +96,10 @@ cc -O2 -o glbench examples/support/glbench.c -lEGL -lGLESv2
 cargo run --release --example bench_opengl -- ./glbench
 cc -O2 -o vkbench examples/support/vkbench.c -lvulkan
 cargo run --release --example bench_vulkan -- ./vkbench
+
+# ✅ correctness vs a CPU reference and Mesa
+cc -O1 -o glref examples/support/glref.c -lEGL -lGLESv2
+GLREF=./glref cargo run --release --example correct
 
 # 📞 GL calls vs Mesa
 cc -O1 -o glcalls examples/support/glcalls.c -lEGL -lGLESv2

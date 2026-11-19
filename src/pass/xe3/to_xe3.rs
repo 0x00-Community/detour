@@ -16,6 +16,9 @@ const LSC_SLM_FENCE: u32 = 31 | 2 << 7;
 
 type Cr<'r, 'a, 'p> = ConversionRewriter<'r, 'a, 'p>;
 
+/// Something that writes an EU instruction (name, operands, attributes, result element) and gives its result
+type Emit<'e> = dyn FnMut(&str, &[ValueId], Vec<(&str, A)>, &'static str) -> ValueId + 'e;
+
 mod std450;
 use std450::Std450;
 
@@ -31,7 +34,7 @@ pub const XE3_SIMD: u8 = 16;
 
 pub const XE3_VS_ATTR_GRF: u8 = 2;
 
-pub const XE3_MAX_VARYINGS: usize = 2;
+pub const XE3_MAX_VARYINGS: usize = 16;
 
 pub const XE3_MAX_TARGETS: usize = 8;
 
@@ -210,7 +213,25 @@ impl GpuToXe3 {
         for i in indices {
             let crate::Def::Result(c, _) = body[*i].def else { return None };
             let k = Attrs::as_int(body[c].get("value")?).ok()? as usize;
+            if let Some((n, _)) = Xe3Types::of(&ty).filter(|_| SpirvType::try_from(&ty).is_err()) {
+                // a vector's component
+                if k >= n {
+                    return None;
+                }
+                at += 4 * k as i64;
+                ty = match &ty {
+                    Type::Shaped(s) => (*s.elem).clone(),
+                    t => t.clone(),
+                };
+                stride = None;
+                continue;
+            }
             match SpirvType::try_from(&ty).ok()? {
+                SpirvType::Matrix { cols, column } if (k as u64) < u64::from(cols) => {
+                    at += stride? * i64::try_from(k).ok()?;
+                    ty = (*column).clone();
+                    stride = None;
+                }
                 SpirvType::Struct { members: Some(m), .. } => {
                     at += i64::from(m.get(k)?.offset?);
                     stride = m[k].decorations.iter().find(|d| d.name == Self::MATRIX_STRIDE).and_then(|d| d.value.as_deref()?.parse().ok());
@@ -251,6 +272,20 @@ impl GpuToXe3 {
             for (n, arg) in args.into_iter().enumerate() {
                 let g = *regs.get(n).ok_or_else(|| Error("kernel: more arguments than payload entries".into()))?;
                 let ty = rw.body[arg].ty.clone();
+                if g <= Self::VERTEX_INDEX {
+                    let r = Self::VERTEX_INDEX - g;
+                    let [id, first] = [r, r + 2].map(|g| OpData::of(&EuPayload::new(g, Grf("i32").into())).map(|(data, _)| data));
+                    let (id, first) = (put(&mut rw, id?, ty.clone()), put(&mut rw, first?, ty.clone()));
+                    let v = put(&mut rw, OpData::build("xe3.eu.add").operands(&[id, first]), ty);
+                    rw.replace_all_uses(arg, v);
+                    continue;
+                }
+                if g < 0 {
+                    let used = !rw.body[arg].uses.is_empty();
+                    let Some(v) = Self::fragment_builtin(&mut rw, g, used)? else { continue };
+                    rw.replace_all_uses(arg, v);
+                    continue;
+                }
                 let v = match bary {
                     Some((bx, by)) => {
                         let k = g as usize;
@@ -269,13 +304,43 @@ impl GpuToXe3 {
                 rw.create(data, &[]);
             }
             let reserve = match (fragment, compute) {
-                (true, _) => Interpolate::end(setup, regs.iter().map(|k| *k as usize + 1).max().unwrap_or(0)),
+                (true, _) => Interpolate::end(setup, regs.iter().filter(|k| **k >= 0).map(|k| *k as usize + 1).max().unwrap_or(0)),
                 (_, true) => XE3_COMPUTE_INLINE_GRF + 1,
-                _ => regs.iter().map(|g| *g as u8 + 1).max().unwrap_or(0),
+                _ => regs.iter().map(|&g| if g <= Self::VERTEX_INDEX { Self::VERTEX_INDEX - g + 3 } else { g + 1 }).max().unwrap_or(0).max(0) as u8,
             };
             rw.update::<Kernel>(k, |k| k.reserve = Some(u32::from(reserve)))?;
         }
         Ok(())
+    }
+
+    /// A fragment built-in's value (`Self::FRAG_COORD`, `Self::FRONT_FACING`) from the SIMD16 thread payload, as
+    /// Mesa reads it on Xe2+: each subspan's (2×2 pixels) upper-left x and y as words at r0.40, 44, 48, 52 (y two
+    /// bytes after x), lanes in subspan order and in each the upper left, upper right, lower left, lower right
+    /// pixel; the polygon's back-facing bit 11 of the word at r0.36. None: a component nothing reads. The offsets
+    /// added to each lane are Mesa's: into a dword, lane i takes the immediate vector's half-byte 2i (mod 8)
+    fn fragment_builtin<'a>(rw: &mut Rewriter<'_, 'a>, code: i64, used: bool) -> Result<Option<ValueId>, Error> {
+        let mut put = |name: &str, operands: &[ValueId], attrs: Vec<(&str, A)>, elem: &'static str| {
+            let data = OpData::build(name).operands(operands).with_attrs(attrs).with_attrs(vec![("exec", A::from(XE3_SIMD))]);
+            let p = rw.create(data, &[Type::from(Grf(elem))]);
+            rw.body[p].results[0]
+        };
+        let axis = |put: &mut Emit<'_>, at: u8, offsets: u32| {
+            let int = put("xe3.eu.add", &[], vec![("src0", A::str(format!("r0.{at}<2;4,0>:uw"))), ("src1", A::str(format!("{offsets:#x}:v")))], "i32");
+            let float = put("xe3.eu.mov", &[int], vec![], "f32");
+            put("xe3.eu.add", &[float], vec![("src1", A::str("0x3f000000:f"))], "f32")
+        };
+        Ok(match code {
+            c if c == Self::FRAG_COORD => Some(axis(&mut put, 40, 0x0100_0100)),
+            c if c == Self::FRAG_COORD - 1 => Some(axis(&mut put, 42, 0x0101_0000)),
+            c if c == Self::FRONT_FACING => {
+                let back = put("xe3.eu.and", &[], vec![("src0", A::str("r0.36<0;1,0>:uw")), ("src1", A::str("0x800:uw")), ("as", A::str("ud"))], "i32");
+                let bit = put("xe3.eu.shr", &[back], vec![("src1", A::str("0xb:ud")), ("unsigned", A::Bool(true))], "i32");
+                let front = put("xe3.eu.add", &[bit], vec![("src1", A::str("0xffffffff:d"))], "i32");
+                Some(put("xe3.eu.mov", &[front], vec![("as", A::str("ud"))], "f32"))
+            }
+            _ if used => return Err(Error("gl_FragCoord.z and .w are not supported yet".into())),
+            _ => None,
+        })
     }
 
     const URB: Lsc = Lsc {
@@ -380,6 +445,38 @@ impl GpuToXe3 {
             _ => None,
         }
     }
+
+    /// The attribute of a shader module listing a stage's built-in inputs (comma separated): they are the first
+    /// arguments of its entry point
+    pub fn builtins_attr(stage: Stage) -> String {
+        format!("xe3.builtins.{stage:?}").to_lowercase()
+    }
+
+    fn builtins(body: &Body<'_>, f: OpId, stage: Stage) -> Vec<String> {
+        let names = body.parent_op(f).and_then(|m| body[m].get_str(&Self::builtins_attr(stage)).map(str::to_owned));
+        names.map(|n| n.split(',').filter(|s| !s.is_empty()).map(str::to_owned).collect()).unwrap_or_default()
+    }
+
+    /// Where a built-in's components come from: a vertex's indices are written by the vertex fetcher into the
+    /// input after the attributes (`after`: its first register), the vertex index's component 0, the instance
+    /// index's 1; a fragment's position and facing come from the thread payload (`Self::FRAG_COORD`,
+    /// `Self::FRONT_FACING`)
+    fn builtin_payload(name: &str, stage: Stage, after: usize) -> Option<Vec<i64>> {
+        match (stage, name) {
+            (Stage::Vertex, "VertexIndex") => Some(vec![Self::VERTEX_INDEX - after as i64]),
+            (Stage::Vertex, "InstanceIndex") => Some(vec![after as i64 + 1]),
+            (Stage::Fragment, "FragCoord") => Some((0..4).map(|c| Self::FRAG_COORD - c).collect()),
+            (Stage::Fragment, "FrontFacing") => Some(vec![Self::FRONT_FACING]),
+            _ => None,
+        }
+    }
+
+    /// Payload entries that are not registers: gl_FragCoord's x (then y, z, w below it), gl_FrontFacing, and the
+    /// vertex index (less the register `r` of the vertex fetcher's VertexID: the sum of it and r + 2, the first
+    /// vertex)
+    pub const FRAG_COORD: i64 = -1;
+    pub const FRONT_FACING: i64 = -5;
+    pub const VERTEX_INDEX: i64 = -1000;
 
     fn interface_inputs(body: &Body<'_>, f: OpId, inputs: &[Type<'_>]) -> usize {
         let Some(Attribute::Array(attrs)) = body[f].get("arg_attrs") else { return inputs.len() };
@@ -522,21 +619,35 @@ impl GpuToXe3 {
         let attributions: Vec<ValueId> = cr.rw.body[entry].args[fty.inputs.len()..].to_vec();
         let mut sig = SignatureConversion::new(fty.inputs.len() + attributions.len());
         let mut payload = Vec::new();
-        let inputs = Self::interface_inputs(cr.rw.body, op, &fty.inputs);
+        let all = Self::interface_inputs(cr.rw.body, op, &fty.inputs);
+        let builtins = Self::builtins(cr.rw.body, op, stage);
+        let Some(inputs) = all.checked_sub(builtins.len()) else { return false };
+        let mut system = 0u32;
         for (i, t) in fty.inputs.iter().enumerate() {
-            if i >= inputs {
+            if i >= all {
                 sig.add_inputs(i, Vec::new());
                 continue;
             }
             let Some((n, elem)) = Xe3Types::of(t) else { return false };
-            if stage == Stage::Compute {
-                if n != 1 || i >= XE3_COMPUTE_PARAMS {
-                    return false;
+            let base = if stage == Stage::Vertex { XE3_VS_ATTR_GRF as usize } else { 0 };
+            match builtins.get(i).map(String::as_str) {
+                Some(b) => {
+                    let Some(at) = Self::builtin_payload(b, stage, base + 4 * inputs) else { return false };
+                    if stage == Stage::Vertex {
+                        system |= if b == "VertexIndex" { 1 } else { 2 };
+                    }
+                    payload.extend(at.into_iter().take(n));
                 }
-                payload.push(i as i64);
-            } else {
-                let base = if stage == Stage::Vertex { XE3_VS_ATTR_GRF as usize } else { 0 };
-                payload.extend((0..n).map(|c| (base + 4 * i + c) as i64));
+                None if stage == Stage::Compute => {
+                    if n != 1 || i >= XE3_COMPUTE_PARAMS {
+                        return false;
+                    }
+                    payload.push(i as i64);
+                }
+                None => {
+                    let j = i - builtins.len();
+                    payload.extend((0..n).map(|c| (base + 4 * j + c) as i64));
+                }
             }
             sig.add_inputs(i, vec![Type::from(Grf(elem)); n]);
         }
@@ -575,8 +686,9 @@ impl GpuToXe3 {
             buffers: Some(buffers),
             push: Some(push),
             threads: (stage == Stage::Compute && threads > 1).then_some(threads),
+            system: (system != 0).then_some(system),
             shared: (stage == Stage::Compute && shared > 0).then_some(shared),
-            ..Kernel::new(name, Some(stage), None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, mlirformat::Region { blocks: Vec::new() })
+            ..Kernel::new(name, Some(stage), None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, mlirformat::Region { blocks: Vec::new() })
         };
         let Ok(data) = OpData::head(&kernel) else { return false };
         cr.rw.set_before(op);

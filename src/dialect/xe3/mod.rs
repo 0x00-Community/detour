@@ -73,7 +73,7 @@ pub struct EuPayload<'a> {
 impl Xe3Dialect {
     pub const INHERENT: &[(&str, &[&str])] = &[
         ("xe3.eu.payload", &["grf"]),
-        ("xe3.kernel", &["sym_name", "stage", "simd", "payload", "inputs", "varyings", "targets", "omask", "imask", "bindings", "buffers", "push", "reserve", "threads", "shared", "params", "pad", "align"]),
+        ("xe3.kernel", &["sym_name", "stage", "simd", "payload", "inputs", "varyings", "targets", "omask", "imask", "bindings", "buffers", "push", "reserve", "threads", "shared", "params", "pad", "align", "system"]),
     ];
 }
 
@@ -98,6 +98,9 @@ pub struct Xe3Kernel<'a> {
     pub params: Option<u32>,
     pub pad: Option<u64>,
     pub align: Option<u64>,
+    /// the system values the vertex fetcher writes into the input after the attributes: 1 the vertex index, 2 the
+    /// instance index
+    pub system: Option<u32>,
     pub body: mlirformat::Region<'a>,
 }
 

@@ -45,6 +45,7 @@ detour 是**我们自己的 GPU 驱动用户态**. GL 状态、着色器到机�
 | --- | --- | --- |
 | 🎨 | 绘制 (`examples/compare`): 同一份 GLSL 和顶点分别经 detour 在 Xe3 上画、经 Mesa 画, 64×64 RGBA32F | 10 个用例里 6 个**逐字节一致** (三角形、两个阶段的 uniform、向量 `?:`、`\|\|`、写分量); 其余的等 Mesa 的 NIR 数学 (`mod`、整数除法、GLSL 内建函数、Mesa 改值的 NIR 优化) |
 | 📞 | GL 调用 (`examples/glcalls`): 纹理、renderbuffer、framebuffer 对象的调用脚本分别在 detour 和 Mesa 上跑 | **203 / 203** 次调用: 每次 `glGetError` 和每个查询值都相同 |
+| ✅ | 正确性 (`examples/correct`): 经 `Device::draw` 绘制, 对照 CPU 参考 (像素中心、8 位子像素对齐、左上规则、GL ES 混合、着色器数学按 Vulkan 的精度) 和同一 GPU 上的 Mesa: 覆盖、共享边、细的 / 退化的 / 极大的三角形、strip、first / count、剔除、裁剪、视口、实例化、所有混合因子和方程、颜色掩码、顶点格式和步长、插值、std140 块、内建变量、15 个 varying、局部数组、20 个数学函数 (含 NaN、无穷、非规格化数) | **752 / 752** 例: 固定功能**和 Mesa 逐字节相同**; 只在 Xe3 混合或转 unorm8 处与 f32 参考差 ±1 (Mesa 相同) |
 | 🔣 | 编码 (`tests/binary`) | Xe3 EU 对 gentool、genxml 对 Mesa, RDNA2 对 llvm-mc 和 Mesa 寄存器宏: **4 / 4** |
 | 🪜 | 下降 (`tests/pass`) | kernel 对 acgpu (Xe3、RDNA2)、GLSL 到 Xe3、RDNA2 IB 对 Mesa: **4 / 4** |
 | 🏁 | 和官方驱动比速度 (`examples/bench_opengl`、`examples/bench_vulkan`): 同一批用例分别在 detour 和 Mesa 上跑 (GL ES 对 iris, Vulkan 用同一份 SPIR-V 对 ANV), 每例 100 帧 256×256 | 每帧是 Mesa 的**约 2 倍** (GL 约 0.24 ms 对 0.11 ms, Vulkan 路径约 0.22 对 0.10: 镜像常驻、帧缓冲留在 GPU、上下文只设一次); GL 编译 + 链接和 Mesa 相当 (约 5 ms 对 5) |
@@ -70,7 +71,7 @@ detour 只驱动 x86_64 Linux 上的这两种核显. 没有任何回退: 没有 
 | `src/binary` | 机器码和镜像: 各 GPU 的编码器、按布局表打包记录、写出镜像 |
 | `src/shader.rs`、`src/render.rs` | 工具链 (mlirpass + detour 的 pass) 和执行绘制的设备 |
 | `src/kmd` | 内核接口: DRM、`Gpu` trait、`xe` 驱动 (`src/kmd/xe`) |
-| `examples/` | `compare` (绘制对 Mesa)、`glcalls` (GL 调用对 Mesa)、`bench_opengl` / `bench_vulkan` (和 Mesa 的 GL ES / Vulkan 比速度; `support/glbench.c`、`support/vkbench.c`)、`gl_link`、`xe_info` |
+| `examples/` | `compare` (绘制对 Mesa)、`glcalls` (GL 调用对 Mesa)、`bench_opengl` / `bench_vulkan` (和 Mesa 的 GL ES / Vulkan 比速度; `support/glbench.c`、`support/vkbench.c`)、`correct` (正确性对 CPU 参考和 Mesa; `support/glref.c`)、`gl_link`、`xe_info` |
 | `tests/binary`、`tests/pass` | 编码、下降 |
 | `scripts/` | 方言生成器 (`xe3gen`、`rdna2gen`) 和它们读的 Mesa 数据 (`data/{intel,amd}`)、`gl_enums.py`、opcode 表, 以及各测试期望值的来源 (`*_oracle.*`) |
 
@@ -92,6 +93,10 @@ cc -O2 -o glbench examples/support/glbench.c -lEGL -lGLESv2
 cargo run --release --example bench_opengl -- ./glbench
 cc -O2 -o vkbench examples/support/vkbench.c -lvulkan
 cargo run --release --example bench_vulkan -- ./vkbench
+
+# ✅ 正确性对 CPU 参考和 Mesa
+cc -O1 -o glref examples/support/glref.c -lEGL -lGLESv2
+GLREF=./glref cargo run --release --example correct
 
 # 📞 GL 调用对 Mesa
 cc -O1 -o glcalls examples/support/glcalls.c -lEGL -lGLESv2

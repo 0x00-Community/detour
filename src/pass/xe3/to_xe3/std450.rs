@@ -216,8 +216,11 @@ impl Std450 {
                     Self::min(cr, op, lo, c)
                 }
                 "spirv.GL.FMix" => {
-                    let d = Self::sub(cr, op, b, a);
-                    Self::mad(cr, op, a, c, d)
+                    // GLSL's x·(1 − a) + y·a: y when a is 1, and no overflow in y − x
+                    let one = Self::imm(cr, op, 1.0);
+                    let rest = Self::sub(cr, op, one, c);
+                    let ya = Self::mul(cr, op, b, c);
+                    Self::mad(cr, op, ya, a, rest)
                 }
                 _ => {
                     let span = Self::sub(cr, op, b, a);
