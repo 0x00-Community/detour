@@ -213,7 +213,25 @@ impl GpuToXe3 {
         for i in indices {
             let crate::Def::Result(c, _) = body[*i].def else { return None };
             let k = Attrs::as_int(body[c].get("value")?).ok()? as usize;
+            if let Some((n, _)) = Xe3Types::of(&ty).filter(|_| SpirvType::try_from(&ty).is_err()) {
+                // a vector's component
+                if k >= n {
+                    return None;
+                }
+                at += 4 * k as i64;
+                ty = match &ty {
+                    Type::Shaped(s) => (*s.elem).clone(),
+                    t => t.clone(),
+                };
+                stride = None;
+                continue;
+            }
             match SpirvType::try_from(&ty).ok()? {
+                SpirvType::Matrix { cols, column } if (k as u64) < u64::from(cols) => {
+                    at += stride? * i64::try_from(k).ok()?;
+                    ty = (*column).clone();
+                    stride = None;
+                }
                 SpirvType::Struct { members: Some(m), .. } => {
                     at += i64::from(m.get(k)?.offset?);
                     stride = m[k].decorations.iter().find(|d| d.name == Self::MATRIX_STRIDE).and_then(|d| d.value.as_deref()?.parse().ok());
