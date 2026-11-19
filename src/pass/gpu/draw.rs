@@ -19,6 +19,51 @@ pub enum CullMode {
     Back,
 }
 
+/// A blend factor (glBlendFunc's)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BlendFactor {
+    Zero,
+    One,
+    SrcColor,
+    OneMinusSrcColor,
+    DstColor,
+    OneMinusDstColor,
+    SrcAlpha,
+    OneMinusSrcAlpha,
+    DstAlpha,
+    OneMinusDstAlpha,
+    ConstantColor,
+    OneMinusConstantColor,
+    ConstantAlpha,
+    OneMinusConstantAlpha,
+    SrcAlphaSaturate,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum BlendEquation {
+    #[default]
+    Add,
+    Subtract,
+    ReverseSubtract,
+    Min,
+    Max,
+}
+
+/// How a draw blends into its target: RGB's and alpha's factors and equations, and the constant color
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Blend {
+    pub src: [BlendFactor; 2],
+    pub dst: [BlendFactor; 2],
+    pub equation: [BlendEquation; 2],
+    pub color: [f32; 4],
+}
+
+impl Default for Blend {
+    fn default() -> Self {
+        Blend { src: [BlendFactor::One; 2], dst: [BlendFactor::Zero; 2], equation: [BlendEquation::Add; 2], color: [0.0; 4] }
+    }
+}
+
 /// A vertex attribute's format in its buffer
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VertexFormat {
@@ -199,5 +244,9 @@ pub struct Draw<'d> {
     pub scissor: Option<[u32; 4]>,
     pub cull: CullMode,
     pub front_ccw: bool,
+    /// None: the fragments replace the target's pixels
+    pub blend: Option<Blend>,
+    /// red, green, blue, alpha: written or kept
+    pub color_mask: [bool; 4],
     pub target: ColorTarget<'d>,
 }

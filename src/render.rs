@@ -315,7 +315,10 @@ fn key(program: u64, d: &Draw<'_>) -> u64 {
     (discriminant(&d.primitive), d.first, d.count, d.instances).hash(&mut h);
     d.viewport.map(f32::to_bits).hash(&mut h);
     d.depth_range.map(f32::to_bits).hash(&mut h);
-    (d.scissor, discriminant(&d.cull), d.front_ccw).hash(&mut h);
+    (d.scissor, discriminant(&d.cull), d.front_ccw, d.color_mask, d.blend.is_some()).hash(&mut h);
+    if let Some(b) = &d.blend {
+        (b.src.map(|f| f as u8), b.dst.map(|f| f as u8), b.equation.map(|e| e as u8), b.color.map(f32::to_bits)).hash(&mut h);
+    }
     (d.target.width, d.target.height, discriminant(&d.target.format), d.target.tiling).hash(&mut h);
     h.finish()
 }

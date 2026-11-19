@@ -112,6 +112,8 @@ impl Spirv {
             scissor: None,
             cull: CullMode::None,
             front_ccw: true,
+            blend: None,
+            color_mask: [true; 4],
             target,
         };
         let mut times = Vec::new();

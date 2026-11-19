@@ -102,6 +102,49 @@ const BUFFER_WIDTH_BITS: u32 = 7;
 const BUFFER_HEIGHT_BITS: u32 = 14;
 const BUFFER_DEPTH_BITS: u32 = 11;
 
+/// GL's blending as the blend state's factors and functions
+struct XeBlend;
+
+impl XeBlend {
+    const fn factor(f: BlendFactor) -> u32 {
+        match f {
+            BlendFactor::Zero => XE3_BLENDFACTOR_ZERO,
+            BlendFactor::One => XE3_BLENDFACTOR_ONE,
+            BlendFactor::SrcColor => XE3_BLENDFACTOR_SRC_COLOR,
+            BlendFactor::OneMinusSrcColor => XE3_BLENDFACTOR_INV_SRC_COLOR,
+            BlendFactor::DstColor => XE3_BLENDFACTOR_DST_COLOR,
+            BlendFactor::OneMinusDstColor => XE3_BLENDFACTOR_INV_DST_COLOR,
+            BlendFactor::SrcAlpha => XE3_BLENDFACTOR_SRC_ALPHA,
+            BlendFactor::OneMinusSrcAlpha => XE3_BLENDFACTOR_INV_SRC_ALPHA,
+            BlendFactor::DstAlpha => XE3_BLENDFACTOR_DST_ALPHA,
+            BlendFactor::OneMinusDstAlpha => XE3_BLENDFACTOR_INV_DST_ALPHA,
+            BlendFactor::ConstantColor => XE3_BLENDFACTOR_CONST_COLOR,
+            BlendFactor::OneMinusConstantColor => XE3_BLENDFACTOR_INV_CONST_COLOR,
+            BlendFactor::ConstantAlpha => XE3_BLENDFACTOR_CONST_ALPHA,
+            BlendFactor::OneMinusConstantAlpha => XE3_BLENDFACTOR_INV_CONST_ALPHA,
+            BlendFactor::SrcAlphaSaturate => XE3_BLENDFACTOR_SRC_ALPHA_SATURATE,
+        }
+    }
+
+    const fn function(e: BlendEquation) -> u32 {
+        match e {
+            BlendEquation::Add => XE3_BLENDFUNCTION_ADD,
+            BlendEquation::Subtract => XE3_BLENDFUNCTION_SUBTRACT,
+            BlendEquation::ReverseSubtract => XE3_BLENDFUNCTION_REVERSE_SUBTRACT,
+            BlendEquation::Min => XE3_BLENDFUNCTION_MIN,
+            BlendEquation::Max => XE3_BLENDFUNCTION_MAX,
+        }
+    }
+
+    /// Channel `i`'s (0 RGB, 1 alpha) source and destination factors: MIN and MAX ignore GL's factors, as ONE
+    const fn factors(b: &Blend, i: usize) -> [u32; 2] {
+        match b.equation[i] {
+            BlendEquation::Min | BlendEquation::Max => [XE3_BLENDFACTOR_ONE; 2],
+            _ => [XeBlend::factor(b.src[i]), XeBlend::factor(b.dst[i])],
+        }
+    }
+}
+
 /// genxml's SURFACE_FORMAT values the draw uses
 struct SurfaceFormat;
 
@@ -501,9 +544,35 @@ impl<'a> Xe3Draw<'_, 'a> {
             return Err(Error("a draw on Xe3: one color target and no textures, for now".into()));
         }
         self.viewport(d);
-        self.state(false, Xe3Draw::COLOR_CALC, STATE_ALIGN, &xe3!(StateColorCalcState { alpha_test_format: ALPHA_TEST_FLOAT }));
-        self.state(false, Xe3Draw::BLEND, STATE_ALIGN, &xe3!(StateBlendState { color_dither_enable: true, alpha_test_function: ALPHA_TEST_NEVER_USED }));
+        let blend = d.blend.unwrap_or_default();
+        let [red, green, blue, alpha] = blend.color;
+        self.state(false, Xe3Draw::COLOR_CALC, STATE_ALIGN, &xe3!(StateColorCalcState {
+            alpha_test_format: ALPHA_TEST_FLOAT,
+            blend_constant_color_red: red,
+            blend_constant_color_green: green,
+            blend_constant_color_blue: blue,
+            blend_constant_color_alpha: alpha,
+        }));
+        let independent = blend.src[0] != blend.src[1] || blend.dst[0] != blend.dst[1] || blend.equation[0] != blend.equation[1];
+        self.state(false, Xe3Draw::BLEND, STATE_ALIGN, &xe3!(StateBlendState {
+            color_dither_enable: true,
+            alpha_test_function: ALPHA_TEST_NEVER_USED,
+            independent_alpha_blend_enable: independent,
+        }));
+        let [rgb, alpha] = [XeBlend::factors(&blend, 0), XeBlend::factors(&blend, 1)];
+        let [r, g, b, a] = d.color_mask;
         let entry = self.put(self.code, &xe3!(StateBlendStateEntry {
+            write_disable_red: !r,
+            write_disable_green: !g,
+            write_disable_blue: !b,
+            write_disable_alpha: !a,
+            color_buffer_blend_enable: d.blend.is_some(),
+            source_blend_factor: rgb[0],
+            destination_blend_factor: rgb[1],
+            color_blend_function: XeBlend::function(blend.equation[0]),
+            source_alpha_blend_factor: alpha[0],
+            destination_alpha_blend_factor: alpha[1],
+            alpha_blend_function: XeBlend::function(blend.equation[1]),
             post_blend_color_clamp_enable: true,
             pre_blend_color_clamp_enable: true,
             color_clamp_range: XE3_COLORCLAMP_RTFORMAT,
@@ -631,7 +700,15 @@ impl<'a> Xe3Draw<'_, 'a> {
         }));
         let swiz: Vec<_> = (0..SBE_SWIZZLES).map(|i| Fields(StateSfOutputAttributeDetailFields { source_attribute: (i < varyings).then(|| i.into()), ..Default::default() })).collect();
         self.cmd(&xe3!(Cmd3dstateSbeSwiz { attribute: swiz }));
-        self.cmd(&xe3!(Cmd3dstatePsBlend { has_writeable_rt: true }));
+        self.cmd(&xe3!(Cmd3dstatePsBlend {
+            has_writeable_rt: d.color_mask.iter().any(|c| *c),
+            color_buffer_blend_enable: d.blend.is_some(),
+            independent_alpha_blend_enable: independent,
+            source_blend_factor: rgb[0],
+            destination_blend_factor: rgb[1],
+            source_alpha_blend_factor: alpha[0],
+            destination_alpha_blend_factor: alpha[1],
+        }));
         self.cmd(&Cmd3dstateWmDepthStencil::default());
         self.cmd(&Cmd3dstateDepthBounds::default());
         self.cmd(&xe3!(Cmd3dstateDepthBuffer { surface_type: XE3_SURFTYPE_NULL, surface_format: XE3_D32_FLOAT, mocs: MOCS }));

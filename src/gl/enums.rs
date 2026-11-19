@@ -1,3 +1,5 @@
+use crate::{BlendEquation, BlendFactor};
+
 use super::{
     AttachPoint, BufferTarget, ColorBuffer, Compare, Filter, FramebufferStatus, FramebufferTarget, GlError, GlResult, ImageTarget, InternalFormat, PixelFormat, PixelType, ShaderType, Swizzle, TextureTarget,
     Usage, Wrap,
@@ -20,7 +22,7 @@ macro_rules! gl_enums {
     )*};
 }
 
-gl_enums!(GlError, BufferTarget, Usage, ShaderType, TextureTarget, ImageTarget, InternalFormat, PixelFormat, PixelType, Filter, Wrap, Compare, Swizzle, FramebufferTarget, FramebufferStatus);
+gl_enums!(BlendFactor, BlendEquation, GlError, BufferTarget, Usage, ShaderType, TextureTarget, ImageTarget, InternalFormat, PixelFormat, PixelType, Filter, Wrap, Compare, Swizzle, FramebufferTarget, FramebufferStatus);
 
 impl Gl {
     /// A value by its name (with or without GL_)
@@ -42,6 +44,36 @@ impl GlError {
         (Gl::INVALID_OPERATION, GlError::InvalidOperation),
         (Gl::INVALID_FRAMEBUFFER_OPERATION, GlError::InvalidFramebufferOperation),
         (Gl::OUT_OF_MEMORY, GlError::OutOfMemory),
+    ];
+}
+
+impl BlendFactor {
+    const GL: &[(u32, Self)] = &[
+        (Gl::ZERO, BlendFactor::Zero),
+        (Gl::ONE, BlendFactor::One),
+        (Gl::SRC_COLOR, BlendFactor::SrcColor),
+        (Gl::ONE_MINUS_SRC_COLOR, BlendFactor::OneMinusSrcColor),
+        (Gl::DST_COLOR, BlendFactor::DstColor),
+        (Gl::ONE_MINUS_DST_COLOR, BlendFactor::OneMinusDstColor),
+        (Gl::SRC_ALPHA, BlendFactor::SrcAlpha),
+        (Gl::ONE_MINUS_SRC_ALPHA, BlendFactor::OneMinusSrcAlpha),
+        (Gl::DST_ALPHA, BlendFactor::DstAlpha),
+        (Gl::ONE_MINUS_DST_ALPHA, BlendFactor::OneMinusDstAlpha),
+        (Gl::CONSTANT_COLOR, BlendFactor::ConstantColor),
+        (Gl::ONE_MINUS_CONSTANT_COLOR, BlendFactor::OneMinusConstantColor),
+        (Gl::CONSTANT_ALPHA, BlendFactor::ConstantAlpha),
+        (Gl::ONE_MINUS_CONSTANT_ALPHA, BlendFactor::OneMinusConstantAlpha),
+        (Gl::SRC_ALPHA_SATURATE, BlendFactor::SrcAlphaSaturate),
+    ];
+}
+
+impl BlendEquation {
+    const GL: &[(u32, Self)] = &[
+        (Gl::FUNC_ADD, BlendEquation::Add),
+        (Gl::FUNC_SUBTRACT, BlendEquation::Subtract),
+        (Gl::FUNC_REVERSE_SUBTRACT, BlendEquation::ReverseSubtract),
+        (Gl::MIN, BlendEquation::Min),
+        (Gl::MAX, BlendEquation::Max),
     ];
 }
 
