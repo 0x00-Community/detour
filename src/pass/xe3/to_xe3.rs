@@ -16,6 +16,9 @@ const LSC_SLM_FENCE: u32 = 31 | 2 << 7;
 
 type Cr<'r, 'a, 'p> = ConversionRewriter<'r, 'a, 'p>;
 
+mod std450;
+use std450::Std450;
+
 pub const XE3_COMPUTE_PARAMS: usize = 8;
 
 pub const XE3_COMPUTE_INLINE_GRF: u8 = 2;
@@ -1179,6 +1182,54 @@ impl GpuToXe3 {
     #[convert("vector.shuffle")]
     fn shuffle(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
         cr.lanes_shuffle(op, o)
+    }
+
+    #[convert("spirv.GL.Exp", "spirv.GL.Exp2", "spirv.GL.Log", "spirv.GL.Log2", "spirv.GL.InverseSqrt", "spirv.GL.Sin", "spirv.GL.Cos", "spirv.GL.Tan", "spirv.GL.Atan", "spirv.GL.Fract", "spirv.GL.Trunc", "spirv.GL.Radians", "spirv.GL.Degrees", "spirv.GL.FSign")]
+    fn std450_unary(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
+        let name = cr.rw.body[op].name.to_string();
+        Std450::unary(cr, op, o, &name)
+    }
+
+    #[convert("spirv.GL.Pow", "spirv.GL.Atan2", "spirv.GL.Step", "spirv.FMod")]
+    fn std450_binary(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
+        let name = cr.rw.body[op].name.to_string();
+        Std450::binary(cr, op, o, &name)
+    }
+
+    #[convert("spirv.GL.FClamp", "spirv.GL.FMix", "spirv.GL.SmoothStep")]
+    fn std450_ternary(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
+        let name = cr.rw.body[op].name.to_string();
+        Std450::ternary(cr, op, o, &name)
+    }
+
+    #[convert("spirv.Dot", "spirv.GL.Length", "spirv.GL.Distance")]
+    fn std450_reduce(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
+        let name = cr.rw.body[op].name.to_string();
+        Std450::reduce(cr, op, o, &name)
+    }
+
+    #[convert("spirv.GL.Normalize", "spirv.GL.Cross", "spirv.GL.Reflect")]
+    fn std450_vector(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
+        let name = cr.rw.body[op].name.to_string();
+        Std450::vector(cr, op, o, &name)
+    }
+
+    #[convert("spirv.UDiv", "spirv.UMod", "spirv.SDiv", "spirv.SRem", "spirv.SMod")]
+    fn std450_divide(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
+        let name = cr.rw.body[op].name.to_string();
+        Std450::divide(cr, op, o, &name)
+    }
+
+    #[convert("spirv.SNegate", "spirv.GL.SAbs", "spirv.GL.SSign")]
+    fn std450_integer(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
+        let name = cr.rw.body[op].name.to_string();
+        Std450::integer(cr, op, o, &name)
+    }
+
+    #[convert("spirv.GL.SClamp", "spirv.GL.UClamp")]
+    fn std450_clamp(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
+        let unsigned = &*cr.rw.body[op].name == "spirv.GL.UClamp";
+        Std450::clamp(cr, op, o, unsigned)
     }
 
 }

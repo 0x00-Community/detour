@@ -50,7 +50,10 @@ impl Case {
         let differing: Vec<usize> = (0..ours.len() / PIXEL).filter(|&i| ours[i * PIXEL..(i + 1) * PIXEL] != theirs[i * PIXEL..(i + 1) * PIXEL]).collect();
         match differing.first() {
             None => Ok(format!("ok ({covered} pixels)")),
-            Some(&i) => Err(format!("{} of {covered} pixels differ; ({}, {}) detour {:?} mesa {:?}", differing.len(), i as u32 % SIZE, i as u32 / SIZE, px(&ours, i), px(&theirs, i))),
+            Some(&i) => {
+                let worst = differing.iter().flat_map(|&j| px(&ours, j).into_iter().zip(px(&theirs, j)).map(|(a, b)| (a - b).abs() / b.abs().max(1.0))).fold(0.0f32, f32::max);
+                Err(format!("{} of {covered} pixels differ, by at most {worst:e} (relative); ({}, {}) detour {:?} mesa {:?}", differing.len(), i as u32 % SIZE, i as u32 / SIZE, px(&ours, i), px(&theirs, i)))
+            }
         }
     }
 }
