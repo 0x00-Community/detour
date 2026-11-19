@@ -136,6 +136,7 @@ const DRM_SYNCOBJ_CREATE_SIGNALED: u32 = 1 << 0;
 const DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL: u32 = 1 << 0;
 const DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT: u32 = 1 << 1;
 const DRM_SYNCOBJ_HANDLE_TO_FD_FLAGS_EXPORT_SYNC_FILE: u32 = 1 << 0;
+const DRM_SYNCOBJ_FD_TO_HANDLE_FLAGS_IMPORT_SYNC_FILE: u32 = 1 << 0;
 const DRM_CLOEXEC: u32 = OFlags::CLOEXEC.bits();
 const DRM_RDWR: u32 = OFlags::RDWR.bits();
 
@@ -146,6 +147,7 @@ const DRM_IOCTL_PRIME_FD_TO_HANDLE: Opcode = opcode::read_write::<drm_prime_hand
 const DRM_IOCTL_SYNCOBJ_CREATE: Opcode = opcode::read_write::<drm_syncobj_create>(DRM_IOCTL_BASE, 0xbf);
 const DRM_IOCTL_SYNCOBJ_DESTROY: Opcode = opcode::read_write::<drm_syncobj_destroy>(DRM_IOCTL_BASE, 0xc0);
 const DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD: Opcode = opcode::read_write::<drm_syncobj_handle>(DRM_IOCTL_BASE, 0xc1);
+const DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE: Opcode = opcode::read_write::<drm_syncobj_handle>(DRM_IOCTL_BASE, 0xc2);
 const DRM_IOCTL_SYNCOBJ_WAIT: Opcode = opcode::read_write::<drm_syncobj_wait>(DRM_IOCTL_BASE, 0xc3);
 const DRM_IOCTL_SYNCOBJ_SIGNAL: Opcode = opcode::read_write::<drm_syncobj_array>(DRM_IOCTL_BASE, 0xc5);
 const SYNC_IOC_FILE_INFO: Opcode = opcode::read_write::<sync_file_info>(b'>', 4);
@@ -271,6 +273,12 @@ impl Syncobj<'_> {
         unsafe { self.node.ioctl(DRM_IOCTL_SYNCOBJ_SIGNAL, &mut a) }
     }
 
+    /// The fence of `sync_file` put in it: a wait on it waits for that
+    pub fn import(&self, sync_file: BorrowedFd<'_>) -> Result<()> {
+        let mut h = drm_syncobj_handle { handle: self.handle, flags: DRM_SYNCOBJ_FD_TO_HANDLE_FLAGS_IMPORT_SYNC_FILE, fd: sync_file.as_raw_fd(), ..Default::default() };
+        unsafe { self.node.ioctl(DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, &mut h) }
+    }
+
     pub fn status(&self) -> Result<i32> {
         let file = self.export()?;
         let mut info = sync_file_info::default();
@@ -324,6 +332,7 @@ mod tests {
         assert_eq!(DRM_IOCTL_VERSION, 0xc040_6400);
         assert_eq!(DRM_IOCTL_SYNCOBJ_WAIT, 0xc028_64c3);
         assert_eq!(DRM_IOCTL_SYNCOBJ_SIGNAL, 0xc010_64c5);
+        assert_eq!(DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, 0xc018_64c2);
         assert_eq!(SYNC_IOC_FILE_INFO, 0xc038_3e04);
     }
 }
