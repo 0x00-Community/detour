@@ -1,8 +1,5 @@
-//! detour's passes: each GPU's lowering and command streams against what Mesa, acgpu and the M4 ran
+//! detour's passes: each GPU's lowering and command streams against what Mesa and acgpu ran
 
-mod agx;
-mod apple9;
-mod rdna2;
 mod xe3;
 
 use mlirpass::Passes;

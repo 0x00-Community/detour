@@ -5,7 +5,7 @@ version = "0.2.0"
 edition = "2024"
 # mlirformat's (0.6 onwards) `if let` guards (rust-toolchain.toml pins it here; a git dependent like acde-base reads this)
 rust-version = "1.96"
-description = "detour: a GPU userspace driver in Rust over mlirpass: OpenGL ES (src/gl), Vulkan (src/vk), Direct3D 11 and 12 to come; its GPUs' dialects (src/dialect), lowerings (src/pass) and machine code (src/binary)"
+description = "detour: a GPU userspace driver in Rust over mlirpass: OpenGL ES (src/gl), Vulkan (src/vk), Direct3D 11 and 12 to come; the Xe3 dialects (src/dialect), lowerings (src/pass) and machine code (src/binary)"
 readme = "README.md"
 repository = "https://github.com/0x00-Community/detour"
 license = "Apache-2.0"
@@ -27,7 +27,7 @@ rustix = { version = "1", features = ["fs", "mm", "time"] }
 serde = { version = "1", features = ["derive"] }
 
 [workspace]
-members = ["scripts/agxgen", "scripts/rdna2gen", "scripts/xe3gen"]
+members = ["scripts/xe3gen"]
 
 [profile.release]
 debug = 1

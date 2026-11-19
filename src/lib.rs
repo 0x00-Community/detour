@@ -1,6 +1,6 @@
-//! detour: a GPU user-mode driver over mlirpass: the kernel interface, shaders to machine code, OpenGL (gl) and Vulkan (vk).
-//! Its GPU dialects are mlirformat plugins (`dialect`), its lowerings mlirpass plugins (`pass`), and their machine code
-//! and images what it writes (`binary`).
+//! detour: a user-mode driver for Intel Xe3 integrated graphics over mlirpass: the kernel interface, shaders to
+//! machine code, OpenGL (gl) and Vulkan (vk). Its Xe3 dialects are mlirformat plugins (`dialect`), its lowerings mlirpass plugins
+//! (`pass`), and their machine code and images what it writes (`binary`).
 
 extern crate alloc;
 
@@ -22,7 +22,7 @@ pub use pass::*;
 pub use render::*;
 pub use shader::*;
 pub use tiling::*;
-// gl's names win over the GPU dialects' ops of the same name (`agx.texture`: AgxTexture)
+// gl's names win over mlirpass's of the same name, glob-imported below
 pub use gl::{Names, Texture};
 
 // The passes came from mlirpass and name its items as `crate::…`, as its #[pass] / #[patterns] /

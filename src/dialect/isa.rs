@@ -1,5 +1,5 @@
-//! What the GPU instruction-set dialects (`apple9`, `agx`, `rdna2`, `xe3`) share: register types
-//! (`!apple9.r<u32>`), the stage a kernel runs as, their op tables, and `attr_ops!`, which declares
+//! What the GPU instruction-set dialect (`xe3`) is built from: register types
+//! (`!xe3.grf<u32>`), the stage a kernel runs as, their op tables, and `attr_ops!`, which declares
 //! instruction ops whose fields are attributes.
 
 use alloc::borrow::ToOwned;
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use mlirformat::{Error, Extended, Type};
 
-/// A register type: the dialect's register type name and what it holds (`!apple9.r<u32>`)
+/// A register type: the dialect's register type name and what it holds (`!xe3.grf<u32>`)
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RegType<'t> {
     pub name: &'t str,
@@ -60,7 +60,7 @@ impl OpRows {
     }
 }
 
-/// Instruction ops whose fields are attributes: `"apple9.iadd"(%a, %b) {dst = 3} : (…) -> …`
+/// Instruction ops whose fields are attributes: `"xe3.eu.add"(%a, %b) {dst = 3} : (…) -> …`
 #[macro_export]
 macro_rules! attr_ops {
     ($ns:tt $set:ident; $($ty:ident $op:literal,)*) => {
