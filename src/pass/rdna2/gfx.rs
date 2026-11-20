@@ -101,10 +101,29 @@ fn abs(o: Opnd) -> Opnd {
     }
 }
 
+/// The components of a value its users read (all, unless only extracted from)
+fn used(body: &Body<'_>, v: ValueId) -> Vec<u32> {
+    let lanes = Xe3Types::lanes(&body[v].ty).unwrap_or(1) as u32;
+    let mut set = BTreeSet::new();
+    for u in body[v].uses.iter() {
+        let o = u.op;
+        if &*body[o].name == "vector.extract"
+            && let Some(p) = body.dense_i64(o, "static_position").first()
+        {
+            set.insert(*p as u32);
+            continue;
+        }
+        return (0..lanes).collect();
+    }
+    set.into_iter().collect()
+}
+
 type Memo = BTreeMap<(Op, Vec<Opnd>, bool), Src>;
 
 struct Lower<'b, 'a> {
     body: &'b Body<'a>,
+    /// the shader's ABI (where its textures' descriptors are)
+    abi: Rdna2Shader,
     regs: Vec<VReg>,
     code: Vec<Inst>,
     vals: BTreeMap<ValueId, Vec<Val>>,
@@ -121,10 +140,8 @@ impl<'b, 'a> Lower<'b, 'a> {
             return Err(Error(format!("RDNA2: built-in inputs ({names}) not yet")));
         }
         let vertex = stage == ShaderStage::Vertex;
-        let mut l = Lower { body, regs: Vec::new(), code: Vec::new(), vals: BTreeMap::new(), memo: vec![Memo::new()], labels: 0, ubo: BTreeMap::new() };
         let block = body.top_block(f);
-        let args: Vec<ValueId> = body[block].args.to_vec();
-        let inputs: Vec<ValueId> = args.iter().copied().filter(|a| SpirvType::try_from(&body[*a].ty).is_err()).collect();
+        let inputs: Vec<ValueId> = body[block].args.iter().copied().filter(|a| SpirvType::try_from(&body[*a].ty).is_err()).collect();
         let mut all = Vec::new();
         body.walk(f, &mut |o| all.push(o));
         let int = |o: OpId, n: &str| body[o].get(n).and_then(|a| Attrs::as_int(a).ok()).map(|v| v as u32);
@@ -136,7 +153,7 @@ impl<'b, 'a> Lower<'b, 'a> {
             {
                 let r = body[o].results[0];
                 let set = ubos.entry(b).or_default();
-                for c in l.used(r) {
+                for c in used(body, r) {
                     set.insert(off / 4 + c);
                 }
             } else if name.starts_with("spirv.Image")
@@ -145,7 +162,7 @@ impl<'b, 'a> Lower<'b, 'a> {
                 textures.insert(b);
             }
         }
-        let mut shader = Rdna2Shader {
+        let abi = Rdna2Shader {
             stage,
             code: Vec::new(),
             sgprs: 0,
@@ -156,6 +173,7 @@ impl<'b, 'a> Lower<'b, 'a> {
             textures: textures.into_iter().collect(),
             ps_input: if vertex { 0 } else { RDNA2_PERSP_CENTER },
         };
+        let mut l = Lower { body, abi, regs: Vec::new(), code: Vec::new(), vals: BTreeMap::new(), memo: vec![Memo::new()], labels: 0, ubo: BTreeMap::new() };
         let user = if vertex { RDNA2_VS_USER_SGPR } else { 0 };
         let end = l.label();
         if vertex {
@@ -163,16 +181,15 @@ impl<'b, 'a> Lower<'b, 'a> {
             l.code.push(Inst::Branch { op: Op::SCbranchExecz, label: end });
         }
         for (b, dwords) in &ubos {
-            let base = (user + shader.ubo_sgpr(*b).unwrap_or(0)) as u16;
+            let base = (user + l.abi.ubo_sgpr(*b).unwrap_or(0)) as u16;
             l.preload(*b, base, dwords);
         }
         if vertex {
-            l.fetch(&shader, &inputs)?;
+            l.fetch(&inputs);
         } else {
-            l.interpolate(&inputs, (user + shader.user_sgprs()) as u16);
+            l.interpolate(&inputs, (user + l.abi.user_sgprs()) as u16);
         }
-        let ret = l.block(block, &shader)?;
-        let ret = ret.ok_or_else(|| Error("RDNA2: a shader without a return".into()))?;
+        let ret = l.block(block)?.ok_or_else(|| Error("RDNA2: a shader without a return".into()))?;
         if vertex {
             let types = l.result_lanes(f);
             let mut at = 0;
@@ -187,7 +204,7 @@ impl<'b, 'a> Lower<'b, 'a> {
                 let target = if n == 0 { POS0 } else { PARAM0 + n as u8 - 1 };
                 exports.push(Inst::Exp { target, src, done: n == 0, compr: false, vm: false });
             }
-            shader.varyings = types.len().saturating_sub(1) as u32;
+            l.abi.varyings = types.len().saturating_sub(1) as u32;
             l.code.extend(exports);
         } else {
             let c: Vec<Opnd> = ret.iter().map(|v| l.x(*v)).collect::<Result<_, _>>()?;
@@ -200,12 +217,14 @@ impl<'b, 'a> Lower<'b, 'a> {
         }
         l.code.push(Inst::Label(end));
         l.code.push(Inst::Sopp { op: Op::SEndpgm, imm: 0 });
-        let reserved = user + shader.user_sgprs() + (!vertex) as u32;
+        fold_clamps(&mut l.code);
+        let reserved = user + l.abi.user_sgprs() + (!vertex) as u32;
         let alloc = allocate(&l.code, &l.regs, reserved)?;
         let mut enc = Encoder::new(&alloc.base, &l.regs);
         for i in &l.code {
             enc.emit(i)?;
         }
+        let mut shader = l.abi;
         shader.code = enc.finish()?;
         shader.sgprs = alloc.sgprs;
         shader.vgprs = alloc.vgprs.max(if vertex { 6 } else { 2 });
@@ -230,23 +249,6 @@ impl<'b, 'a> Lower<'b, 'a> {
 
     fn mask_reg(&mut self, uniform: bool) -> u32 {
         self.reg(Class::S, 1, true, uniform)
-    }
-
-    /// The components of a value its users read (all, unless only extracted from)
-    fn used(&self, v: ValueId) -> Vec<u32> {
-        let lanes = Xe3Types::lanes(&self.body[v].ty).unwrap_or(1) as u32;
-        let mut set = BTreeSet::new();
-        for u in self.body[v].uses.iter() {
-            let o = u.op;
-            if &*self.body[o].name == "vector.extract"
-                && let Some(p) = self.body.dense_i64(o, "static_position").first()
-            {
-                set.insert(*p as u32);
-                continue;
-            }
-            return (0..lanes).collect();
-        }
-        set.into_iter().collect()
     }
 
     fn uniform(&self, o: Opnd) -> bool {
@@ -292,25 +294,24 @@ impl<'b, 'a> Lower<'b, 'a> {
     }
 
     /// Each vertex input's used components fetched by vertex index (plus the first vertex)
-    fn fetch(&mut self, shader: &Rdna2Shader, inputs: &[ValueId]) -> Result<(), Error> {
+    fn fetch(&mut self, inputs: &[ValueId]) {
+        let first = Src::Phys((RDNA2_VS_USER_SGPR + self.abi.first_vertex_sgpr()) as u16);
         let mut index = None;
         for (loc, &a) in inputs.iter().enumerate() {
             let lanes = Xe3Types::lanes(&self.body[a].ty).unwrap_or(1);
-            let used = self.used(a);
+            let used = used(self.body, a);
             let Some(&m) = used.last() else {
                 self.vals.insert(a, vec![Val::None; lanes]);
                 continue;
             };
-            let first = Src::Phys((RDNA2_VS_USER_SGPR + shader.first_vertex_sgpr()) as u16);
             let i = *index.get_or_insert_with(|| self.alu(Op::VAddU32, vec![Opnd::of(first), Opnd::of(Src::Phys(VERTEX_INDEX))], false).src);
             let op = [Op::BufferLoadFormatX, Op::BufferLoadFormatXy, Op::BufferLoadFormatXyz, Op::BufferLoadFormatXyzw][m as usize];
             let r = self.reg(Class::V, m as u8 + 1, false, false);
-            let rsrc = (RDNA2_VS_USER_SGPR + shader.input_sgpr(loc as u32)) as u16;
+            let rsrc = (RDNA2_VS_USER_SGPR + self.abi.input_sgpr(loc as u32)) as u16;
             self.code.push(Inst::Mubuf { op, dst: Src::R(r, 0), vindex: i, rsrc });
             let vals = (0..lanes as u32).map(|c| if c <= m { Val::X(Opnd::of(Src::R(r, c as u8))) } else { Val::X(k(if c == 3 { 1.0 } else { 0.0 })) }).collect();
             self.vals.insert(a, vals);
         }
-        Ok(())
     }
 
     /// Each varying's used components interpolated (perspective, center): all `p1`s, then all `p2`s
@@ -319,7 +320,7 @@ impl<'b, 'a> Lower<'b, 'a> {
         for (attr, &a) in inputs.iter().enumerate() {
             let lanes = Xe3Types::lanes(&self.body[a].ty).unwrap_or(1);
             let mut vals = vec![Val::X(k(0.0)); lanes];
-            for c in self.used(a) {
+            for c in used(self.body, a) {
                 let r = self.reg(Class::V, 1, false, false);
                 todo.push((Src::R(r, 0), attr as u8, c as u8));
                 vals[c as usize] = Val::X(Opnd::of(Src::R(r, 0)));
@@ -439,13 +440,6 @@ impl<'b, 'a> Lower<'b, 'a> {
         }
     }
 
-    fn mask_uniform(&self, m: Src) -> bool {
-        match m {
-            Src::R(v, _) => self.regs[v as usize].uniform,
-            _ => true,
-        }
-    }
-
     /// The single user of a value, if one
     fn single_user(&self, v: ValueId) -> Option<&str> {
         let u = self.body[v].uses.single()?;
@@ -499,30 +493,9 @@ impl<'b, 'a> Lower<'b, 'a> {
         }
     }
 
-    /// `x` clamped to [0, 1]: the clamp bit of the op that just made it if nothing else reads it, else `v_med3_f32`
-    fn saturate(&mut self, x: Opnd, only: bool) -> Opnd {
-        if only
-            && x.plain()
-            && let Src::R(v, 0) = x.src
-            && let Some(Inst::Alu { op, dst: Src::R(d, 0), clamp, src }) = self.code.last_mut()
-            && *d == v
-            && !*clamp
-            && matches!(op, Op::VAddF32 | Op::VSubF32 | Op::VMulF32 | Op::VFmaF32 | Op::VMaxF32 | Op::VMinF32 | Op::VMed3F32 | Op::VRcpF32 | Op::VSqrtF32 | Op::VExpF32 | Op::VFloorF32 | Op::VFractF32)
-        {
-            let key = (*op, src.clone(), false);
-            *clamp = true;
-            for m in &mut self.memo {
-                m.remove(&key);
-            }
-            return x;
-        }
-        self.alu(Op::VMed3F32, vec![x, k(0.0), k(1.0)], false)
-    }
-
-    fn clamp(&mut self, x: Opnd, lo: Opnd, hi: Opnd, only: bool) -> Opnd {
+    fn clamp(&mut self, x: Opnd, lo: Opnd, hi: Opnd) -> Opnd {
         match (konst_of(x), konst_of(lo), konst_of(hi)) {
             (Some(v), Some(l), Some(h)) => k(v.max(l).min(h)),
-            (_, Some(l), Some(h)) if l == 0.0 && h == 1.0 => self.saturate(x, only),
             _ => self.alu(Op::VMed3F32, vec![x, lo, hi], false),
         }
     }
@@ -537,7 +510,7 @@ impl<'b, 'a> Lower<'b, 'a> {
     }
 
     /// Lowers a block's ops; its terminator's operands' components (`scf.yield`, `func.return`)
-    fn block(&mut self, block: BlockId, shader: &Rdna2Shader) -> Result<Option<Vec<Val>>, Error> {
+    fn block(&mut self, block: BlockId) -> Result<Option<Vec<Val>>, Error> {
         for o in self.body.block_ops(block) {
             let name = self.body[o].name.to_string();
             if name == "scf.yield" || name == "func.return" {
@@ -547,7 +520,7 @@ impl<'b, 'a> Lower<'b, 'a> {
                 }
                 return Ok(Some(out));
             }
-            self.op(o, &name, shader)?;
+            self.op(o, &name)?;
         }
         Ok(None)
     }
@@ -570,7 +543,7 @@ impl<'b, 'a> Lower<'b, 'a> {
         n
     }
 
-    fn op(&mut self, o: OpId, name: &str, shader: &Rdna2Shader) -> Result<(), Error> {
+    fn op(&mut self, o: OpId, name: &str) -> Result<(), Error> {
         let body = self.body;
         let results: Vec<ValueId> = body[o].results.to_vec();
         let operands: Vec<ValueId> = body[o].operands.to_vec();
@@ -602,9 +575,13 @@ impl<'b, 'a> Lower<'b, 'a> {
             "spirv.AccessChain" => set(self, vec![Val::None]),
             "spirv.Load" => {
                 let int = |n: &str| body[o].get(n).and_then(|a| Attrs::as_int(a).ok()).map(|v| v as u32);
+                if body[o].get("xe3.matrix_stride").is_some() || body[o].get("xe3.push_offset").is_some() {
+                    return Err(Error("RDNA2: matrices and push constants in uniform blocks not yet".into()));
+                }
                 let vals = match (int("xe3.binding"), int("xe3.offset")) {
                     (Some(b), Some(off)) => (0..lanes as u32).map(|c| self.ubo.get(&(b, off / 4 + c)).map_or(Val::None, |s| Val::X(Opnd::of(*s)))).collect(),
-                    _ => vec![Val::None],
+                    _ if matches!(SpirvType::try_from(&body[r.unwrap()].ty), Ok(SpirvType::SampledImage(_))) => vec![Val::None],
+                    _ => return Err(Error(format!("RDNA2: a load of {} not yet", body[r.unwrap()].ty))),
                 };
                 set(self, vals);
             }
@@ -639,10 +616,17 @@ impl<'b, 'a> Lower<'b, 'a> {
             }
             "spirv.ImageSampleImplicitLod" | "spirv.ImageSampleExplicitLod" => {
                 let b = body[o].get("xe3.binding").and_then(|a| Attrs::as_int(a).ok()).ok_or_else(|| Error("RDNA2: a sample of no binding".into()))? as u32;
-                let t = shader.texture_sgpr(b).ok_or_else(|| Error("RDNA2: an unbound texture".into()))?;
+                let t = self.abi.texture_sgpr(b).ok_or_else(|| Error("RDNA2: an unbound texture".into()))?;
+                let explicit_zero = name == "spirv.ImageSampleExplicitLod"
+                    && operands.len() == 3
+                    && matches!(self.vals(operands[2])?.first(), Some(Val::X(o)) if konst_of(*o) == Some(0.0));
+                let image = body[operands[0]].ty.to_string();
+                if !image.contains("Dim2D") || image.contains(" Arrayed") || !(name == "spirv.ImageSampleImplicitLod" && operands.len() == 2 || explicit_zero) {
+                    return Err(Error(format!("RDNA2: {name} of {image}: only 2D, non-arrayed, level 0 sampling (one mip level) yet")));
+                }
                 let coord = self.vals(operands[1])?;
                 let addr = coord.into_iter().map(|c| self.vgpr_val(c)).collect::<Result<Vec<_>, _>>()?;
-                let used = self.used(r.unwrap());
+                let used = used(self.body, r.unwrap());
                 let dmask = used.iter().fold(0u8, |m, c| m | 1 << c);
                 let reg = self.reg(Class::V, used.len().max(1) as u8, false, false);
                 self.code.push(Inst::Mimg { op: Op::ImageSampleLz, dst: Src::R(reg, 0), addr, rsrc: t as u16, samp: (t + 8) as u16, dmask: dmask.max(1) });
@@ -652,7 +636,7 @@ impl<'b, 'a> Lower<'b, 'a> {
                 }
                 set(self, vals);
             }
-            "scf.if" => self.lower_if(o, shader)?,
+            "scf.if" => self.lower_if(o)?,
             "arith.cmpf" => {
                 let p = body[o].get("predicate").and_then(|a| Attrs::as_int(a).ok()).ok_or_else(|| Error("RDNA2: cmpf without predicate".into()))?;
                 let op = match p {
@@ -724,8 +708,7 @@ impl<'b, 'a> Lower<'b, 'a> {
                             (Val::Lazy(Op::VMaxF32, x, lo), hi) | (hi, Val::Lazy(Op::VMaxF32, x, lo)) if konst_of(self.x(hi)?).is_some() => {
                                 let hi = self.x(hi)?;
                                 let (x, lo) = if konst_of(lo).is_some() { (x, lo) } else { (lo, x) };
-                                let single = self.lazy_source_single(operands[0]).unwrap_or(false);
-                                Val::X(self.clamp(x, lo, hi, single))
+                                Val::X(self.clamp(x, lo, hi))
                             }
                             (x, y) => {
                                 let (x, y) = (self.x(x)?, self.x(y)?);
@@ -734,8 +717,7 @@ impl<'b, 'a> Lower<'b, 'a> {
                         },
                         "spirv.GL.FClamp" => {
                             let (x, lo, hi) = (self.x(a(0))?, self.x(a(1))?, self.x(a(2))?);
-                            let single = body[operands[0]].uses.len() == 1;
-                            Val::X(self.clamp(x, lo, hi, single))
+                            Val::X(self.clamp(x, lo, hi))
                         }
                         "math.sqrt" | "spirv.GL.Sqrt" => { let x = self.x(a(0))?; Val::X(self.unary(Op::VSqrtF32, x)) },
                         "math.rsqrt" | "spirv.GL.InverseSqrt" => { let x = self.x(a(0))?; Val::X(self.unary(Op::VRsqF32, x)) },
@@ -777,13 +759,6 @@ impl<'b, 'a> Lower<'b, 'a> {
         Ok(())
     }
 
-    /// Whether the value a lazy max came from is read only by it
-    fn lazy_source_single(&self, v: ValueId) -> Option<bool> {
-        let crate::Def::Result(max, _) = self.body[v].def else { return None };
-        let x = *self.body[max].operands.first()?;
-        Some(self.body[x].uses.len() == 1)
-    }
-
     fn select(&mut self, m: Src, t: Opnd, e: Opnd) -> Opnd {
         if t == e {
             return t;
@@ -796,10 +771,10 @@ impl<'b, 'a> Lower<'b, 'a> {
         self.alu(Op::VCndmaskB32, vec![e, t, Opnd::of(m)], false)
     }
 
-    fn lower_if(&mut self, o: OpId, shader: &Rdna2Shader) -> Result<(), Error> {
+    fn lower_if(&mut self, o: OpId) -> Result<(), Error> {
         let body = self.body;
         let m = self.mask(body[o].operands[0])?;
-        let uniform = self.mask_uniform(m);
+        let uniform = self.uniform(Opnd::of(m));
         let arms: Vec<Option<BlockId>> = body[o].regions.iter().map(|r| body[*r].blocks.first().copied()).collect();
         let (then, els) = (arms.first().copied().flatten(), arms.get(1).copied().flatten());
         let results: Vec<ValueId> = body[o].results.to_vec();
@@ -807,18 +782,18 @@ impl<'b, 'a> Lower<'b, 'a> {
         if let Src::K(c) = m {
             let arm = if c != 0 { then } else { els };
             if let Some(b) = arm {
-                let y = self.block(b, shader)?.unwrap_or_default();
+                let y = self.block(b)?.unwrap_or_default();
                 self.bind(&results, y);
             }
             return Ok(());
         }
         if cost <= if uniform { FLATTEN_UNIFORM } else { FLATTEN_DIVERGENT } {
             let t = match then {
-                Some(b) => self.block(b, shader)?.unwrap_or_default(),
+                Some(b) => self.block(b)?.unwrap_or_default(),
                 None => Vec::new(),
             };
             let e = match els {
-                Some(b) => self.block(b, shader)?.unwrap_or_default(),
+                Some(b) => self.block(b)?.unwrap_or_default(),
                 None => Vec::new(),
             };
             let mut out = Vec::new();
@@ -843,7 +818,7 @@ impl<'b, 'a> Lower<'b, 'a> {
             save = Some(s);
         }
         let mut all_uniform = uniform;
-        all_uniform &= self.arm(then, &rs, shader)?;
+        all_uniform &= self.arm(then, &rs)?;
         if uniform {
             self.code.push(Inst::Branch { op: Op::SBranch, label: end });
         }
@@ -853,7 +828,7 @@ impl<'b, 'a> Lower<'b, 'a> {
             self.code.push(Inst::Alu { op: Op::SAndn2B32, dst: Src::Phys(EXEC), src: vec![Opnd::of(Src::R(s, 0)), exec], clamp: false });
             self.code.push(Inst::Branch { op: Op::SCbranchExecz, label: end });
         }
-        all_uniform &= self.arm(els, &rs, shader)?;
+        all_uniform &= self.arm(els, &rs)?;
         self.code.push(Inst::Label(end));
         if let Some(s) = save {
             let exec = Opnd::of(Src::Phys(EXEC));
@@ -877,11 +852,11 @@ impl<'b, 'a> Lower<'b, 'a> {
 
     /// An if's arm lowered in its own scope, its yields written to `rs` (a value made in the arm and yielded once
     /// is made in its result register); whether all it yields is uniform
-    fn arm(&mut self, block: Option<BlockId>, rs: &[u32], shader: &Rdna2Shader) -> Result<bool, Error> {
+    fn arm(&mut self, block: Option<BlockId>, rs: &[u32]) -> Result<bool, Error> {
         let Some(block) = block else { return Ok(true) };
         let start = self.code.len();
         self.memo.push(Memo::new());
-        let y = self.block(block, shader)?.unwrap_or_default();
+        let y = self.block(block)?.unwrap_or_default();
         let mut uniform = true;
         let mut renamed: BTreeMap<u32, u32> = BTreeMap::new();
         for (i, v) in y.into_iter().enumerate() {
@@ -912,6 +887,59 @@ impl<'b, 'a> Lower<'b, 'a> {
         self.memo.pop();
         Ok(uniform)
     }
+}
+
+/// `v_med3_f32 d, x, 0, 1` of an `x` read nowhere else and made once, by an op with a clamp bit in the same straight
+/// run of code: that op made `d` with its clamp bit set instead (ACO's saturation folding)
+fn fold_clamps(code: &mut Vec<Inst>) {
+    let mut reads: BTreeMap<u32, usize> = BTreeMap::new();
+    let mut made: BTreeMap<u32, (usize, usize)> = BTreeMap::new();
+    for (i, inst) in code.iter().enumerate() {
+        inst.uses(|s| {
+            if let Src::R(v, _) = s {
+                *reads.entry(v).or_default() += 1;
+            }
+        });
+        inst.defs(|s| {
+            if let Src::R(v, _) = s {
+                let e = made.entry(v).or_insert((i, 0));
+                e.1 += 1;
+            }
+        });
+    }
+    let (zero, one) = (Src::K(0), Src::K(1.0f32.to_bits()));
+    let mut drop = BTreeSet::new();
+    for i in 0..code.len() {
+        let Inst::Alu { op: Op::VMed3F32, dst, src, clamp: false } = &code[i] else { continue };
+        let (dst, x) = (*dst, src[0]);
+        if !(x.plain() && src[1] == Opnd::of(zero) && src[2] == Opnd::of(one)) {
+            continue;
+        }
+        let Src::R(v, 0) = x.src else { continue };
+        let Some(&(j, 1)) = made.get(&v) else { continue };
+        let touches_dst = |c: &Inst| {
+            let mut hit = false;
+            c.uses(|s| hit |= s == dst);
+            c.defs(|s| hit |= s == dst);
+            hit
+        };
+        let straight = !code[j..i].iter().any(|c| matches!(c, Inst::Label(_) | Inst::Branch { .. } | Inst::BranchZero { .. }));
+        if reads.get(&v) != Some(&1) || !straight || code[j + 1..i].iter().any(touches_dst) {
+            continue;
+        }
+        if let Inst::Alu { op, dst: d, clamp: c @ false, .. } = &mut code[j]
+            && matches!(op, Op::VAddF32 | Op::VSubF32 | Op::VSubrevF32 | Op::VMulF32 | Op::VFmaF32 | Op::VMaxF32 | Op::VMinF32 | Op::VMed3F32)
+        {
+            *d = dst;
+            *c = true;
+            drop.insert(i);
+        }
+    }
+    let mut i = 0;
+    code.retain(|_| {
+        i += 1;
+        !drop.contains(&(i - 1))
+    });
 }
 
 fn defines(inst: &Inst, v: u32) -> bool {
