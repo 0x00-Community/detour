@@ -12,7 +12,7 @@ mod glsl;
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd};
 use std::time::{Duration, Instant};
 
-use detour::{Isa, Bo, Caching, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
+use detour::{Bo, Caching, Card, CardRef, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
 
 const VARYING: [&str; 2] = [
     "#version 300 es\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec4 color;\nout vec4 c;\nvoid main() { c = color; gl_Position = vec4(pos, 0.0, 1.0); }\n",
@@ -27,8 +27,9 @@ const GRID: u32 = 8;
 const CELL: u32 = 32;
 const SIZE: u32 = GRID * CELL;
 const FLOATS: usize = 6;
-/// The bytes after each row of an imported buffer (acdes pads its canvases' rows so), and what they hold
-const PAD: u32 = 64;
+/// The bytes after each row of an imported buffer (acdes pads its canvases' rows so; RDNA2 draws rows on 256
+/// bytes), and what they hold
+const PAD: u32 = 256;
 /// The heavy frame: draws of 2 MiB of vertices each, as many as acdes's text-heavy desktop makes
 const HEAVY: usize = 2 << 20;
 const HEAVY_DRAWS: u32 = 12;
@@ -154,8 +155,12 @@ fn check(memory: &[u8], pitch: u32, padded: bool) -> Result<(), String> {
 }
 
 /// Waits for sync_file `f`
-fn done(xe: &Xe, f: Option<OwnedFd>) {
-    let s = xe.fence(false).unwrap();
+fn done(device: &Device<'_>, f: Option<OwnedFd>) {
+    let s = match device.card() {
+        CardRef::Xe(xe) => xe.fence(false),
+        CardRef::Amdgpu(amd) => amd.fence(false),
+    }
+    .unwrap();
     s.import(f.expect("a fence").as_fd()).unwrap();
     assert!(s.wait(Duration::from_secs(5)).unwrap(), "the frame did not finish");
 }
@@ -179,7 +184,7 @@ fn udmabuf(size: usize) -> Option<(OwnedFd, &'static mut [u8])> {
 
 /// Draws of `HEAVY` bytes of vertices each (a cell's quad over and over), `HEAVY_DRAWS` a frame, into `surface`:
 /// the time recording a frame takes and the time its fence then takes, a frame
-fn heavy(xe: &Xe, device: &Device<'_>, program: &Compiled, surface: Surface, frames: u32) -> (f64, f64) {
+fn heavy(device: &Device<'_>, program: &Compiled, surface: Surface, frames: u32) -> (f64, f64) {
     let mut floats = Vec::new();
     let mut bytes: Vec<Vec<u8>> = Vec::new();
     for k in 0..HEAVY_DRAWS {
@@ -216,7 +221,7 @@ fn heavy(xe: &Xe, device: &Device<'_>, program: &Compiled, surface: Surface, fra
             device.draw(program, &d, surface).unwrap();
         }
         let recorded = Instant::now();
-        done(xe, device.fence(surface).unwrap());
+        done(device, device.fence(surface).unwrap());
         record += (recorded - started).as_secs_f64();
         fence += recorded.elapsed().as_secs_f64();
     }
@@ -224,21 +229,21 @@ fn heavy(xe: &Xe, device: &Device<'_>, program: &Compiled, surface: Surface, fra
 }
 
 /// Draws into dma-buf `fd` imported, `frames` frames, checked through `memory` (the exporter's)
-fn imported(xe: &Xe, device: &Device<'_>, programs: &[Compiled; 2], what: &str, fd: BorrowedFd<'_>, memory: &mut dyn FnMut() -> Vec<u8>, frames: u32) {
+fn imported(device: &Device<'_>, programs: &[Compiled; 2], what: &str, fd: BorrowedFd<'_>, memory: &mut dyn FnMut() -> Vec<u8>, frames: u32) {
     let pitch = SIZE * 4 + PAD;
     let surface = device.import(&target(Tiling::Linear, TargetLoad::Keep(&[])), fd, 0, pitch).unwrap();
     frame(device, programs, surface, Tiling::Linear, false);
-    done(xe, device.fence(surface).unwrap());
+    done(device, device.fence(surface).unwrap());
     check(&memory(), pitch, true).unwrap_or_else(|e| panic!("{what}: {e}"));
     let started = Instant::now();
     for _ in 0..frames {
         frame(device, programs, surface, Tiling::Linear, false);
-        done(xe, device.fence(surface).unwrap());
+        done(device, device.fence(surface).unwrap());
     }
     let each = started.elapsed().as_secs_f64() * 1e3 / f64::from(frames);
     check(&memory(), pitch, true).unwrap_or_else(|e| panic!("{what}: {e}"));
     println!("{what}: every cell right, the row padding kept; {each:.2} ms a frame (fenced, nothing read back)");
-    let (record, fence) = heavy(xe, device, &programs[0], surface, frames);
+    let (record, fence) = heavy(device, &programs[0], surface, frames);
     let memory = memory();
     for k in 0..HEAVY_DRAWS {
         let (x, y) = (k % GRID * CELL + CELL / 2, k / GRID * CELL + CELL / 2);
@@ -251,21 +256,26 @@ fn imported(xe: &Xe, device: &Device<'_>, programs: &[Compiled; 2], what: &str, 
 
 fn main() {
     let frames: u32 = std::env::args().nth(1).map_or(50, |n| n.parse().unwrap());
-    let tools = Toolchain::new(Isa::Xe3);
+    let card = Card::open_first().unwrap();
+    let tools = Toolchain::new(card.isa());
     let bytes = [program(&tools, VARYING), program(&tools, UNIFORM)];
     let programs = [tools.load(&bytes[0]).unwrap(), tools.load(&bytes[1]).unwrap()];
-    let xe = Xe::open_first().unwrap();
-    let device = Device::new(&xe);
+    let device = Device::new(&card);
+    // the GPU's own layout: Tile4 on Xe3, linear on RDNA2
+    let tiling = match card {
+        Card::Xe(_) => Tiling::Tile4,
+        Card::Amdgpu(_) => Tiling::Linear,
+    };
 
-    let surface = device.surface(&target(Tiling::Tile4, TargetLoad::Keep(&[]))).unwrap();
+    let surface = device.surface(&target(tiling, TargetLoad::Keep(&[]))).unwrap();
     let started = Instant::now();
-    frame(&device, &programs, surface, Tiling::Tile4, true);
+    frame(&device, &programs, surface, tiling, true);
     let pixels = device.read(surface, (SIZE * SIZE * 4) as usize).unwrap();
     let first = started.elapsed();
     check(&pixels, SIZE * 4, false).unwrap();
     let started = Instant::now();
     for _ in 0..frames {
-        frame(&device, &programs, surface, Tiling::Tile4, true);
+        frame(&device, &programs, surface, tiling, true);
         device.read(surface, (SIZE * SIZE * 4) as usize).unwrap();
     }
     let each = started.elapsed().as_secs_f64() * 1e3 / f64::from(frames);
@@ -285,15 +295,18 @@ fn main() {
         m.fill(0);
         (0..SIZE).for_each(|y| m[(y * pitch + SIZE * 4) as usize..][..PAD as usize].fill(PADDING));
     };
-    let mut bo = xe.bo((size, Caching::WriteCombined).into()).unwrap();
+    let mut bo: Box<dyn Bo> = match &card {
+        Card::Xe(xe) => Box::new(xe.bo((size, Caching::WriteCombined).into()).unwrap()),
+        Card::Amdgpu(amd) => Box::new(amd.bo((size, Caching::WriteCombined).into()).unwrap()),
+    };
     fill(bo.bytes().unwrap());
     let fd = bo.export().unwrap();
-    imported(&xe, &device, &programs, "a GPU buffer imported", fd.as_fd(), &mut || bo.bytes().unwrap().to_vec(), frames);
+    imported(&device, &programs, "a GPU buffer imported", fd.as_fd(), &mut || bo.bytes().unwrap().to_vec(), frames);
 
     match udmabuf(size as usize) {
         Some((fd, memory)) => {
             fill(memory);
-            imported(&xe, &device, &programs, "a udmabuf imported", fd.as_fd(), &mut || memory.to_vec(), frames);
+            imported(&device, &programs, "a udmabuf imported", fd.as_fd(), &mut || memory.to_vec(), frames);
         }
         None => println!("a udmabuf imported: none made (no /dev/udmabuf to use)"),
     }

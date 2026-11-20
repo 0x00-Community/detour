@@ -230,7 +230,7 @@ mod reg {
     pub const USER_DATA_GS_0: u32 = 0x08c;
     pub const PGM_LO_ES: u32 = 0x0c8;
     pub const TA_BC_BASE_ADDR: u32 = 0x020;
-    pub const WINDOW_SCISSOR_BR: u32 = 0x082;
+    pub const WINDOW_SCISSOR_TL: u32 = 0x081;
     pub const HARDWARE_SCREEN_OFFSET: u32 = 0x08d;
     pub const CB_TARGET_MASK: u32 = 0x08e;
     pub const VPORT_SCISSOR_0_TL: u32 = 0x094;
@@ -262,6 +262,10 @@ mod reg {
 
 /// The register spaces' dword offsets a stream may hold (every space's registers lie below)
 const SPACE: usize = 0x400;
+
+/// Scissors whose top-left (here) and bottom-right (the next register) are set together: the bottom-right alone set
+/// leaves the scissor as it was (radeonsi and RADV always write both)
+const PAIRED: [u32; 2] = [reg::WINDOW_SCISSOR_TL, reg::VPORT_SCISSOR_0_TL];
 
 /// What a command stream has set: each register's last value, to set only those a draw changes (a context register
 /// written rolls the context, even to the value it has)
@@ -302,6 +306,17 @@ impl Rdna2Shadow {
                 self.changed.push((op, off, v));
             }
         }
+        for tl in PAIRED {
+            let has = |c: &[Rdna2Write], off: u32| c.iter().any(|r| r.0 == CTX && r.1 == off);
+            for (set, other) in [(tl, tl + 1), (tl + 1, tl)] {
+                if has(&self.changed, set) && !has(&self.changed, other)
+                    && let Some(v) = self.known[Rdna2Shadow::slot(CTX, other)]
+                {
+                    self.changed.push((CTX, other, v));
+                }
+            }
+        }
+        self.changed.sort_unstable_by_key(|r| Rdna2Shadow::slot(r.0, r.1));
         let mut k = 0;
         while k < self.changed.len() {
             let (op, off, _) = self.changed[k];
@@ -424,7 +439,9 @@ impl Rdna2Draw {
         let rgb = mask[..3].iter().any(|m| *m);
         let control = u32::from(!rgb) | u32::from(!alpha) << 1;
         out.extend([
-            (CTX, reg::WINDOW_SCISSOR_BR, t.width | t.height << 16),
+            // the window offset off, the window from (0, 0)
+            (CTX, reg::WINDOW_SCISSOR_TL, 1 << 31),
+            (CTX, reg::WINDOW_SCISSOR_TL + 1, t.width | t.height << 16),
             (CTX, reg::CB_TARGET_MASK, writes),
             (CTX, reg::SX_PS_DOWNCONVERT, downconvert),
             (CTX, reg::SX_PS_DOWNCONVERT + 1, epsilon),
@@ -779,5 +796,17 @@ mod tests {
         out.clear();
         s.set(&mut out, &[(CTX, 0x10, 1), (CTX, 0x11, 5), (SH, 0x8, 3)]);
         assert_eq!(out, [Rdna2Packet::header(CTX, 2), 0x11, 5]);
+    }
+
+    #[test]
+    fn a_scissor_is_set_whole() {
+        let (tl, br) = (reg::VPORT_SCISSOR_0_TL, reg::VPORT_SCISSOR_0_TL + 1);
+        let mut s = Rdna2Shadow::default();
+        let mut out = Vec::new();
+        s.set(&mut out, &[(CTX, tl, 1 << 31), (CTX, br, 16 | 32 << 16)]);
+        out.clear();
+        // only the bottom-right changes: the top-left goes with it
+        s.set(&mut out, &[(CTX, tl, 1 << 31), (CTX, br, 256 | 256 << 16)]);
+        assert_eq!(out, [Rdna2Packet::header(CTX, 3), tl, 1 << 31, 256 | 256 << 16]);
     }
 }

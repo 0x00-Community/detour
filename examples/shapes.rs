@@ -9,7 +9,7 @@ mod glsl;
 
 use std::time::Instant;
 
-use detour::{Isa, ColorFormat, ColorTarget, CullMode, Device, Draw, DrawPrimitive, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
+use detour::{ColorFormat, ColorTarget, CullMode, Device, Draw, DrawPrimitive, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
 
 const VERT: &str = "#version 300 es\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec4 color;\nout vec4 c;\nvoid main() { c = color; gl_Position = vec4(pos, 0.0, 1.0); }\n";
 const FRAG: &str = "#version 300 es\nprecision highp float;\nin vec4 c;\nout vec4 o;\nvoid main() { o = c; }\n";
@@ -54,12 +54,12 @@ fn cell(k: u32, size: u32, floats: &mut Vec<f32>) -> (u32, u32, Option<[u32; 4]>
     (first, count, k.is_multiple_of(2).then_some([x, y, CELL / 2, CELL]))
 }
 
-fn target(size: u32, load: TargetLoad<'_>) -> ColorTarget<'_> {
-    ColorTarget { width: size, height: size, format: ColorFormat::Rgba8Unorm, tiling: Tiling::Tile4, load }
+fn target(size: u32, tiling: Tiling, load: TargetLoad<'_>) -> ColorTarget<'_> {
+    ColorTarget { width: size, height: size, format: ColorFormat::Rgba8Unorm, tiling, load }
 }
 
 /// One frame: the target cleared, a draw a cell
-fn frame(device: &Device<'_>, program: &detour::Compiled, surface: Surface, size: u32) {
+fn frame(device: &Device<'_>, program: &detour::Compiled, surface: Surface, size: u32, tiling: Tiling) {
     let clear = [0u8; 4];
     let mut floats = Vec::new();
     let mut bytes = Vec::new();
@@ -88,7 +88,7 @@ fn frame(device: &Device<'_>, program: &detour::Compiled, surface: Surface, size
             front_ccw: true,
             blend: None,
             color_mask: [true; 4],
-            target: target(size, load),
+            target: target(size, tiling, load),
         };
         device.draw(program, &d, surface).unwrap();
     }
@@ -112,21 +112,26 @@ fn check(pixels: &[u8], size: u32) -> Result<(), String> {
 
 fn main() {
     let frames: u32 = std::env::args().nth(1).map_or(50, |n| n.parse().unwrap());
-    let tools = Toolchain::new(Isa::Xe3);
+    let card = detour::Card::open_first().unwrap();
+    let tools = Toolchain::new(card.isa());
     let bytes = program(&tools);
     let compiled = tools.load(&bytes).unwrap();
-    let xe = detour::Xe::open_first().unwrap();
-    let device = Device::new(&xe);
+    let device = Device::new(&card);
+    // the GPU's own layout: Tile4 on Xe3, linear on RDNA2
+    let tiling = match card {
+        detour::Card::Xe(_) => Tiling::Tile4,
+        detour::Card::Amdgpu(_) => Tiling::Linear,
+    };
     let size = GRID * CELL;
-    let surface = device.surface(&target(size, TargetLoad::Keep(&[]))).unwrap();
+    let surface = device.surface(&target(size, tiling, TargetLoad::Keep(&[]))).unwrap();
     let started = Instant::now();
-    frame(&device, &compiled, surface, size);
+    frame(&device, &compiled, surface, size, tiling);
     let pixels = device.read(surface, (size * size * 4) as usize).unwrap();
     let first = started.elapsed();
     check(&pixels, size).unwrap();
     let started = Instant::now();
     for _ in 0..frames {
-        frame(&device, &compiled, surface, size);
+        frame(&device, &compiled, surface, size, tiling);
         device.read(surface, (size * size * 4) as usize).unwrap();
     }
     let each = started.elapsed().as_secs_f64() * 1e3 / f64::from(frames);
@@ -136,8 +141,8 @@ fn main() {
     device.free(surface).unwrap();
     assert!(device.read(surface, 4).is_err(), "a freed surface read");
     let bigger = 2 * size;
-    let surface = device.surface(&target(bigger, TargetLoad::Keep(&[]))).unwrap();
-    frame(&device, &compiled, surface, bigger);
+    let surface = device.surface(&target(bigger, tiling, TargetLoad::Keep(&[]))).unwrap();
+    frame(&device, &compiled, surface, bigger, tiling);
     let pixels = device.read(surface, (bigger * bigger * 4) as usize).unwrap();
     let inside: Vec<u8> = (0..size).flat_map(|y| pixels[(y * bigger * 4) as usize..][..(size * 4) as usize].to_vec()).collect();
     check(&inside, size).unwrap();
