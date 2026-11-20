@@ -1,34 +1,48 @@
 //! Programs compiled ahead of time (`Toolchain::program`) and loaded without compiling (`Toolchain::load`), drawn
-//! with `Device::draw` and no GL: each case under examples/cases that sets no uniforms, its GLSL made SPIR-V MLIR text
-//! by detour's front end, compiled twice (the bytes must be the same), loaded, drawn, and compared byte for byte with
-//! the same case drawn through detour's GL. A program for another detour or GPU, and bytes that are not one, must be
-//! refused.
+//! with `Device::draw`: each case under examples/cases that sets no uniforms, its GLSL made SPIR-V MLIR text by
+//! detour's front end, compiled twice (the bytes must be the same), loaded, drawn, and compared byte for byte with the
+//! same SPIR-V compiled in place (`Toolchain::compile`) and drawn. A program for another detour or GPU, and bytes that
+//! are not one, must be refused. A case's `resources` has a line per vertex input, `attribute NAME LOCATION N V...`
+//! (three vertices of N floats); a case with a `uniform` line is left out.
 //!
 //!   cargo run --release --example program [CASE...]      (DETOUR_SPIRV=DIR: the SPIR-V MLIR text of each case there)
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[path = "glcase/mod.rs"]
-mod glcase;
-
-use detour::{ClearMask, ColorFormat, ColorTarget, CullMode, Device, Draw, DrawMode, DrawPrimitive, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
-use glcase::{Case, Resource, VERTICES};
-use mlirpass::{GlslReader, GlslStage};
+use detour::{ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
+use mlirpass::{Body, GlslReader, GlslStage};
 
 const SIZE: u32 = 64;
+/// The vertices a case draws
+const VERTICES: u32 = 3;
 const TO_SPIRV: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=vulkan})";
 
 /// A case's vertex inputs in location order: floats a vertex, values
 type Inputs = Vec<(u32, Vec<f32>)>;
 
-/// A case's SPIR-V modules as MLIR text, and its vertex inputs
-fn spirv(case: &Case, tools: &Toolchain<'_>) -> Result<(String, Inputs), String> {
-    let resources = case.resources()?;
-    if resources.iter().any(|r| !matches!(r, Resource::Attribute { .. })) {
-        return Err("sets uniforms: left out".into());
+/// A case's vertex inputs by name: floats a vertex, values
+fn attributes(dir: &Path) -> Result<Vec<(String, u32, Vec<f32>)>, String> {
+    let text = fs::read_to_string(dir.join("resources")).map_err(|e| format!("resources: {e}"))?;
+    let mut out = Vec::new();
+    for line in text.lines().filter(|l| !l.trim().is_empty()) {
+        let w: Vec<&str> = line.split_whitespace().collect();
+        match w.as_slice() {
+            ["attribute", name, _, n, v @ ..] => {
+                let values = v.iter().map(|x| x.parse::<f32>().map_err(|e| format!("{line}: {e}"))).collect::<Result<_, _>>()?;
+                out.push(((*name).to_owned(), n.parse().map_err(|e| format!("{line}: {e}"))?, values));
+            }
+            ["uniform", ..] => return Err("sets uniforms: left out".into()),
+            _ => return Err(format!("resources: {line}")),
+        }
     }
-    let read = |f: &str| fs::read_to_string(case.dir.join(f)).map_err(|e| format!("{f}: {e}"));
+    Ok(out)
+}
+
+/// A case's SPIR-V modules, as a body and as MLIR text, and its vertex inputs
+fn spirv<'t>(dir: &Path, tools: &'t Toolchain<'t>) -> Result<(Body<'t>, String, Inputs), String> {
+    let attributes = attributes(dir)?;
+    let read = |f: &str| fs::read_to_string(dir.join(f)).map_err(|e| format!("{f}: {e}"));
     let mut body = tools.body();
     GlslReader::read(&mut body, &read("shader.vert")?, GlslStage::Vertex).map_err(|e| e.0)?;
     GlslReader::read(&mut body, &read("shader.frag")?, GlslStage::Fragment).map_err(|e| e.0)?;
@@ -41,34 +55,25 @@ fn spirv(case: &Case, tools: &Toolchain<'_>) -> Result<(String, Inputs), String>
         let input = op.get("type").is_some_and(|t| t.to_string().contains("Input"));
         let (Some(name), Some(at), false, true) = (op.get_str("sym_name"), op.get("location"), op.get("built_in").is_some(), input) else { continue };
         let at: u32 = at.to_string().split(':').next().unwrap_or("").trim().parse().map_err(|_| format!("@{name}: location {at}"))?;
-        let r = resources.iter().find_map(|r| match r {
-            Resource::Attribute { name: n, size, values } if n == name => Some((*size, values.clone())),
-            _ => None,
-        });
-        let (size, values) = r.ok_or_else(|| format!("input {name}: not in resources"))?;
+        let (_, size, values) = attributes.iter().find(|a| a.0 == name).cloned().ok_or_else(|| format!("input {name}: not in resources"))?;
         inputs.push((at, size, values));
     }
     inputs.sort_by_key(|i| i.0);
-    Ok((tools.show(&body), inputs.into_iter().map(|(_, n, v)| (n, v)).collect()))
+    let text = tools.show(&body);
+    Ok((body, text, inputs.into_iter().map(|(_, n, v)| (n, v)).collect()))
 }
 
-/// The case drawn through detour's GL
-fn through_gl(case: &Case, tools: &Toolchain<'_>, device: &Device<'_>) -> Result<Vec<u8>, String> {
-    let mut gl = case.context(tools, SIZE)?;
-    gl.viewport(0, 0, SIZE as i32, SIZE as i32);
-    gl.clear_color([0.0; 4]);
-    gl.clear(ClearMask { color: true, ..Default::default() });
-    gl.draw_arrays(device, DrawMode::Triangles, 0, VERTICES).map_err(|e| e.0)?;
-    gl.framebuffer.pixels(device).map_err(|e| e.0)
-}
-
-/// The case compiled ahead of time, loaded and drawn with `Device::draw`
-fn loaded(text: &str, inputs: &[(u32, Vec<f32>)], tools: &Toolchain<'_>, device: &Device<'_>) -> Result<Vec<u8>, String> {
-    let program = tools.program(text).map_err(|e| e.0)?;
-    if tools.program(text).map_err(|e| e.0)? != program {
+/// The case compiled ahead of time and loaded
+fn loaded<'t>(text: &str, tools: &'t Toolchain<'t>, program: &'t mut Vec<u8>) -> Result<Compiled<'t>, String> {
+    *program = tools.program(text).map_err(|e| e.0)?;
+    if tools.program(text).map_err(|e| e.0)? != *program {
         return Err("compiled twice, two different programs".into());
     }
-    let compiled = tools.load(&program).map_err(|e| e.0)?;
+    tools.load(program).map_err(|e| e.0)
+}
+
+/// `compiled` drawn with the case's vertex inputs, read back
+fn draw(compiled: &Compiled<'_>, inputs: &[(u32, Vec<f32>)], device: &Device<'_>) -> Result<Vec<u8>, String> {
     let bytes: Vec<Vec<u8>> = inputs.iter().map(|(_, v)| v.iter().flat_map(|f| f.to_le_bytes()).collect()).collect();
     let mut elements = Vec::new();
     for (i, (n, _)) in inputs.iter().enumerate() {
@@ -83,7 +88,7 @@ fn loaded(text: &str, inputs: &[(u32, Vec<f32>)], tools: &Toolchain<'_>, device:
         uniforms: Vec::new(),
         primitive: DrawPrimitive::Triangles,
         first: 0,
-        count: VERTICES as u32,
+        count: VERTICES,
         instances: 1,
         viewport: [0.0, 0.0, SIZE as f32, SIZE as f32],
         depth_range: [0.0, 1.0],
@@ -94,7 +99,7 @@ fn loaded(text: &str, inputs: &[(u32, Vec<f32>)], tools: &Toolchain<'_>, device:
         color_mask: [true; 4],
         target,
     };
-    device.draw(&compiled, &draw, surface).map_err(|e| e.0)?;
+    device.draw(compiled, &draw, surface).map_err(|e| e.0)?;
     device.read(surface, (SIZE * SIZE * 16) as usize).map_err(|e| e.0)
 }
 
@@ -127,8 +132,7 @@ fn main() {
         if !only.is_empty() && !only.contains(&name) {
             continue;
         }
-        let case = Case { dir };
-        let r = spirv(&case, &tools).and_then(|(text, inputs)| {
+        let r = spirv(&dir, &tools).and_then(|(body, text, inputs)| {
             if let Some(dir) = &save {
                 fs::write(dir.join(format!("{name}.mlir")), &text).map_err(|e| e.to_string())?;
             }
@@ -136,11 +140,12 @@ fn main() {
                 refusals(&text, &tools)?;
                 refused = true;
             }
-            let ours = loaded(&text, &inputs, &tools, &device)?;
-            let gl = through_gl(&case, &tools, &device)?;
-            match ours == gl {
+            let mut program = Vec::new();
+            let ours = draw(&loaded(&text, &tools, &mut program)?, &inputs, &device)?;
+            let compiled = tools.compile(body).map_err(|e| e.0)?;
+            match ours == draw(&compiled, &inputs, &device)? {
                 true => Ok(format!("ok ({} bytes)", ours.len())),
-                false => Err("differs from the same case drawn through GL".into()),
+                false => Err("differs from the same SPIR-V compiled in place".into()),
             }
         });
         match &r {
