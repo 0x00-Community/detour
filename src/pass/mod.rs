@@ -1,5 +1,5 @@
-//! The passes detour adds to mlirpass: each GPU's lowering from `gpu.func` kernels and SPIR-V
-//! shaders to its instructions, registers, waits and command streams, and what they share (`gpu`).
+//! The passes detour adds to mlirpass: each GPU's lowering from SPIR-V shaders
+//! to its instructions, registers, waits and command streams, and what they share (`gpu`).
 //! `Passes::with(DetourPasses::add)` registers them.
 
 mod gpu;
@@ -17,7 +17,6 @@ impl DetourPasses {
     pub fn add(p: &mut mlirpass::Passes) {
         p
             .register::<ConvertGpuToXe3>()
-            .register::<GpuInlineCalls>()
             .register::<GpuLocalArrays>()
             .register::<Xe3Branches>()
             .register::<Xe3Control>()

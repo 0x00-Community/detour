@@ -33,7 +33,7 @@ pub struct Rdna2Graphics;
 
 impl Rdna2Graphics {
     pub const SHADERS: &'static str =
-        "builtin.module(convert-spirv-entry-points, gpu-inline-calls, convert-spirv-cf-to-cf, sroa, mem2reg, gpu-local-arrays, mem2reg, lift-cf-to-scf, canonicalize, cse)";
+        "builtin.module(convert-spirv-entry-points, convert-spirv-cf-to-cf, sroa, mem2reg, gpu-local-arrays, mem2reg, lift-cf-to-scf, canonicalize, cse)";
 
     /// The vertex and fragment shader of `body` (MLIR text's top-level `spirv.module`s), compiled
     pub fn compile(body: &mut Body<'_>, passes: &Passes) -> Result<(Rdna2Shader, Rdna2Shader), Error> {
@@ -50,7 +50,6 @@ impl Rdna2Graphics {
             let slot = match stage {
                 ShaderStage::Vertex => &mut vs,
                 ShaderStage::Fragment => &mut ps,
-                s => return Err(Error(format!("RDNA2: a program of vertex and fragment shaders, not {s:?}"))),
             };
             if slot.replace(Lower::shader(body, f, stage)?).is_some() {
                 return Err(Error("RDNA2: a program of one vertex and one fragment shader".into()));

@@ -9,10 +9,7 @@
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd};
 use std::time::{Duration, Instant};
 
-use detour::{Isa, 
-    Bo, Caching, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, Fence, Gpu, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat,
-    Xe,
-};
+use detour::{Isa, Bo, Caching, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
 use mlirpass::{GlslReader, GlslStage};
 
 const VARYING: [&str; 2] = [

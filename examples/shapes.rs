@@ -119,7 +119,7 @@ fn main() {
     let tools = Toolchain::new(Isa::Xe3);
     let bytes = program(&tools);
     let compiled = tools.load(&bytes).unwrap();
-    let xe = <detour::Xe as detour::Gpu>::open_first().unwrap();
+    let xe = detour::Xe::open_first().unwrap();
     let device = Device::new(&xe);
     let size = GRID * CELL;
     let surface = device.surface(&target(size, TargetLoad::Keep(&[]))).unwrap();

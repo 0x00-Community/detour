@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use mlirformat::Error;
 
-use crate::{AMDGPU_FAMILY_GC_10_3_6, Amdgpu, ColorTarget, Compiled, Draw, Fence, Gpu, Isa, Node, Surface, Syncobj, Xe};
+use crate::{AMDGPU_FAMILY_GC_10_3_6, Amdgpu, ColorTarget, Compiled, Draw, Isa, Node, Surface, Syncobj, Xe};
 pub(crate) use target::SurfaceMem;
 
 /// How long a submission may take before the GPU is called hung

@@ -1,12 +1,12 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use mlirformat::{Error, MlirOpt, Op};
+use mlirformat::{Error, MlirOpt};
 use mlirpass::{Body, Ctx, GlslDialect, Interfaces, PassManager, Passes};
 
 /// What `Toolchain::program` writes ahead of the compiled program: this, the detour version, the GPU, each ending in
 /// a newline
 const PROGRAM_MAGIC: &str = "detour program";
-use crate::{DetourPasses, Kernels, Rdna2Graphics, Rdna2Shader, ShaderStage, Xe3Dialect, Xe3Draw, Xe3Kernel, Xe3Shader};
+use crate::{DetourPasses, Rdna2Graphics, Rdna2Shader, ShaderStage, Xe3Dialect, Xe3Draw, Xe3Kernel, Xe3Shader};
 
 /// The instruction set a program is compiled for: a GPU detour draws on
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -79,12 +79,11 @@ impl Toolchain<'_> {
         Xe3Draw::compile(&mut body, &self.passes).map_err(|e| Error(format!("{e}\n{}", self.show(&body))))?;
         let root = body.root;
         let (mut vs, mut fs) = (None, None);
-        for k in Kernels::all(&body, root, Xe3Kernel::NAME) {
+        for k in Xe3Kernel::all(&body, root) {
             let shader = Xe3Shader::of(&body, k)?;
             let slot = match shader.stage {
                 ShaderStage::Vertex => &mut vs,
                 ShaderStage::Fragment => &mut fs,
-                s => return Err(Error(format!("a program of vertex and fragment shaders, not {s:?}"))),
             };
             if slot.replace(shader).is_some() {
                 return Err(Error("a program of one vertex and one fragment shader".into()));

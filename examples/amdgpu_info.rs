@@ -6,7 +6,7 @@
 
 use std::time::{Duration, Instant};
 
-use detour::{Amdgpu, AmdgpuIb, Bo, Caching, Engine, Fence, Gpu, MemType, Queue, Vm};
+use detour::{Amdgpu, AmdgpuIb, Bo, Caching, MemType};
 
 /// PM4 type-3 packet header: opcode, then `n` dwords of body
 const fn pkt3(op: u32, n: u32) -> u32 {
@@ -35,7 +35,7 @@ fn main() {
         i.virtual_address_alignment
     );
     let vm = amd.vm().unwrap();
-    let queue = amd.queue(&vm, Engine::Render).unwrap();
+    let queue = amd.queue(&vm).unwrap();
     let base = i.virtual_address_offset.max(1 << 32);
     let (data_addr, ib_addr) = (base, base + (1 << 20));
     let mut data = amd.bo((4096, Caching::WriteBack).into()).unwrap();
@@ -52,7 +52,7 @@ fn main() {
     vm.bind(&cmd, 0, ib_addr, 4096, MemType::Streaming, &[]).unwrap();
     let done = amd.fence(false).unwrap();
     let t = Instant::now();
-    queue.submit(&AmdgpuIb { addr: ib_addr, dwords: ib.len() as u32 }, &[], &[&done]).unwrap();
+    queue.submit(AmdgpuIb { addr: ib_addr, dwords: ib.len() as u32 }, &[], &[&done]).unwrap();
     assert!(done.wait(Duration::from_secs(5)).unwrap(), "the IB did not finish");
     let took = t.elapsed();
     let got: Vec<u32> = data.bytes().unwrap()[..64].as_chunks::<4>().0.iter().map(|c| u32::from_le_bytes(*c)).collect();
@@ -61,7 +61,7 @@ fn main() {
         "ok   WRITE_DATA of {} words on the GFX ring, fenced in {:.3} ms; fault: {:?}",
         words.len(),
         took.as_secs_f64() * 1e3,
-        queue.fault(&done).unwrap()
+        queue.fault().unwrap()
     );
     let fd = data.export().unwrap();
     let mut again = amd.import(std::os::fd::AsFd::as_fd(&fd)).unwrap();

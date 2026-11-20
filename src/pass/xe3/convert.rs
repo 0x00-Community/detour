@@ -2,12 +2,11 @@ use alloc::vec::Vec;
 
 use mlirformat::Error;
 
-use crate::{Body, ConversionConfig, ConversionPatterns, ConversionTarget, Converter, Kernels, Mode, OpId, SinkConstants, pass};
+use crate::{Body, ConversionConfig, ConversionPatterns, ConversionTarget, Converter, Mode, OpId, SinkConstants, pass};
 use crate::{GpuToXe3, Xe3Types};
 
 #[pass("convert-gpu-to-xe3", on = "builtin.module")]
 pub fn convert_gpu_to_xe3<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
-    Kernels::inline_calls(body, op)?;
     let mut shaders = Vec::new();
     body.walk(op, &mut |f| {
         if GpuToXe3::stage_of(body, f).is_some() {
@@ -21,8 +20,8 @@ pub fn convert_gpu_to_xe3<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error
     let i = patterns.converter(&tc);
     GpuToXe3::populate(&mut patterns, i);
     let mut target = ConversionTarget::default();
-    target.legal_dialect("xe3").illegal_dialect("spirv").illegal_dialect("arith").illegal_dialect("vector").illegal_dialect("math").illegal_dialect("llvm");
-    for o in ["func.func", "func.return", "gpu.func", "gpu.return", "gpu.block_id", "gpu.thread_id", "gpu.barrier"] {
+    target.legal_dialect("xe3").illegal_dialect("spirv").illegal_dialect("arith").illegal_dialect("vector").illegal_dialect("math");
+    for o in ["func.func", "func.return"] {
         target.illegal_op(o);
     }
     for o in ["scf.for", "scf.if", "scf.while", "scf.condition", "scf.yield"] {

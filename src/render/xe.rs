@@ -8,10 +8,7 @@ use std::rc::Rc;
 use mlirformat::Error;
 
 use super::{DRM_FORMAT_ABGR8888, DRM_FORMAT_MOD_LINEAR, DRM_FORMAT_R8, Exported, I915_FORMAT_MOD_4_TILED, Surface, io, wait};
-use crate::{
-    Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Shaders, Syncobj, TargetLoad, Template, Tiling, Vm, Xe, Xe3Device, Xe3Draw,
-    Xe3DrawCommands, Xe3Shader, XeBo, XeQueue, XeVm,
-};
+use crate::{Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Host, IndexFormat, MemType, Native, Shaders, Syncobj, TargetLoad, Template, Tiling, Xe, Xe3Device, Xe3Draw, Xe3DrawCommands, Xe3Shader, XeBo, XeQueue, XeVm};
 
 /// Draw shapes kept resident
 const RESIDENT: usize = 64;
@@ -409,7 +406,7 @@ struct State<'x> {
 impl<'x> State<'x> {
     fn new(xe: &'x Xe) -> Result<State<'x>, Error> {
         let vm = xe.vm().map_err(io)?;
-        let queue = xe.queue(&vm, Engine::Render).map_err(io)?;
+        let queue = xe.queue(&vm).map_err(io)?;
         let calls = xe.bo((CALLS_SIZE + GUARD, Caching::WriteCombined).into()).map_err(io)?;
         bind(xe, &vm, &calls, 0, CALLS_ADDR, CALLS_SIZE + GUARD, MemType::Streaming)?;
         let dynamic = xe.bo((DYNAMIC_SIZE as u64, Caching::WriteCombined).into()).map_err(io)?;
@@ -424,7 +421,7 @@ impl<'x> State<'x> {
         let context = arena.put(xe, &vm, &Xe3Device::context(FENCE_ADDR)?)?;
         Native::fence();
         let done = xe.fence(false).map_err(io)?;
-        queue.submit(&context, &[], &[&done]).map_err(io)?;
+        queue.submit(context, &[], &[&done]).map_err(io)?;
         Ok(State {
             xe,
             vm,
@@ -515,7 +512,7 @@ impl<'x> State<'x> {
         Native::fence();
         let done = Rc::new(self.xe.fence(false).map_err(io)?);
         let waits: Vec<&Syncobj<'x>> = self.waits.iter().collect();
-        self.queue.submit(&(CALLS_ADDR + start as u64), &waits, &[&done]).map_err(io)?;
+        self.queue.submit(CALLS_ADDR + start as u64, &waits, &[&done]).map_err(io)?;
         self.waits.clear();
         self.drawn_since.clear();
         self.sampled_since.clear();

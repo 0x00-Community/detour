@@ -1,82 +1,75 @@
-//! Xe3 lowering: kernels as acgpu compiled them, GLSL shaders taken whole (encoding and genxml
-//! packing are mlirbinary's tests)
+//! Xe3 lowering: hand-written SPIR-V shaders and GLSL ones taken whole, their code against a reading of it
 
 use mlirformat::MlirOpt;
 use mlirpass::{Body, Ctx, Interfaces};
 use detour::Xe3Dialect;
 
 #[test]
-fn kernels_as_acgpu() {
+fn shaders() {
     use std::fmt::Write as _;
 
-    use mlirformat::Op;
     use mlirpass::{Heads, PassManager, Symbol};
-    use detour::{Kernels, ShaderStage, Xe3Code, Xe3Kernel};
+    use detour::{ShaderStage, Xe3Code, Xe3Kernel};
     let mut opt = MlirOpt::upstream();
     opt.load(Xe3Dialect);
     let interfaces = Interfaces::upstream();
     let passes = super::passes();
-    let pm = PassManager::parse(&passes, "builtin.module(convert-spirv-entry-points, gpu-inline-calls, canonicalize, cse, convert-gpu-to-xe3, xe3-regalloc, xe3-control, xe3-swsb, xe3-branches, xe3-pad)").unwrap();
-    let cases = [
-        ("ints", include_str!("xe3/kernels/ints.mlir"), include_str!("xe3/kernels/ints.expected")),
-        ("atomics", include_str!("xe3/kernels/atomics.mlir"), include_str!("xe3/kernels/atomics.expected")),
-        ("loops", include_str!("xe3/kernels/loops.mlir"), include_str!("xe3/kernels/loops.expected")),
-        ("math64", include_str!("xe3/kernels/math64.mlir"), include_str!("xe3/kernels/math64.expected")),
-        ("workgroups", include_str!("xe3/kernels/workgroups.mlir"), include_str!("xe3/kernels/workgroups.expected")),
-        ("copy", include_str!("xe3/kernels/copy.mlir"), include_str!("xe3/kernels/copy.expected")),
-        ("triangle", include_str!("xe3/kernels/triangle.mlir"), include_str!("xe3/kernels/triangle.expected")),
-        ("texture", include_str!("xe3/kernels/texture.mlir"), include_str!("xe3/kernels/texture.expected")),
-        ("push", include_str!("xe3/kernels/push.mlir"), include_str!("xe3/kernels/push.expected")),
-        ("push_mixed", include_str!("xe3/kernels/push_mixed.mlir"), include_str!("xe3/kernels/push_mixed.expected")),
-        ("uniform", include_str!("xe3/kernels/uniform.mlir"), include_str!("xe3/kernels/uniform.expected")),
-        ("resolve", include_str!("xe3/kernels/resolve.mlir"), include_str!("xe3/kernels/resolve.expected")),
-        ("mrt", include_str!("xe3/kernels/mrt.mlir"), include_str!("xe3/kernels/mrt.expected")),
-        ("math", include_str!("xe3/kernels/math.mlir"), include_str!("xe3/kernels/math.expected")),
-    ];
+    let pm = PassManager::parse(&passes, "builtin.module(convert-spirv-entry-points, canonicalize, cse, convert-gpu-to-xe3, xe3-regalloc, xe3-control, xe3-swsb, xe3-branches, xe3-pad)").unwrap();
+    let cases = ["triangle", "texture", "push", "push_mixed", "uniform", "resolve", "mrt", "math"];
+
     let mut bad = Vec::new();
-    for (name, src, want) in cases {
-        let mut body = Body::parse(Ctx::new(&opt, &interfaces), src).unwrap();
+    for name in cases {
+        let src = std::fs::read_to_string(super::path(&format!("xe3/shaders/{name}.mlir"))).unwrap();
+        let mut body = Body::parse(Ctx::new(&opt, &interfaces), &src).unwrap();
         let root = body.root;
         pm.run(&mut body, root).unwrap_or_else(|e| panic!("{name}: {e}"));
         let mut got = String::new();
-        for k in Kernels::all(&body, root, Xe3Kernel::NAME) {
+        for k in Xe3Kernel::all(&body, root) {
             let h = body.head::<Xe3Kernel>(k).unwrap();
             let stage = h.stage.map(|s| match s {
-                ShaderStage::Compute => "Compute",
                 ShaderStage::Vertex => "Vertex",
                 ShaderStage::Fragment => "Fragment",
             });
             let stage = stage.map_or("None".to_owned(), |s| format!("Some({s})"));
-            writeln!(got, "kernel {} stage={stage} simd={:?} payload={:?} inputs={:?} varyings={:?} targets={:?} omask={:?} imask={:?} bindings={:?} buffers={:?} push={:?} reserve={:?} threads={:?} shared={:?} params={:?} pad={:?} align={:?}",
-                Symbol::defined(&h.sym_name).unwrap(), h.simd, h.payload, h.inputs, h.varyings, h.targets, h.omask, h.imask, h.bindings, h.buffers, h.push, h.reserve, h.threads, h.shared, h.params, h.pad, h.align).unwrap();
-            for line in Xe3Code::padded(&body.operation(k)).unwrap().chunks(32) {
-                writeln!(got, "  {}", line.iter().map(|b| format!("{b:02x}")).collect::<String>()).unwrap();
-            }
+            writeln!(got, "kernel {} stage={stage} simd={:?} payload={:?} inputs={:?} varyings={:?} targets={:?} omask={:?} bindings={:?} buffers={:?} push={:?} reserve={:?} pad={:?}",
+                Symbol::defined(&h.sym_name).unwrap(), h.simd, h.payload, h.inputs, h.varyings, h.targets, h.omask, h.bindings, h.buffers, h.push, h.reserve, h.pad).unwrap();
+            super::hex(&mut got, &Xe3Code::padded(&body.operation(k)).unwrap());
         }
-        if got != want {
+        if !super::matches(&format!("xe3/shaders/{name}.expected"), &got) {
             bad.push(name);
         }
     }
-    assert!(bad.is_empty(), "differ from acgpu's kernels: {bad:?}");
+    assert!(bad.is_empty(), "compiled otherwise than read through: {bad:?}");
 }
 
-/// GLSL shaders from tests/gl that the Xe3 backend takes whole: control flow and locals are
-/// flattened, promoted and lifted back to scf before convert-gpu-to-xe3.
+/// GLSL shaders that the Xe3 backend takes whole (control flow and locals flattened, promoted and lifted back to scf
+/// before convert-gpu-to-xe3), their code as it was read through: uniforms, built-ins, sampling, and per-pixel integer
+/// and float arithmetic and loops (`alu`)
 #[test]
-fn glsl_reaches_xe3() {
+fn glsl_shaders() {
     use mlirpass::{GlslDialect, GlslReader, GlslStage, PassManager};
+    use detour::Xe3Shader;
     let mut opt = MlirOpt::upstream();
     opt.load(GlslDialect);
     opt.load(Xe3Dialect);
     let interfaces = Interfaces::upstream();
     let passes = super::passes();
     let glsl = PassManager::parse(&passes, "builtin.module(glsl-link, glsl-default-block{binding=7}, convert-glsl-to-spirv)").unwrap();
-    let xe3 = PassManager::parse(&passes, "builtin.module(convert-spirv-entry-points, gpu-inline-calls, convert-spirv-cf-to-cf, sroa, mem2reg, lift-cf-to-scf, canonicalize, cse, convert-gpu-to-xe3, xe3-regalloc, xe3-control, xe3-swsb, xe3-branches, xe3-pad)").unwrap();
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/pass/xe3/glsl");
-    let cases = [("uniforms", "shader.frag"), ("builtins", "bits.frag"), ("builtins", "const_cnorm.frag"), ("sampling", "offset.frag"), ("sampling", "offset_bias.frag")];
+    let xe3 = PassManager::parse(&passes, detour::Xe3Draw::SHADERS).unwrap();
+    let cases = [
+        ("uniforms", "shader.frag"),
+        ("builtins", "bits.frag"),
+        ("builtins", "const_cnorm.frag"),
+        ("sampling", "offset.frag"),
+        ("sampling", "offset_bias.frag"),
+        ("alu", "ints.frag"),
+        ("alu", "loops.frag"),
+        ("alu", "floats.frag"),
+        ("alu", "calls.frag"),
+    ];
     let mut bad = Vec::new();
     for (dir, frag) in cases {
-        let read = |f: &str| std::fs::read_to_string(root.join(dir).join(f)).unwrap();
+        let read = |f: &str| std::fs::read_to_string(super::path(&format!("xe3/glsl/{dir}/{f}"))).unwrap();
         let mut body = Body::new(Ctx::new(&opt, &interfaces));
         GlslReader::read(&mut body, &read("shader.vert"), GlslStage::Vertex).unwrap();
         GlslReader::read(&mut body, &read(frag), GlslStage::Fragment).unwrap();
@@ -89,7 +82,41 @@ fn glsl_reaches_xe3() {
         let r = gpu.root;
         if let Err(e) = xe3.run(&mut gpu, r) {
             bad.push(format!("{dir}/{frag}: {e}"));
+            continue;
+        }
+        let mut got = String::new();
+        for k in detour::Xe3Kernel::all(&gpu, r) {
+            let s = Xe3Shader::of(&gpu, k).unwrap();
+            show(&mut got, &s);
+        }
+        if !super::matches(&format!("xe3/glsl/{dir}/{}.expected", frag.trim_end_matches(".frag")), &got) {
+            bad.push(format!("{dir}/{frag}: compiled otherwise than read through"));
         }
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
+}
+
+/// acdes's four page programs compiled for Xe3 as they were when their code was read through
+#[test]
+fn acdes_programs() {
+    use detour::{Isa, Shaders, Toolchain};
+    let tools = Toolchain::new(Isa::Xe3);
+    let mut bad = Vec::new();
+    for (name, src) in super::programs() {
+        let program = tools.program(&src).unwrap_or_else(|e| panic!("{name}: {}", e.0));
+        let Shaders::Xe3 { vs, fs } = tools.load(&program).unwrap().shaders else { panic!("{name}: not Xe3") };
+        let mut got = String::new();
+        show(&mut got, &vs);
+        show(&mut got, &fs);
+        if !super::matches(&format!("xe3/programs/{name}.expected"), &got) {
+            bad.push(name);
+        }
+    }
+    assert!(bad.is_empty(), "compiled otherwise than read through: {bad:?}");
+}
+
+fn show(out: &mut String, s: &detour::Xe3Shader) {
+    use std::fmt::Write as _;
+    writeln!(out, "{:?} inputs={} varyings={} targets={} omask={} bindings={} buffers={} system={}", s.stage, s.inputs, s.varyings, s.targets, s.omask, s.bindings, s.buffers, s.system).unwrap();
+    super::hex(out, &s.code);
 }

@@ -5,7 +5,7 @@ use std::io;
 use std::os::fd::{BorrowedFd, OwnedFd};
 use std::path::Path;
 
-use crate::{BoDesc, Caching, DeviceInfo, Engine, Gpu, Map, MemType, Node, Result, Syncobj};
+use crate::{BoDesc, Caching, DeviceInfo, Map, MemType, Node, Result, Syncobj};
 
 pub use sys::{AMDGPU_FAMILY_GC_10_3_6, drm_amdgpu_info_device as AmdgpuInfo};
 
@@ -63,19 +63,13 @@ pub struct AmdgpuIb {
     pub dwords: u32,
 }
 
-impl Gpu for Amdgpu {
-    type Info = AmdgpuInfo;
-    type Bo<'d> = AmdgpuBo<'d>;
-    type Vm<'d> = AmdgpuVm<'d>;
-    type Queue<'d> = AmdgpuQueue<'d>;
-    type Fence<'d> = Syncobj<'d>;
-    type Cmd = AmdgpuIb;
+impl Amdgpu {
 
-    fn open_first() -> Result<Amdgpu> {
+    pub fn open_first() -> Result<Amdgpu> {
         Amdgpu::try_from(Node::open_driver("amdgpu")?)
     }
 
-    fn info(&self) -> DeviceInfo {
+    pub fn info(&self) -> DeviceInfo {
         DeviceInfo {
             vendor_id: AMD,
             device_id: self.info.device_id as u16,
@@ -86,11 +80,11 @@ impl Gpu for Amdgpu {
         }
     }
 
-    fn driver_info(&self) -> &AmdgpuInfo {
+    pub fn driver_info(&self) -> &AmdgpuInfo {
         &self.info
     }
 
-    fn bo(&self, desc: BoDesc) -> Result<AmdgpuBo<'_>> {
+    pub fn bo(&self, desc: BoDesc) -> Result<AmdgpuBo<'_>> {
         let size = desc.size.next_multiple_of(ALIGN);
         let mut c = sys::drm_amdgpu_gem_create {
             bo_size: size,
@@ -105,27 +99,22 @@ impl Gpu for Amdgpu {
         Ok(self.adopt(c.bo_size as u32, size))
     }
 
-    fn import(&self, fd: BorrowedFd<'_>) -> Result<AmdgpuBo<'_>> {
+    pub fn import(&self, fd: BorrowedFd<'_>) -> Result<AmdgpuBo<'_>> {
         let (handle, size) = self.node.import(fd)?;
         Ok(self.adopt(handle, size))
     }
 
-    fn vm(&self) -> Result<AmdgpuVm<'_>> {
+    pub fn vm(&self) -> Result<AmdgpuVm<'_>> {
         Ok(AmdgpuVm { amd: self })
     }
 
-    fn queue<'d>(&'d self, _vm: &AmdgpuVm<'d>, engine: Engine) -> Result<AmdgpuQueue<'d>> {
+    pub fn queue<'d>(&'d self, _vm: &AmdgpuVm<'d>) -> Result<AmdgpuQueue<'d>> {
         let mut c = sys::drm_amdgpu_ctx { op_or_ctx: sys::AMDGPU_CTX_OP_ALLOC_CTX, ..Default::default() };
         ioctl(&self.node, sys::DRM_IOCTL_AMDGPU_CTX, &mut c)?;
-        let ip = match engine {
-            Engine::Render => sys::AMDGPU_HW_IP_GFX,
-            Engine::Compute => sys::AMDGPU_HW_IP_COMPUTE,
-            Engine::Copy => sys::AMDGPU_HW_IP_DMA,
-        };
-        Ok(AmdgpuQueue { amd: self, ctx: c.op_or_ctx, ip })
+        Ok(AmdgpuQueue { amd: self, ctx: c.op_or_ctx })
     }
 
-    fn fence(&self, signaled: bool) -> Result<Syncobj<'_>> {
+    pub fn fence(&self, signaled: bool) -> Result<Syncobj<'_>> {
         self.node.syncobj(signaled)
     }
 }
@@ -176,8 +165,8 @@ impl AmdgpuVm<'_> {
     }
 }
 
-impl<'d> crate::Vm<'d, Amdgpu> for AmdgpuVm<'d> {
-    fn bind(&self, bo: &AmdgpuBo<'d>, offset: u64, addr: u64, range: u64, mem: MemType, done: &[&Syncobj<'d>]) -> Result<()> {
+impl<'d> AmdgpuVm<'d> {
+    pub fn bind(&self, bo: &AmdgpuBo<'d>, offset: u64, addr: u64, range: u64, mem: MemType, done: &[&Syncobj<'d>]) -> Result<()> {
         let mtype = match mem {
             MemType::Coherent | MemType::Streaming | MemType::Compressed => sys::AMDGPU_VM_MTYPE_DEFAULT,
             MemType::Scanout => sys::AMDGPU_VM_MTYPE_UC,
@@ -194,7 +183,7 @@ impl<'d> crate::Vm<'d, Amdgpu> for AmdgpuVm<'d> {
         self.va(v, done)
     }
 
-    fn unbind(&self, addr: u64, range: u64, done: &[&Syncobj<'d>]) -> Result<()> {
+    pub fn unbind(&self, addr: u64, range: u64, done: &[&Syncobj<'d>]) -> Result<()> {
         let v = sys::drm_amdgpu_gem_va { operation: sys::AMDGPU_VA_OP_CLEAR, va_address: addr, map_size: range.next_multiple_of(ALIGN), ..Default::default() };
         self.va(v, done)
     }
@@ -204,11 +193,10 @@ impl<'d> crate::Vm<'d, Amdgpu> for AmdgpuVm<'d> {
 pub struct AmdgpuQueue<'d> {
     amd: &'d Amdgpu,
     ctx: u32,
-    ip: u32,
 }
 
-impl<'d> crate::Queue<'d, Amdgpu> for AmdgpuQueue<'d> {
-    fn submit(&self, ib: &AmdgpuIb, wait: &[&Syncobj<'d>], signal: &[&Syncobj<'d>]) -> Result<()> {
+impl<'d> AmdgpuQueue<'d> {
+    pub fn submit(&self, ib: AmdgpuIb, wait: &[&Syncobj<'d>], signal: &[&Syncobj<'d>]) -> Result<()> {
         let resident: Vec<sys::drm_amdgpu_bo_list_entry> =
             self.amd.resident.borrow().iter().map(|&h| sys::drm_amdgpu_bo_list_entry { bo_handle: h, bo_priority: 0 }).collect();
         let list = sys::drm_amdgpu_bo_list_in {
@@ -218,7 +206,7 @@ impl<'d> crate::Queue<'d, Amdgpu> for AmdgpuQueue<'d> {
             bo_info_size: size_of::<sys::drm_amdgpu_bo_list_entry>() as u32,
             bo_info_ptr: resident.as_ptr() as u64,
         };
-        let chunk_ib = sys::drm_amdgpu_cs_chunk_ib { va_start: ib.addr, ib_bytes: 4 * ib.dwords, ip_type: self.ip, ..Default::default() };
+        let chunk_ib = sys::drm_amdgpu_cs_chunk_ib { va_start: ib.addr, ib_bytes: 4 * ib.dwords, ip_type: sys::AMDGPU_HW_IP_GFX, ..Default::default() };
         let sems = |fs: &[&Syncobj<'d>]| -> Vec<u32> { fs.iter().map(|f| f.handle()).collect() };
         let (waits, signals) = (sems(wait), sems(signal));
         let dw = |n: usize| (n / 4) as u32;
@@ -245,7 +233,7 @@ impl<'d> crate::Queue<'d, Amdgpu> for AmdgpuQueue<'d> {
         ioctl(&self.amd.node, sys::DRM_IOCTL_AMDGPU_CS, &mut cs)
     }
 
-    fn fault(&self, _done: &Syncobj<'d>) -> Result<Option<u64>> {
+    pub fn fault(&self) -> Result<Option<u64>> {
         let mut c = sys::drm_amdgpu_ctx { op_or_ctx: sys::AMDGPU_CTX_OP_QUERY_STATE2, ctx_id: self.ctx, ..Default::default() };
         ioctl(&self.amd.node, sys::DRM_IOCTL_AMDGPU_CTX, &mut c)?;
         let flags = u64::from(c.op_or_ctx) | u64::from(c.flags) << 32;

@@ -73,7 +73,7 @@ pub struct EuPayload<'a> {
 impl Xe3Dialect {
     pub const INHERENT: &[(&str, &[&str])] = &[
         ("xe3.eu.payload", &["grf"]),
-        ("xe3.kernel", &["sym_name", "stage", "simd", "payload", "inputs", "varyings", "targets", "omask", "imask", "bindings", "buffers", "push", "reserve", "threads", "shared", "params", "pad", "align", "system"]),
+        ("xe3.kernel", &["sym_name", "stage", "simd", "payload", "inputs", "varyings", "targets", "omask", "bindings", "buffers", "push", "reserve", "pad", "system"]),
     ];
 }
 
@@ -88,16 +88,11 @@ pub struct Xe3Kernel<'a> {
     pub varyings: Option<u32>,
     pub targets: Option<u32>,
     pub omask: Option<bool>,
-    pub imask: Option<bool>,
     pub bindings: Option<u32>,
     pub buffers: Option<u32>,
     pub push: Option<u32>,
     pub reserve: Option<u32>,
-    pub threads: Option<u32>,
-    pub shared: Option<u32>,
-    pub params: Option<u32>,
     pub pad: Option<u64>,
-    pub align: Option<u64>,
     /// the system values the vertex fetcher writes into the input after the attributes: 1 the vertex index, 2 the
     /// instance index
     pub system: Option<u32>,

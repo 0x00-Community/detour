@@ -10,10 +10,7 @@ use std::rc::Rc;
 use mlirformat::Error;
 
 use super::{DRM_FORMAT_ABGR8888, DRM_FORMAT_MOD_LINEAR, DRM_FORMAT_R8, Exported, Surface, io, wait};
-use crate::{
-    Amdgpu, AmdgpuBo, AmdgpuIb, AmdgpuQueue, AmdgpuVm, Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Rdna2Draw, Rdna2Surface,
-    Rdna2Packet, Rdna2Write, Rdna2Shader, Rdna2Shadow, Shaders, Syncobj, TargetLoad, Tiling, Vm,
-};
+use crate::{Amdgpu, AmdgpuBo, AmdgpuIb, AmdgpuQueue, AmdgpuVm, Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Host, IndexFormat, MemType, Native, Rdna2Draw, Rdna2Surface, Rdna2Packet, Rdna2Write, Rdna2Shader, Rdna2Shadow, Shaders, Syncobj, TargetLoad, Tiling};
 
 type SurfaceMem<'a> = super::SurfaceMem<'a, AmdgpuBo<'a>>;
 
@@ -189,7 +186,7 @@ struct State<'a> {
 impl<'a> State<'a> {
     fn new(amd: &'a Amdgpu) -> Result<State<'a>, Error> {
         let vm = amd.vm().map_err(io)?;
-        let queue = amd.queue(&vm, Engine::Render).map_err(io)?;
+        let queue = amd.queue(&vm).map_err(io)?;
         let (mut ring, mut cmds) = (Ring::new(RING_ADDR, MemType::Streaming), Ring::new(CMDS_ADDR, MemType::Scanout));
         ring.restart(amd, &vm, RING_MIN / 4)?;
         cmds.restart(amd, &vm, RING_MIN / 4)?;
@@ -268,7 +265,7 @@ impl<'a> State<'a> {
         Native::fence();
         let done = Rc::new(self.amd.fence(false).map_err(io)?);
         let waits: Vec<&Syncobj<'a>> = self.waits.iter().collect();
-        self.queue.submit(&AmdgpuIb { addr, dwords: self.ib.len() as u32 }, &waits, &[&done]).map_err(io)?;
+        self.queue.submit(AmdgpuIb { addr, dwords: self.ib.len() as u32 }, &waits, &[&done]).map_err(io)?;
         self.waits.clear();
         self.ib.clear();
         self.index_type = None;

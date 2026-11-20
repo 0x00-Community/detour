@@ -4,10 +4,9 @@ use alloc::{borrow::ToOwned, boxed::Box, format, string::{String, ToString}, vec
 use alloc::collections::BTreeMap;
 use core::ops::Range;
 
-use mlirformat::Op;
 use mlirformat::Error;
 use crate::Xe3Ctl;
-use crate::{Body, Kernels, OpData, OpId, Quiet, Rewriter, pass};
+use crate::{Body, OpData, OpId, Quiet, Rewriter, pass};
 use crate::{EuFormat as Format, EuOpcode as Opcode, EuOperand as Operand, File, Inst, Pipe, SbidMode, Swsb, SyncFn, Xe3Kernel};
 
 struct Footprint {
@@ -183,7 +182,7 @@ impl Board {
 pub fn xe3_swsb<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     let mut quiet = Quiet;
     let mut rw = Rewriter::new(body, &mut quiet);
-    for k in Kernels::all(rw.body, op, Xe3Kernel::NAME) {
+    for k in Xe3Kernel::all(rw.body, op) {
         let mut board = Board::default();
         let block = rw.body.top_block(k);
         for i in rw.body.block_ops(block) {

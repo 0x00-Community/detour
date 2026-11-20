@@ -6,11 +6,6 @@ use rustix::ioctl::{Opcode, opcode};
 use crate::{DRM_COMMAND_BASE, DRM_IOCTL_BASE};
 
 pub const DRM_XE_ENGINE_CLASS_RENDER: u16 = 0;
-pub const DRM_XE_ENGINE_CLASS_COPY: u16 = 1;
-pub const DRM_XE_ENGINE_CLASS_VIDEO_DECODE: u16 = 2;
-pub const DRM_XE_ENGINE_CLASS_VIDEO_ENHANCE: u16 = 3;
-pub const DRM_XE_ENGINE_CLASS_COMPUTE: u16 = 4;
-pub const DRM_XE_ENGINE_CLASS_VM_BIND: u16 = 5;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -35,7 +30,6 @@ pub struct drm_xe_query_engines {
     pub pad: u32,
 }
 
-pub const DRM_XE_MEM_REGION_CLASS_SYSMEM: u16 = 0;
 pub const DRM_XE_MEM_REGION_CLASS_VRAM: u16 = 1;
 
 #[repr(C)]
@@ -72,7 +66,6 @@ pub struct drm_xe_query_config {
     pub pad: u32,
 }
 
-pub const DRM_XE_QUERY_GT_TYPE_MAIN: u16 = 0;
 pub const DRM_XE_QUERY_GT_TYPE_MEDIA: u16 = 1;
 
 #[repr(C)]
@@ -99,12 +92,6 @@ pub struct drm_xe_query_gt_list {
     pub pad: u32,
 }
 
-pub const DRM_XE_TOPO_DSS_GEOMETRY: u16 = 1;
-pub const DRM_XE_TOPO_DSS_COMPUTE: u16 = 2;
-pub const DRM_XE_TOPO_L3_BANK: u16 = 3;
-pub const DRM_XE_TOPO_EU_PER_DSS: u16 = 4;
-pub const DRM_XE_TOPO_SIMD16_EU_PER_DSS: u16 = 5;
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct drm_xe_query_topology_mask {
@@ -130,9 +117,7 @@ pub struct drm_xe_device_query {
     pub reserved: [u64; 2],
 }
 
-pub const DRM_XE_GEM_CREATE_FLAG_DEFER_BACKING: u32 = 1 << 0;
 pub const DRM_XE_GEM_CREATE_FLAG_SCANOUT: u32 = 1 << 1;
-pub const DRM_XE_GEM_CREATE_FLAG_NEEDS_VISIBLE_VRAM: u32 = 1 << 2;
 pub const DRM_XE_GEM_CPU_CACHING_WB: u16 = 1;
 pub const DRM_XE_GEM_CPU_CACHING_WC: u16 = 2;
 
@@ -179,11 +164,6 @@ pub struct drm_xe_vm_destroy {
 
 pub const DRM_XE_VM_BIND_OP_MAP: u32 = 0x0;
 pub const DRM_XE_VM_BIND_OP_UNMAP: u32 = 0x1;
-pub const DRM_XE_VM_BIND_OP_MAP_USERPTR: u32 = 0x2;
-pub const DRM_XE_VM_BIND_FLAG_READONLY: u32 = 1 << 0;
-pub const DRM_XE_VM_BIND_FLAG_IMMEDIATE: u32 = 1 << 1;
-pub const DRM_XE_VM_BIND_FLAG_NULL: u32 = 1 << 2;
-pub const DRM_XE_VM_BIND_FLAG_DUMPABLE: u32 = 1 << 3;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
@@ -249,12 +229,8 @@ pub struct drm_xe_exec_queue_get_property {
 }
 
 pub const DRM_XE_EXEC_QUEUE_GET_PROPERTY_BAN: u32 = 0;
-pub const DRM_XE_EXEC_QUEUE_BAN_REASON_GPU_HANG: u64 = 1 << 0;
-pub const DRM_XE_EXEC_QUEUE_BAN_REASON_PAGE_OFFLINE: u64 = 1 << 1;
 
 pub const DRM_XE_SYNC_TYPE_SYNCOBJ: u32 = 0x0;
-pub const DRM_XE_SYNC_TYPE_TIMELINE_SYNCOBJ: u32 = 0x1;
-pub const DRM_XE_SYNC_TYPE_USER_FENCE: u32 = 0x2;
 pub const DRM_XE_SYNC_FLAG_SIGNAL: u32 = 1 << 0;
 
 #[repr(C)]

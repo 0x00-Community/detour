@@ -1,4 +1,4 @@
-use detour::{Gpu, Xe};
+use detour::Xe;
 
 fn main() -> detour::Result<()> {
     let xe = Xe::open_first()?;

@@ -3,9 +3,8 @@ use alloc::{borrow::ToOwned, boxed::Box, format, string::{String, ToString}, vec
 
 use alloc::collections::BTreeMap;
 
-use mlirformat::Op;
 use mlirformat::{Attribute, Error};
-use crate::{A, Attrs, BlockId, Body, Groups, Heads, Kernels, LinearScan, OpData, OpId, Quiet, RegTarget, Rewriter, ValueId, pass};
+use crate::{A, Attrs, BlockId, Body, Groups, Heads, LinearScan, OpData, OpId, Quiet, RegTarget, Rewriter, ValueId, pass};
 use crate::{Grf, XE3_EOT_GRF as EOT_GRF, Xe3Kernel};
 
 struct GrfFile;
@@ -418,7 +417,7 @@ impl Retype {
 
 #[pass("xe3-regalloc", on = "builtin.module")]
 pub fn xe3_regalloc<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
-    for k in Kernels::all(body, op, Xe3Kernel::NAME) {
+    for k in Xe3Kernel::all(body, op) {
         let reserve = body.head::<Xe3Kernel>(k)?.reserve.unwrap_or(0) as u8;
         let block = body.top_block(k);
         let mut quiet = Quiet;

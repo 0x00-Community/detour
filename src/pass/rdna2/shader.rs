@@ -107,7 +107,6 @@ impl Rdna2Shader {
         let stage = match self.stage {
             ShaderStage::Vertex => 0,
             ShaderStage::Fragment => 1,
-            _ => 2,
         };
         let mut words = alloc::vec![stage, self.sgprs, self.vgprs, self.inputs, self.varyings, self.ps_input];
         for list in [&self.ubos, &self.textures] {

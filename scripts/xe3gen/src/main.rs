@@ -1,9 +1,27 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Write;
 
-const VIDEO: &[&str] = &[
-    "AVP", "HCP", "HEVC", "HUC", "MFC", "MFD", "MFX", "SFC", "VD", "VD0", "VDENC", "VVCP", "AES", "CHROMA", "LUMA",
-    "FRAMEDELTAQP", "FRAMEDELTAQPRANGE", "ROUNDINGPRECISIONTABLE", "VEBOX", "VDAQM", "VDL", "MFX_", "JPEG", "VP9",
+/// The commands and state structs detour writes: they, the structs they nest and the values of their fields' enums are
+/// generated, nothing else
+const KEEP: &[&str] = &[
+    "3DPRIMITIVE_EXTENDED", "3DSTATE_3D_MODE", "3DSTATE_AA_LINE_PARAMETERS", "3DSTATE_BINDING_TABLE_POINTERS_DS",
+    "3DSTATE_BINDING_TABLE_POINTERS_GS", "3DSTATE_BINDING_TABLE_POINTERS_HS", "3DSTATE_BINDING_TABLE_POINTERS_PS",
+    "3DSTATE_BINDING_TABLE_POINTERS_VS", "3DSTATE_BINDING_TABLE_POOL_ALLOC", "3DSTATE_BLEND_STATE_POINTERS",
+    "3DSTATE_CC_STATE_POINTERS", "3DSTATE_CLIP", "3DSTATE_CONSTANT_ALL", "3DSTATE_DEPTH_BOUNDS", "3DSTATE_DEPTH_BUFFER",
+    "3DSTATE_DRAWING_RECTANGLE_FAST", "3DSTATE_DS", "3DSTATE_GS", "3DSTATE_HIER_DEPTH_BUFFER", "3DSTATE_HS",
+    "3DSTATE_INDEX_BUFFER", "3DSTATE_MESH_CONTROL", "3DSTATE_MULTISAMPLE", "3DSTATE_POLY_STIPPLE_OFFSET",
+    "3DSTATE_PRIMITIVE_REPLICATION", "3DSTATE_PS", "3DSTATE_PS_BLEND", "3DSTATE_PS_EXTRA",
+    "3DSTATE_PUSH_CONSTANT_ALLOC_DS", "3DSTATE_RASTER", "3DSTATE_SAMPLE_MASK", "3DSTATE_SAMPLE_PATTERN",
+    "3DSTATE_SAMPLER_STATE_POINTERS_PS", "3DSTATE_SBE", "3DSTATE_SBE_SWIZ", "3DSTATE_SCISSOR_STATE_POINTERS",
+    "3DSTATE_SF", "3DSTATE_STENCIL_BUFFER", "3DSTATE_STREAMOUT", "3DSTATE_TASK_CONTROL", "3DSTATE_TE",
+    "3DSTATE_URB_ALLOC_DS", "3DSTATE_URB_ALLOC_GS", "3DSTATE_URB_ALLOC_HS", "3DSTATE_URB_ALLOC_VS",
+    "3DSTATE_VERTEX_BUFFERS", "3DSTATE_VERTEX_ELEMENTS", "3DSTATE_VF", "3DSTATE_VF_INSTANCING", "3DSTATE_VF_SGVS",
+    "3DSTATE_VF_SGVS_2", "3DSTATE_VF_STATISTICS", "3DSTATE_VF_TOPOLOGY", "3DSTATE_VFG",
+    "3DSTATE_VIEWPORT_STATE_POINTERS_CC", "3DSTATE_VIEWPORT_STATE_POINTERS_SF_CLIP", "3DSTATE_VS", "3DSTATE_WM",
+    "3DSTATE_WM_CHROMAKEY", "3DSTATE_WM_DEPTH_STENCIL", "3DSTATE_WM_HZ_OP", "MI_BATCH_BUFFER_END",
+    "MI_LOAD_REGISTER_IMM", "MI_NOOP", "PIPE_CONTROL", "STATE_BASE_ADDRESS", "STATE_COMPUTE_MODE",
+    "STATE_SYSTEM_MEM_FENCE_ADDRESS", "BINDING_TABLE_STATE", "BLEND_STATE", "CC_VIEWPORT", "COLOR_CALC_STATE",
+    "RENDER_SURFACE_STATE", "SAMPLER_BORDER_COLOR_STATE", "SAMPLER_STATE", "SCISSOR_RECT", "SF_CLIP_VIEWPORT",
 ];
 
 #[derive(Clone, Debug)]
@@ -27,6 +45,8 @@ struct Field {
     ty: Ty,
     default: u64,
     dims: Vec<(u32, u32)>,
+    /// the genxml enum its values come from
+    of: Option<String>,
 }
 
 struct Group {
@@ -43,6 +63,8 @@ struct Item {
     num: u32,
     fields: Vec<Field>,
     group: Option<Group>,
+    /// its fields' own values
+    values: Vec<(String, u64)>,
 }
 
 struct Names;
@@ -89,10 +111,6 @@ impl Names {
         let id = Self::words(s).collect::<Vec<_>>().join("_").to_ascii_uppercase();
         if id.as_bytes()[0].is_ascii_digit() { format!("_{id}") } else { id }
     }
-
-    fn video(name: &str) -> bool {
-        VIDEO.contains(&name.split(['_', ' ']).next().unwrap_or(""))
-    }
 }
 
 impl Item {
@@ -111,12 +129,17 @@ impl Item {
             (None, None) => Self::end_bit(&self.fields).div_ceil(32),
         }
     }
-    fn refs(&self) -> impl Iterator<Item = &String> {
-        self.fields.iter().chain(self.group.iter().flat_map(|g| &g.fields)).filter_map(|f| if let Ty::Struct(s) = &f.ty { Some(s) } else { None })
+    fn all_fields(&self) -> impl Iterator<Item = &Field> {
+        self.fields.iter().chain(self.group.iter().flat_map(|g| &g.fields))
     }
 
-    fn drop_unreferenced_video(items: &mut Vec<Item>) {
-        let mut keep: HashSet<String> = items.iter().filter(|i| i.space != "state" || !Names::video(&i.orig)).map(Item::op).collect();
+    fn refs(&self) -> impl Iterator<Item = &String> {
+        self.all_fields().filter_map(|f| if let Ty::Struct(s) = &f.ty { Some(s) } else { None })
+    }
+
+    /// Only `KEEP` and the structs they nest
+    fn keep(items: &mut Vec<Item>) {
+        let mut keep: HashSet<String> = items.iter().filter(|i| KEEP.contains(&&*i.orig)).map(Item::op).collect();
         loop {
             let more: Vec<String> = items.iter().filter(|i| keep.contains(&i.op())).flat_map(Item::refs).filter(|s| !keep.contains(*s)).cloned().collect();
             if more.is_empty() {
@@ -130,7 +153,8 @@ impl Item {
 
 struct Reader<'x> {
     structs: HashSet<&'x str>,
-    enums: HashSet<&'x str>,
+    /// each genxml enum's values
+    enums: HashMap<&'x str, Vec<(String, u64)>>,
     values: Vec<(String, u64)>,
 }
 
@@ -145,7 +169,7 @@ impl<'x> Reader<'x> {
             "mbo" => Ty::Mbo,
             "mbz" => Ty::Mbz,
             _ if self.structs.contains(t) => Ty::Struct(format!("xe3.state.{}", Names::snake(t))),
-            _ if self.enums.contains(t) => Ty::Uint,
+            _ if self.enums.contains_key(t) => Ty::Uint,
             _ if (t.starts_with('u') || t.starts_with('s')) && t[1..].contains('.') => {
                 let (_, frac) = t[1..].split_once('.').unwrap();
                 Ty::Fixed { signed: t.starts_with('s'), frac: frac.parse().unwrap() }
@@ -154,11 +178,11 @@ impl<'x> Reader<'x> {
         }
     }
 
-    fn values(&mut self, node: roxmltree::Node, prefix: Option<&str>) {
+    fn values(node: roxmltree::Node, prefix: Option<&str>, out: &mut Vec<(String, u64)>) {
         for v in node.children().filter(|v| v.has_tag_name("value")) {
             let name = v.attribute("name").unwrap();
             let full = prefix.map_or_else(|| name.to_owned(), |p| format!("{p}_{name}"));
-            self.values.push((Names::constant(&full), Names::int(v.attribute("value").unwrap())));
+            out.push((Names::constant(&full), Names::int(v.attribute("value").unwrap())));
         }
     }
 
@@ -170,14 +194,16 @@ impl<'x> Reader<'x> {
                     let (hi, lo) = b.split_once(':').unwrap_or((b, b));
                     let (hi, lo): (u32, u32) = (hi.trim().parse().unwrap(), lo.trim().parse().unwrap());
                     let dword: u32 = c.attribute("dword").unwrap().parse().unwrap();
-                    self.values(c, c.attribute("prefix"));
-                    let ty = self.ty(c.attribute("type").unwrap());
+                    Self::values(c, c.attribute("prefix"), &mut self.values);
+                    let t = c.attribute("type").unwrap();
+                    let ty = self.ty(t);
                     let width = hi - lo + 1;
                     let default = match ty {
                         Ty::Mbo => if width >= 64 { u64::MAX } else { (1 << width) - 1 },
                         _ => c.attribute("default").map_or(0, Names::int),
                     };
-                    out.push(Field { name: Names::attr(c.attribute("name").unwrap()), bit: base + dword * 32 + lo, width, ty, default, dims: dims.to_vec() });
+                    let of = self.enums.contains_key(t).then(|| t.to_owned());
+                    out.push(Field { name: Names::attr(c.attribute("name").unwrap()), bit: base + dword * 32 + lo, width, ty, default, dims: dims.to_vec(), of });
                 }
                 "group" => {
                     let count: u32 = c.attribute("count").unwrap().parse().unwrap();
@@ -208,15 +234,9 @@ impl<'x> Reader<'x> {
             _ => return None,
         };
         let name = c.attribute("name").unwrap();
-        if space != "state" && (Names::video(name) || c.attribute("engine") == Some("video")) {
-            return None;
-        }
         let (mut fields, mut group) = (Vec::new(), None);
-        let before = self.values.len();
         self.fields(c, 0, &[], &mut fields, &mut group);
-        if space == "reg" {
-            self.values.truncate(before);
-        }
+        let values = core::mem::take(&mut self.values);
         Self::dedup(&mut fields);
         if let Some(g) = &mut group {
             Self::dedup(&mut g.fields);
@@ -229,6 +249,7 @@ impl<'x> Reader<'x> {
             num: c.attribute("num").map_or(0, |n| Names::int(n) as u32),
             fields,
             group,
+            values,
         })
     }
 
@@ -300,7 +321,10 @@ impl Writer {
             None => self.out.push_str(",\n        group: None,\n    },\n"),
         }
     }
-    fn values(&mut self, values: &[(String, u64)]) {
+    /// The kept items' fields' values and their enums' values, each name with one value
+    fn values(&mut self, items: &[Item], enums: &HashMap<&str, Vec<(String, u64)>>) {
+        let used: HashSet<&str> = items.iter().flat_map(Item::all_fields).filter_map(|f| f.of.as_deref()).collect();
+        let values = items.iter().flat_map(|i| &i.values).chain(used.iter().flat_map(|e| &enums[e]));
         let mut by_name: BTreeMap<&str, HashSet<u64>> = BTreeMap::new();
         for (n, v) in values {
             by_name.entry(n).or_default().insert(*v);
@@ -377,13 +401,14 @@ fn main() {
     let doc = roxmltree::Document::parse(&text).unwrap();
     let root = doc.root_element();
 
-    let named = |tag: &str| root.children().filter(|c| c.has_tag_name(tag)).map(|c| c.attribute("name").unwrap()).collect::<HashSet<_>>();
-    let mut r = Reader { structs: named("struct"), enums: named("enum"), values: Vec::new() };
+    let structs = root.children().filter(|c| c.has_tag_name("struct")).map(|c| c.attribute("name").unwrap()).collect();
+    let mut enums: HashMap<&str, Vec<(String, u64)>> = HashMap::new();
     for e in root.children().filter(|c| c.has_tag_name("enum")) {
-        r.values(e, e.attribute("prefix"));
+        Reader::values(e, e.attribute("prefix"), enums.entry(e.attribute("name").unwrap()).or_default());
     }
+    let mut r = Reader { structs, enums, values: Vec::new() };
     let mut items: Vec<Item> = root.children().filter_map(|c| r.item(c)).collect();
-    Item::drop_unreferenced_video(&mut items);
+    Item::keep(&mut items);
     items.sort_by_key(Item::op);
     items.dedup_by_key(|i| i.op());
 
@@ -400,7 +425,7 @@ fn main() {
     }
     w.out.push_str("];\n\n");
     w.typed(&items);
-    w.values(&r.values);
+    w.values(&items, &r.enums);
     std::fs::write(output, &w.out).unwrap();
     eprintln!("{} items -> {output}", items.len());
 }

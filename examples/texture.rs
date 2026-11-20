@@ -6,10 +6,7 @@
 //!
 //!   cargo run --release --example texture [FILTER...]      (cases whose name contains a filter)
 
-use detour::{Isa, 
-    ColorFormat, ColorTarget, Compiled, Device, Draw, Filter, Gpu, Sampled, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat,
-    Wrap, Xe,
-};
+use detour::{Isa, ColorFormat, ColorTarget, Compiled, Device, Draw, Filter, Sampled, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Wrap, Xe};
 use mlirpass::{GlslReader, GlslStage};
 
 const SHADERS: [&str; 2] = [

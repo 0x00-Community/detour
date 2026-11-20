@@ -42,7 +42,6 @@ impl<'t> TryFrom<&'t Type<'_>> for RegType<'t> {
 pub enum ShaderStage {
     Vertex,
     Fragment,
-    Compute,
 }
 
 /// An instruction dialect's op infos: each op and its inherent attributes, no traits, effects unknown

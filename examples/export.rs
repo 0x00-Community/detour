@@ -8,7 +8,7 @@
 use std::fs::OpenOptions;
 use std::os::fd::{AsFd, AsRawFd};
 
-use detour::{Isa, ColorFormat, ColorTarget, Compiled, Device, Draw, Exported, Gpu, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
+use detour::{Isa, ColorFormat, ColorTarget, Compiled, Device, Draw, Exported, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
 use mlirpass::{GlslReader, GlslStage};
 
 const SHADERS: [&str; 2] = [
