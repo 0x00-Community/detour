@@ -5,7 +5,7 @@
 #[allow(unused_imports, reason = "what the items use")]
 use alloc::{vec, vec::Vec};
 
-use crate::dialect::image::{Field, Group, Item, Ty};
+use crate::dialect::layout::{Field, Group, Item, Ty};
 
 /// Every item's layout, sorted by op name.
 pub const XE3_ITEMS: &[Item] = &[
@@ -5728,5074 +5728,5074 @@ pub const XE3_ITEMS: &[Item] = &[
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct State3dstateConstantAllDataFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub constant_buffer_read_length: Option<crate::dialect::image::Fill>,
+    pub constant_buffer_read_length: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pointer_to_constant_buffer: Option<crate::dialect::image::Fill>,
+    pub pointer_to_constant_buffer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.3dstate_constant_body`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct State3dstateConstantBodyFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub read_length: Option<Vec<crate::dialect::image::Fill>>,
+    pub read_length: Option<Vec<crate::dialect::layout::Fill>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub buffer: Option<Vec<crate::dialect::image::Fill>>,
+    pub buffer: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.state.3dstate_so_buffer_index_body`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct State3dstateSoBufferIndexBodyFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_output_buffer_offset_address_enable: Option<crate::dialect::image::Fill>,
+    pub stream_output_buffer_offset_address_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_offset_write_enable: Option<crate::dialect::image::Fill>,
+    pub stream_offset_write_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mocs: Option<crate::dialect::image::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub so_buffer_enable: Option<crate::dialect::image::Fill>,
+    pub so_buffer_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub surface_base_address: Option<crate::dialect::image::Fill>,
+    pub surface_base_address: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub surface_size: Option<crate::dialect::image::Fill>,
+    pub surface_size: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_output_buffer_offset_address: Option<crate::dialect::image::Fill>,
+    pub stream_output_buffer_offset_address: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_offset: Option<crate::dialect::image::Fill>,
+    pub stream_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.binding_table_edit_entry`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateBindingTableEditEntryFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub surface_state_pointer: Option<crate::dialect::image::Fill>,
+    pub surface_state_pointer: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub binding_table_index: Option<crate::dialect::image::Fill>,
+    pub binding_table_index: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.blend_state_entry`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateBlendStateEntryFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub write_disable_blue: Option<crate::dialect::image::Fill>,
+    pub write_disable_blue: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub write_disable_green: Option<crate::dialect::image::Fill>,
+    pub write_disable_green: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub write_disable_red: Option<crate::dialect::image::Fill>,
+    pub write_disable_red: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub write_disable_alpha: Option<crate::dialect::image::Fill>,
+    pub write_disable_alpha: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub alpha_blend_function: Option<crate::dialect::image::Fill>,
+    pub alpha_blend_function: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub destination_alpha_blend_factor: Option<crate::dialect::image::Fill>,
+    pub destination_alpha_blend_factor: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_alpha_blend_factor: Option<crate::dialect::image::Fill>,
+    pub source_alpha_blend_factor: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub color_blend_function: Option<crate::dialect::image::Fill>,
+    pub color_blend_function: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub destination_blend_factor: Option<crate::dialect::image::Fill>,
+    pub destination_blend_factor: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_blend_factor: Option<crate::dialect::image::Fill>,
+    pub source_blend_factor: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub color_buffer_blend_enable: Option<crate::dialect::image::Fill>,
+    pub color_buffer_blend_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub post_blend_color_clamp_enable: Option<crate::dialect::image::Fill>,
+    pub post_blend_color_clamp_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pre_blend_color_clamp_enable: Option<crate::dialect::image::Fill>,
+    pub pre_blend_color_clamp_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub color_clamp_range: Option<crate::dialect::image::Fill>,
+    pub color_clamp_range: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pre_blend_source_only_clamp_enable: Option<crate::dialect::image::Fill>,
+    pub pre_blend_source_only_clamp_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub simple_float_blend_enable: Option<crate::dialect::image::Fill>,
+    pub simple_float_blend_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub logic_op_function: Option<crate::dialect::image::Fill>,
+    pub logic_op_function: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub logic_op_enable: Option<crate::dialect::image::Fill>,
+    pub logic_op_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.compute_walker_body`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateComputeWalkerBodyFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub indirect_data_length: Option<crate::dialect::image::Fill>,
+    pub indirect_data_length: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub l3_prefetch_disable: Option<crate::dialect::image::Fill>,
+    pub l3_prefetch_disable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub partition_dispatch_parameter: Option<crate::dialect::image::Fill>,
+    pub partition_dispatch_parameter: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub partition_type: Option<crate::dialect::image::Fill>,
+    pub partition_type: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub indirect_data_start_address: Option<crate::dialect::image::Fill>,
+    pub indirect_data_start_address: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub compute_dispatch_all_walker_enable: Option<crate::dialect::image::Fill>,
+    pub compute_dispatch_all_walker_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_group_batch_size: Option<crate::dialect::image::Fill>,
+    pub thread_group_batch_size: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dispatch_walk_order: Option<crate::dialect::image::Fill>,
+    pub dispatch_walk_order: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub message_simd: Option<crate::dialect::image::Fill>,
+    pub message_simd: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tile_layout: Option<crate::dialect::image::Fill>,
+    pub tile_layout: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub walk_order: Option<crate::dialect::image::Fill>,
+    pub walk_order: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub emit_inline_parameter: Option<crate::dialect::image::Fill>,
+    pub emit_inline_parameter: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub emit_local: Option<crate::dialect::image::Fill>,
+    pub emit_local: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub generate_local_id: Option<crate::dialect::image::Fill>,
+    pub generate_local_id: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub simd_size: Option<crate::dialect::image::Fill>,
+    pub simd_size: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub execution_mask: Option<crate::dialect::image::Fill>,
+    pub execution_mask: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub local_x_maximum: Option<crate::dialect::image::Fill>,
+    pub local_x_maximum: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub local_y_maximum: Option<crate::dialect::image::Fill>,
+    pub local_y_maximum: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub local_z_maximum: Option<crate::dialect::image::Fill>,
+    pub local_z_maximum: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_group_id_x_dimension: Option<crate::dialect::image::Fill>,
+    pub thread_group_id_x_dimension: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_group_id_y_dimension: Option<crate::dialect::image::Fill>,
+    pub thread_group_id_y_dimension: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_group_id_z_dimension: Option<crate::dialect::image::Fill>,
+    pub thread_group_id_z_dimension: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_group_id_starting_x: Option<crate::dialect::image::Fill>,
+    pub thread_group_id_starting_x: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_group_id_starting_y: Option<crate::dialect::image::Fill>,
+    pub thread_group_id_starting_y: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_group_id_starting_z: Option<crate::dialect::image::Fill>,
+    pub thread_group_id_starting_z: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub partition_id: Option<crate::dialect::image::Fill>,
+    pub partition_id: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub partition_size: Option<crate::dialect::image::Fill>,
+    pub partition_size: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub preempt_x: Option<crate::dialect::image::Fill>,
+    pub preempt_x: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub preempt_y: Option<crate::dialect::image::Fill>,
+    pub preempt_y: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub preempt_z: Option<crate::dialect::image::Fill>,
+    pub preempt_z: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub walker_id: Option<crate::dialect::image::Fill>,
+    pub walker_id: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub over_dispatch_tg_count: Option<crate::dialect::image::Fill>,
+    pub over_dispatch_tg_count: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub interface_descriptor: Option<crate::dialect::image::Fields<StateInterfaceDescriptorDataFields>>,
+    pub interface_descriptor: Option<crate::dialect::layout::Fields<StateInterfaceDescriptorDataFields>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub post_sync: Option<crate::dialect::image::Fields<StatePostsyncDataFields>>,
+    pub post_sync: Option<crate::dialect::layout::Fields<StatePostsyncDataFields>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub inline_data: Option<Vec<crate::dialect::image::Fill>>,
+    pub inline_data: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.state.gather_constant_entry`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateGatherConstantEntryFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub binding_table_index_offset: Option<crate::dialect::image::Fill>,
+    pub binding_table_index_offset: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub channel_mask: Option<crate::dialect::image::Fill>,
+    pub channel_mask: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub constant_buffer_offset: Option<crate::dialect::image::Fill>,
+    pub constant_buffer_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.hevc_arbitration_priority`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateHevcArbitrationPriorityFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub priority: Option<crate::dialect::image::Fill>,
+    pub priority: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.interface_descriptor_data`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateInterfaceDescriptorDataFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub kernel_start_pointer: Option<crate::dialect::image::Fill>,
+    pub kernel_start_pointer: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub software_exception_enable: Option<crate::dialect::image::Fill>,
+    pub software_exception_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub illegal_opcode_exception_enable: Option<crate::dialect::image::Fill>,
+    pub illegal_opcode_exception_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub floating_point_mode: Option<crate::dialect::image::Fill>,
+    pub floating_point_mode: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub single_program_flow: Option<crate::dialect::image::Fill>,
+    pub single_program_flow: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub denorm_mode: Option<crate::dialect::image::Fill>,
+    pub denorm_mode: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_preemption: Option<crate::dialect::image::Fill>,
+    pub thread_preemption: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub registers_per_thread: Option<crate::dialect::image::Fill>,
+    pub registers_per_thread: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sampler_count: Option<crate::dialect::image::Fill>,
+    pub sampler_count: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sampler_state_pointer: Option<crate::dialect::image::Fill>,
+    pub sampler_state_pointer: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub binding_table_entry_count: Option<crate::dialect::image::Fill>,
+    pub binding_table_entry_count: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub binding_table_pointer: Option<crate::dialect::image::Fill>,
+    pub binding_table_pointer: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub number_of_threads_in_gpgpu_thread_group: Option<crate::dialect::image::Fill>,
+    pub number_of_threads_in_gpgpu_thread_group: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_group_forward_progress_guarantee: Option<crate::dialect::image::Fill>,
+    pub thread_group_forward_progress_guarantee: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub shared_local_memory_size: Option<crate::dialect::image::Fill>,
+    pub shared_local_memory_size: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rounding_mode: Option<crate::dialect::image::Fill>,
+    pub rounding_mode: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thread_group_dispatch_size: Option<crate::dialect::image::Fill>,
+    pub thread_group_dispatch_size: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub number_of_barriers: Option<crate::dialect::image::Fill>,
+    pub number_of_barriers: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub btd_mode: Option<crate::dialect::image::Fill>,
+    pub btd_mode: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub preferred_slm_allocation_size: Option<crate::dialect::image::Fill>,
+    pub preferred_slm_allocation_size: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.mi_math_alu_instruction`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateMiMathAluInstructionFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub operand_2: Option<crate::dialect::image::Fill>,
+    pub operand_2: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub operand_1: Option<crate::dialect::image::Fill>,
+    pub operand_1: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub alu_opcode: Option<crate::dialect::image::Fill>,
+    pub alu_opcode: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.palette_entry`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StatePaletteEntryFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub blue: Option<crate::dialect::image::Fill>,
+    pub blue: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub green: Option<crate::dialect::image::Fill>,
+    pub green: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub red: Option<crate::dialect::image::Fill>,
+    pub red: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub alpha: Option<crate::dialect::image::Fill>,
+    pub alpha: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.postsync_data`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StatePostsyncDataFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub operation: Option<crate::dialect::image::Fill>,
+    pub operation: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hdc_pipeline_flush: Option<crate::dialect::image::Fill>,
+    pub hdc_pipeline_flush: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mocs: Option<crate::dialect::image::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub system_memory_fence_request: Option<crate::dialect::image::Fill>,
+    pub system_memory_fence_request: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dataport_subslice_cache_flush: Option<crate::dialect::image::Fill>,
+    pub dataport_subslice_cache_flush: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub destination_address: Option<crate::dialect::image::Fill>,
+    pub destination_address: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub immediate_data: Option<crate::dialect::image::Fill>,
+    pub immediate_data: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.resource_barrier_body`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateResourceBarrierBodyFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub wait_stage: Option<crate::dialect::image::Fill>,
+    pub wait_stage: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub signal_stage: Option<crate::dialect::image::Fill>,
+    pub signal_stage: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub barrier_type: Option<crate::dialect::image::Fill>,
+    pub barrier_type: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub l1_dataport_cache_invalidate: Option<crate::dialect::image::Fill>,
+    pub l1_dataport_cache_invalidate: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub depth_cache: Option<crate::dialect::image::Fill>,
+    pub depth_cache: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub color_cache: Option<crate::dialect::image::Fill>,
+    pub color_cache: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub l1_dataport_uav_flush: Option<crate::dialect::image::Fill>,
+    pub l1_dataport_uav_flush: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub texture_ro: Option<crate::dialect::image::Fill>,
+    pub texture_ro: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub state_ro: Option<crate::dialect::image::Fill>,
+    pub state_ro: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub vf_ro: Option<crate::dialect::image::Fill>,
+    pub vf_ro: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub amfs: Option<crate::dialect::image::Fill>,
+    pub amfs: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub constant_cache: Option<crate::dialect::image::Fill>,
+    pub constant_cache: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub barrier_id_address: Option<crate::dialect::image::Fill>,
+    pub barrier_id_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.sf_output_attribute_detail`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateSfOutputAttributeDetailFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_attribute: Option<crate::dialect::image::Fill>,
+    pub source_attribute: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub swizzle_select: Option<crate::dialect::image::Fill>,
+    pub swizzle_select: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub constant_source: Option<crate::dialect::image::Fill>,
+    pub constant_source: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub swizzle_control_mode: Option<crate::dialect::image::Fill>,
+    pub swizzle_control_mode: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub component_override_x: Option<crate::dialect::image::Fill>,
+    pub component_override_x: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub component_override_y: Option<crate::dialect::image::Fill>,
+    pub component_override_y: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub component_override_z: Option<crate::dialect::image::Fill>,
+    pub component_override_z: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub component_override_w: Option<crate::dialect::image::Fill>,
+    pub component_override_w: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.so_decl`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateSoDeclFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub component_mask: Option<crate::dialect::image::Fill>,
+    pub component_mask: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub register_index: Option<crate::dialect::image::Fill>,
+    pub register_index: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hole_flag: Option<crate::dialect::image::Fill>,
+    pub hole_flag: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output_buffer_slot: Option<crate::dialect::image::Fill>,
+    pub output_buffer_slot: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.so_decl_entry`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateSoDeclEntryFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_0_decl: Option<crate::dialect::image::Fields<StateSoDeclFields>>,
+    pub stream_0_decl: Option<crate::dialect::layout::Fields<StateSoDeclFields>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_1_decl: Option<crate::dialect::image::Fields<StateSoDeclFields>>,
+    pub stream_1_decl: Option<crate::dialect::layout::Fields<StateSoDeclFields>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_2_decl: Option<crate::dialect::image::Fields<StateSoDeclFields>>,
+    pub stream_2_decl: Option<crate::dialect::layout::Fields<StateSoDeclFields>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stream_3_decl: Option<crate::dialect::image::Fields<StateSoDeclFields>>,
+    pub stream_3_decl: Option<crate::dialect::layout::Fields<StateSoDeclFields>>,
 }
 
 /// `xe3.state.vertex_buffer_state`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateVertexBufferStateFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub buffer_pitch: Option<crate::dialect::image::Fill>,
+    pub buffer_pitch: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub null_vertex_buffer: Option<crate::dialect::image::Fill>,
+    pub null_vertex_buffer: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub address_modify_enable: Option<crate::dialect::image::Fill>,
+    pub address_modify_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mocs: Option<crate::dialect::image::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub l3_bypass_disable: Option<crate::dialect::image::Fill>,
+    pub l3_bypass_disable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub vertex_buffer_index: Option<crate::dialect::image::Fill>,
+    pub vertex_buffer_index: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub buffer_starting_address: Option<crate::dialect::image::Fill>,
+    pub buffer_starting_address: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub buffer_size: Option<crate::dialect::image::Fill>,
+    pub buffer_size: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.vertex_element_state`'s fields, nested in another item.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateVertexElementStateFields {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_element_offset: Option<crate::dialect::image::Fill>,
+    pub source_element_offset: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub edge_flag_enable: Option<crate::dialect::image::Fill>,
+    pub edge_flag_enable: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_element_format: Option<crate::dialect::image::Fill>,
+    pub source_element_format: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub valid: Option<crate::dialect::image::Fill>,
+    pub valid: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub vertex_buffer_index: Option<crate::dialect::image::Fill>,
+    pub vertex_buffer_index: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub component_3_control: Option<crate::dialect::image::Fill>,
+    pub component_3_control: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub component_2_control: Option<crate::dialect::image::Fill>,
+    pub component_2_control: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub component_1_control: Option<crate::dialect::image::Fill>,
+    pub component_1_control: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub component_0_control: Option<crate::dialect::image::Fill>,
+    pub component_0_control: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dmesh_1d`: genxml's 3DMESH_1D.
 #[mlirformat::mlir::op("xe3.cmd.3dmesh_1d", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dmesh1d {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub uav_coherency_required: Option<crate::dialect::image::Fill>,
-    pub indirect_parameter_enable: Option<crate::dialect::image::Fill>,
-    pub tbimr_enabled: Option<crate::dialect::image::Fill>,
-    pub extended_parameter_0_present: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub threadgroup_count_x: Option<crate::dialect::image::Fill>,
-    pub starting_threadgroup_id_x: Option<crate::dialect::image::Fill>,
-    pub extended_parameter_0_xp0: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub uav_coherency_required: Option<crate::dialect::layout::Fill>,
+    pub indirect_parameter_enable: Option<crate::dialect::layout::Fill>,
+    pub tbimr_enabled: Option<crate::dialect::layout::Fill>,
+    pub extended_parameter_0_present: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub threadgroup_count_x: Option<crate::dialect::layout::Fill>,
+    pub starting_threadgroup_id_x: Option<crate::dialect::layout::Fill>,
+    pub extended_parameter_0_xp0: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dmesh_3d`: genxml's 3DMESH_3D.
 #[mlirformat::mlir::op("xe3.cmd.3dmesh_3d", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dmesh3d {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub uav_coherency_required: Option<crate::dialect::image::Fill>,
-    pub indirect_parameter_enable: Option<crate::dialect::image::Fill>,
-    pub tbimr_enabled: Option<crate::dialect::image::Fill>,
-    pub extended_parameter_0_present: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub threadgroup_count_x: Option<crate::dialect::image::Fill>,
-    pub threadgroup_count_y: Option<crate::dialect::image::Fill>,
-    pub threadgroup_count_z: Option<crate::dialect::image::Fill>,
-    pub extended_parameter_0_xp0: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub uav_coherency_required: Option<crate::dialect::layout::Fill>,
+    pub indirect_parameter_enable: Option<crate::dialect::layout::Fill>,
+    pub tbimr_enabled: Option<crate::dialect::layout::Fill>,
+    pub extended_parameter_0_present: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub threadgroup_count_x: Option<crate::dialect::layout::Fill>,
+    pub threadgroup_count_y: Option<crate::dialect::layout::Fill>,
+    pub threadgroup_count_z: Option<crate::dialect::layout::Fill>,
+    pub extended_parameter_0_xp0: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dprimitive`: genxml's 3DPRIMITIVE.
 #[mlirformat::mlir::op("xe3.cmd.3dprimitive", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dprimitive {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub uav_coherency_required: Option<crate::dialect::image::Fill>,
-    pub indirect_parameter_enable: Option<crate::dialect::image::Fill>,
-    pub extended_parameters_present: Option<crate::dialect::image::Fill>,
-    pub tbimr_enable: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub primitive_topology_type: Option<crate::dialect::image::Fill>,
-    pub vertex_access_type: Option<crate::dialect::image::Fill>,
-    pub end_offset_enable: Option<crate::dialect::image::Fill>,
-    pub vertex_count_per_instance: Option<crate::dialect::image::Fill>,
-    pub start_vertex_location: Option<crate::dialect::image::Fill>,
-    pub instance_count: Option<crate::dialect::image::Fill>,
-    pub start_instance_location: Option<crate::dialect::image::Fill>,
-    pub base_vertex_location: Option<crate::dialect::image::Fill>,
-    pub extended_parameter_0: Option<crate::dialect::image::Fill>,
-    pub extended_parameter_1: Option<crate::dialect::image::Fill>,
-    pub extended_parameter_2: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub uav_coherency_required: Option<crate::dialect::layout::Fill>,
+    pub indirect_parameter_enable: Option<crate::dialect::layout::Fill>,
+    pub extended_parameters_present: Option<crate::dialect::layout::Fill>,
+    pub tbimr_enable: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub primitive_topology_type: Option<crate::dialect::layout::Fill>,
+    pub vertex_access_type: Option<crate::dialect::layout::Fill>,
+    pub end_offset_enable: Option<crate::dialect::layout::Fill>,
+    pub vertex_count_per_instance: Option<crate::dialect::layout::Fill>,
+    pub start_vertex_location: Option<crate::dialect::layout::Fill>,
+    pub instance_count: Option<crate::dialect::layout::Fill>,
+    pub start_instance_location: Option<crate::dialect::layout::Fill>,
+    pub base_vertex_location: Option<crate::dialect::layout::Fill>,
+    pub extended_parameter_0: Option<crate::dialect::layout::Fill>,
+    pub extended_parameter_1: Option<crate::dialect::layout::Fill>,
+    pub extended_parameter_2: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dprimitive_extended`: genxml's 3DPRIMITIVE_EXTENDED.
 #[mlirformat::mlir::op("xe3.cmd.3dprimitive_extended", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dprimitiveExtended {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub uav_coherency_required: Option<crate::dialect::image::Fill>,
-    pub indirect_parameter_enable: Option<crate::dialect::image::Fill>,
-    pub extended_parameters_present: Option<crate::dialect::image::Fill>,
-    pub tbimr_enable: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub primitive_topology_type: Option<crate::dialect::image::Fill>,
-    pub vertex_access_type: Option<crate::dialect::image::Fill>,
-    pub end_offset_enable: Option<crate::dialect::image::Fill>,
-    pub vertex_count_per_instance: Option<crate::dialect::image::Fill>,
-    pub start_vertex_location: Option<crate::dialect::image::Fill>,
-    pub instance_count: Option<crate::dialect::image::Fill>,
-    pub start_instance_location: Option<crate::dialect::image::Fill>,
-    pub base_vertex_location: Option<crate::dialect::image::Fill>,
-    pub extended_parameter_0: Option<crate::dialect::image::Fill>,
-    pub extended_parameter_1: Option<crate::dialect::image::Fill>,
-    pub extended_parameter_2: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub uav_coherency_required: Option<crate::dialect::layout::Fill>,
+    pub indirect_parameter_enable: Option<crate::dialect::layout::Fill>,
+    pub extended_parameters_present: Option<crate::dialect::layout::Fill>,
+    pub tbimr_enable: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub primitive_topology_type: Option<crate::dialect::layout::Fill>,
+    pub vertex_access_type: Option<crate::dialect::layout::Fill>,
+    pub end_offset_enable: Option<crate::dialect::layout::Fill>,
+    pub vertex_count_per_instance: Option<crate::dialect::layout::Fill>,
+    pub start_vertex_location: Option<crate::dialect::layout::Fill>,
+    pub instance_count: Option<crate::dialect::layout::Fill>,
+    pub start_instance_location: Option<crate::dialect::layout::Fill>,
+    pub base_vertex_location: Option<crate::dialect::layout::Fill>,
+    pub extended_parameter_0: Option<crate::dialect::layout::Fill>,
+    pub extended_parameter_1: Option<crate::dialect::layout::Fill>,
+    pub extended_parameter_2: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_3d_mode`: genxml's 3DSTATE_3D_MODE.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_3d_mode", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstate3dMode {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub cross_slice_hashing_mode: Option<crate::dialect::image::Fill>,
-    pub _3d_scoreboard_hashing_mode: Option<crate::dialect::image::Fill>,
-    pub subslice_hashing_table_enable: Option<crate::dialect::image::Fill>,
-    pub slice_hashing_table_enable: Option<crate::dialect::image::Fill>,
-    pub dx10_ogl_border_mode_for_ycrcb: Option<crate::dialect::image::Fill>,
-    pub enable_ooo_reads_in_rcpb: Option<crate::dialect::image::Fill>,
-    pub cross_slice_hashing_mode_mask: Option<crate::dialect::image::Fill>,
-    pub _3d_scoreboard_hashing_mode_mask: Option<crate::dialect::image::Fill>,
-    pub subslice_hashing_table_enable_mask: Option<crate::dialect::image::Fill>,
-    pub slice_hashing_table_enable_mask: Option<crate::dialect::image::Fill>,
-    pub dx10_ogl_border_mode_for_ycrcb_mask: Option<crate::dialect::image::Fill>,
-    pub enable_ooo_reads_in_rcpb_mask: Option<crate::dialect::image::Fill>,
-    pub amfs_mocs: Option<crate::dialect::image::Fill>,
-    pub state_cache_redirect_to_cs_section_enable: Option<crate::dialect::image::Fill>,
-    pub amfs_mocs_mask: Option<crate::dialect::image::Fill>,
-    pub state_cache_redirect_to_cs_section_enable_mask: Option<crate::dialect::image::Fill>,
-    pub rcc_rhwo_optimization_disable: Option<crate::dialect::image::Fill>,
-    pub rcc_rhwo_optimization_disable_mask: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub cross_slice_hashing_mode: Option<crate::dialect::layout::Fill>,
+    pub _3d_scoreboard_hashing_mode: Option<crate::dialect::layout::Fill>,
+    pub subslice_hashing_table_enable: Option<crate::dialect::layout::Fill>,
+    pub slice_hashing_table_enable: Option<crate::dialect::layout::Fill>,
+    pub dx10_ogl_border_mode_for_ycrcb: Option<crate::dialect::layout::Fill>,
+    pub enable_ooo_reads_in_rcpb: Option<crate::dialect::layout::Fill>,
+    pub cross_slice_hashing_mode_mask: Option<crate::dialect::layout::Fill>,
+    pub _3d_scoreboard_hashing_mode_mask: Option<crate::dialect::layout::Fill>,
+    pub subslice_hashing_table_enable_mask: Option<crate::dialect::layout::Fill>,
+    pub slice_hashing_table_enable_mask: Option<crate::dialect::layout::Fill>,
+    pub dx10_ogl_border_mode_for_ycrcb_mask: Option<crate::dialect::layout::Fill>,
+    pub enable_ooo_reads_in_rcpb_mask: Option<crate::dialect::layout::Fill>,
+    pub amfs_mocs: Option<crate::dialect::layout::Fill>,
+    pub state_cache_redirect_to_cs_section_enable: Option<crate::dialect::layout::Fill>,
+    pub amfs_mocs_mask: Option<crate::dialect::layout::Fill>,
+    pub state_cache_redirect_to_cs_section_enable_mask: Option<crate::dialect::layout::Fill>,
+    pub rcc_rhwo_optimization_disable: Option<crate::dialect::layout::Fill>,
+    pub rcc_rhwo_optimization_disable_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_aa_line_parameters`: genxml's 3DSTATE_AA_LINE_PARAMETERS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_aa_line_parameters", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateAaLineParameters {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub aa_coverage_slope: Option<crate::dialect::image::Real>,
-    pub aa_point_coverage_slope: Option<crate::dialect::image::Real>,
-    pub aa_coverage_bias: Option<crate::dialect::image::Real>,
-    pub aa_point_coverage_bias: Option<crate::dialect::image::Real>,
-    pub aa_coverage_endcap_slope: Option<crate::dialect::image::Real>,
-    pub aa_point_coverage_endcap_slope: Option<crate::dialect::image::Real>,
-    pub aa_coverage_endcap_bias: Option<crate::dialect::image::Real>,
-    pub aa_point_coverage_endcap_bias: Option<crate::dialect::image::Real>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub aa_coverage_slope: Option<crate::dialect::layout::Real>,
+    pub aa_point_coverage_slope: Option<crate::dialect::layout::Real>,
+    pub aa_coverage_bias: Option<crate::dialect::layout::Real>,
+    pub aa_point_coverage_bias: Option<crate::dialect::layout::Real>,
+    pub aa_coverage_endcap_slope: Option<crate::dialect::layout::Real>,
+    pub aa_point_coverage_endcap_slope: Option<crate::dialect::layout::Real>,
+    pub aa_coverage_endcap_bias: Option<crate::dialect::layout::Real>,
+    pub aa_point_coverage_endcap_bias: Option<crate::dialect::layout::Real>,
 }
 
 /// An element of `xe3.cmd.3dstate_binding_table_edit_ds`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateBindingTableEditDsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_n: Option<crate::dialect::image::Fields<StateBindingTableEditEntryFields>>,
+    pub entry_n: Option<crate::dialect::layout::Fields<StateBindingTableEditEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_edit_ds`: genxml's 3DSTATE_BINDING_TABLE_EDIT_DS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_edit_ds", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTableEditDs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub binding_table_edit_target: Option<crate::dialect::image::Fill>,
-    pub binding_table_block_clear: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateBindingTableEditDsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub binding_table_edit_target: Option<crate::dialect::layout::Fill>,
+    pub binding_table_block_clear: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateBindingTableEditDsElement>>>,
 }
 
 /// An element of `xe3.cmd.3dstate_binding_table_edit_gs`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateBindingTableEditGsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_n: Option<crate::dialect::image::Fields<StateBindingTableEditEntryFields>>,
+    pub entry_n: Option<crate::dialect::layout::Fields<StateBindingTableEditEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_edit_gs`: genxml's 3DSTATE_BINDING_TABLE_EDIT_GS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_edit_gs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTableEditGs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub binding_table_edit_target: Option<crate::dialect::image::Fill>,
-    pub binding_table_block_clear: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateBindingTableEditGsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub binding_table_edit_target: Option<crate::dialect::layout::Fill>,
+    pub binding_table_block_clear: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateBindingTableEditGsElement>>>,
 }
 
 /// An element of `xe3.cmd.3dstate_binding_table_edit_hs`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateBindingTableEditHsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_n: Option<crate::dialect::image::Fields<StateBindingTableEditEntryFields>>,
+    pub entry_n: Option<crate::dialect::layout::Fields<StateBindingTableEditEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_edit_hs`: genxml's 3DSTATE_BINDING_TABLE_EDIT_HS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_edit_hs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTableEditHs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub binding_table_edit_target: Option<crate::dialect::image::Fill>,
-    pub binding_table_block_clear: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateBindingTableEditHsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub binding_table_edit_target: Option<crate::dialect::layout::Fill>,
+    pub binding_table_block_clear: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateBindingTableEditHsElement>>>,
 }
 
 /// An element of `xe3.cmd.3dstate_binding_table_edit_ps`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateBindingTableEditPsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_n: Option<crate::dialect::image::Fields<StateBindingTableEditEntryFields>>,
+    pub entry_n: Option<crate::dialect::layout::Fields<StateBindingTableEditEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_edit_ps`: genxml's 3DSTATE_BINDING_TABLE_EDIT_PS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_edit_ps", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTableEditPs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub binding_table_edit_target: Option<crate::dialect::image::Fill>,
-    pub binding_table_block_clear: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateBindingTableEditPsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub binding_table_edit_target: Option<crate::dialect::layout::Fill>,
+    pub binding_table_block_clear: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateBindingTableEditPsElement>>>,
 }
 
 /// An element of `xe3.cmd.3dstate_binding_table_edit_vs`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateBindingTableEditVsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_n: Option<crate::dialect::image::Fields<StateBindingTableEditEntryFields>>,
+    pub entry_n: Option<crate::dialect::layout::Fields<StateBindingTableEditEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_edit_vs`: genxml's 3DSTATE_BINDING_TABLE_EDIT_VS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_edit_vs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTableEditVs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub binding_table_edit_target: Option<crate::dialect::image::Fill>,
-    pub binding_table_block_clear: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateBindingTableEditVsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub binding_table_edit_target: Option<crate::dialect::layout::Fill>,
+    pub binding_table_block_clear: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateBindingTableEditVsElement>>>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_pointers_ds`: genxml's 3DSTATE_BINDING_TABLE_POINTERS_DS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_pointers_ds", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTablePointersDs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pointer_to_ds_binding_table: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_ds_binding_table: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_pointers_gs`: genxml's 3DSTATE_BINDING_TABLE_POINTERS_GS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_pointers_gs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTablePointersGs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pointer_to_gs_binding_table: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_gs_binding_table: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_pointers_hs`: genxml's 3DSTATE_BINDING_TABLE_POINTERS_HS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_pointers_hs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTablePointersHs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pointer_to_hs_binding_table: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_hs_binding_table: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_pointers_ps`: genxml's 3DSTATE_BINDING_TABLE_POINTERS_PS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_pointers_ps", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTablePointersPs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pointer_to_ps_binding_table: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_ps_binding_table: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_pointers_vs`: genxml's 3DSTATE_BINDING_TABLE_POINTERS_VS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_pointers_vs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTablePointersVs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pointer_to_vs_binding_table: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_vs_binding_table: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_binding_table_pool_alloc`: genxml's 3DSTATE_BINDING_TABLE_POOL_ALLOC.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_binding_table_pool_alloc", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBindingTablePoolAlloc {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub binding_table_pool_base_address: Option<crate::dialect::image::Fill>,
-    pub binding_table_pool_buffer_size: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub binding_table_pool_base_address: Option<crate::dialect::layout::Fill>,
+    pub binding_table_pool_buffer_size: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_blend_state_pointers`: genxml's 3DSTATE_BLEND_STATE_POINTERS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_blend_state_pointers", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBlendStatePointers {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub blend_state_pointer_valid: Option<crate::dialect::image::Fill>,
-    pub blend_state_pointer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub blend_state_pointer_valid: Option<crate::dialect::layout::Fill>,
+    pub blend_state_pointer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_btd`: genxml's 3DSTATE_BTD.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_btd", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateBtd {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub dispatch_timeout_counter: Option<crate::dialect::image::Fill>,
-    pub controls_the_maximum_number_of_outstanding_ray_queries_per_ss: Option<crate::dialect::image::Fill>,
-    pub dynamic_stack_management_mechanism_miss_penalty: Option<crate::dialect::image::Fill>,
-    pub dynamic_stack_management_mechanism_hit_reward: Option<crate::dialect::image::Fill>,
-    pub dynamic_stack_management_mechanism_scaling_factor: Option<crate::dialect::image::Fill>,
-    pub dynamic_stack_management_mechanism_reduction_cap: Option<crate::dialect::image::Fill>,
-    pub rt_mem_structures_64b_mode_enable: Option<crate::dialect::image::Fill>,
-    pub btd_mid_thread_preemption: Option<crate::dialect::image::Fill>,
-    pub per_dss_memory_backed_buffer_size: Option<crate::dialect::image::Fill>,
-    pub memory_backed_buffer_base_pointer: Option<crate::dialect::image::Fill>,
-    pub scratch_space_buffer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub dispatch_timeout_counter: Option<crate::dialect::layout::Fill>,
+    pub controls_the_maximum_number_of_outstanding_ray_queries_per_ss: Option<crate::dialect::layout::Fill>,
+    pub dynamic_stack_management_mechanism_miss_penalty: Option<crate::dialect::layout::Fill>,
+    pub dynamic_stack_management_mechanism_hit_reward: Option<crate::dialect::layout::Fill>,
+    pub dynamic_stack_management_mechanism_scaling_factor: Option<crate::dialect::layout::Fill>,
+    pub dynamic_stack_management_mechanism_reduction_cap: Option<crate::dialect::layout::Fill>,
+    pub rt_mem_structures_64b_mode_enable: Option<crate::dialect::layout::Fill>,
+    pub btd_mid_thread_preemption: Option<crate::dialect::layout::Fill>,
+    pub per_dss_memory_backed_buffer_size: Option<crate::dialect::layout::Fill>,
+    pub memory_backed_buffer_base_pointer: Option<crate::dialect::layout::Fill>,
+    pub scratch_space_buffer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_cc_state_pointers`: genxml's 3DSTATE_CC_STATE_POINTERS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_cc_state_pointers", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateCcStatePointers {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub color_calc_state_pointer_valid: Option<crate::dialect::image::Fill>,
-    pub color_calc_state_pointer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub color_calc_state_pointer_valid: Option<crate::dialect::layout::Fill>,
+    pub color_calc_state_pointer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_chroma_key`: genxml's 3DSTATE_CHROMA_KEY.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_chroma_key", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateChromaKey {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub chromakey_table_index: Option<crate::dialect::image::Fill>,
-    pub chromakey_low_value: Option<crate::dialect::image::Fill>,
-    pub chromakey_high_value: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub chromakey_table_index: Option<crate::dialect::layout::Fill>,
+    pub chromakey_low_value: Option<crate::dialect::layout::Fill>,
+    pub chromakey_high_value: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_clip`: genxml's 3DSTATE_CLIP.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_clip", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateClip {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub statistics_enable: Option<crate::dialect::image::Fill>,
-    pub force_clip_mode: Option<crate::dialect::image::Fill>,
-    pub force_user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub early_cull_enable: Option<crate::dialect::image::Fill>,
-    pub vertex_sub_pixel_precision_select: Option<crate::dialect::image::Fill>,
-    pub force_user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub triangle_fan_provoking_vertex_select: Option<crate::dialect::image::Fill>,
-    pub line_strip_list_provoking_vertex_select: Option<crate::dialect::image::Fill>,
-    pub triangle_strip_list_provoking_vertex_select: Option<crate::dialect::image::Fill>,
-    pub triangle_strip_odd_provoking_vertex_select: Option<crate::dialect::image::Fill>,
-    pub non_perspective_barycentric_enable: Option<crate::dialect::image::Fill>,
-    pub perspective_divide_disable: Option<crate::dialect::image::Fill>,
-    pub clip_mode: Option<crate::dialect::image::Fill>,
-    pub user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub guardband_clip_test_enable: Option<crate::dialect::image::Fill>,
-    pub viewport_xy_clip_test_enable: Option<crate::dialect::image::Fill>,
-    pub api_mode: Option<crate::dialect::image::Fill>,
-    pub clip_enable: Option<crate::dialect::image::Fill>,
-    pub maximum_vp_index: Option<crate::dialect::image::Fill>,
-    pub force_zero_rta_index_enable: Option<crate::dialect::image::Fill>,
-    pub maximum_point_width: Option<crate::dialect::image::Real>,
-    pub minimum_point_width: Option<crate::dialect::image::Real>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub statistics_enable: Option<crate::dialect::layout::Fill>,
+    pub force_clip_mode: Option<crate::dialect::layout::Fill>,
+    pub force_user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub early_cull_enable: Option<crate::dialect::layout::Fill>,
+    pub vertex_sub_pixel_precision_select: Option<crate::dialect::layout::Fill>,
+    pub force_user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub triangle_fan_provoking_vertex_select: Option<crate::dialect::layout::Fill>,
+    pub line_strip_list_provoking_vertex_select: Option<crate::dialect::layout::Fill>,
+    pub triangle_strip_list_provoking_vertex_select: Option<crate::dialect::layout::Fill>,
+    pub triangle_strip_odd_provoking_vertex_select: Option<crate::dialect::layout::Fill>,
+    pub non_perspective_barycentric_enable: Option<crate::dialect::layout::Fill>,
+    pub perspective_divide_disable: Option<crate::dialect::layout::Fill>,
+    pub clip_mode: Option<crate::dialect::layout::Fill>,
+    pub user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub guardband_clip_test_enable: Option<crate::dialect::layout::Fill>,
+    pub viewport_xy_clip_test_enable: Option<crate::dialect::layout::Fill>,
+    pub api_mode: Option<crate::dialect::layout::Fill>,
+    pub clip_enable: Option<crate::dialect::layout::Fill>,
+    pub maximum_vp_index: Option<crate::dialect::layout::Fill>,
+    pub force_zero_rta_index_enable: Option<crate::dialect::layout::Fill>,
+    pub maximum_point_width: Option<crate::dialect::layout::Real>,
+    pub minimum_point_width: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.cmd.3dstate_clip_mesh`: genxml's 3DSTATE_CLIP_MESH.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_clip_mesh", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateClipMesh {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub primitive_header_enable: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub primitive_header_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_coarse_pixel`: genxml's 3DSTATE_COARSE_PIXEL.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_coarse_pixel", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateCoarsePixel {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub cpsizex: Option<crate::dialect::image::Fill>,
-    pub cpsizey: Option<crate::dialect::image::Fill>,
-    pub cpsizecombiner1opcode: Option<crate::dialect::image::Fill>,
-    pub cpsizecombiner0opcode: Option<crate::dialect::image::Fill>,
-    pub disable_cps_pointers: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub cpsizex: Option<crate::dialect::layout::Fill>,
+    pub cpsizey: Option<crate::dialect::layout::Fill>,
+    pub cpsizecombiner1opcode: Option<crate::dialect::layout::Fill>,
+    pub cpsizecombiner0opcode: Option<crate::dialect::layout::Fill>,
+    pub disable_cps_pointers: Option<crate::dialect::layout::Fill>,
 }
 
 /// An element of `xe3.cmd.3dstate_constant_all`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateConstantAllElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub constant_body: Option<crate::dialect::image::Fields<State3dstateConstantAllDataFields>>,
+    pub constant_body: Option<crate::dialect::layout::Fields<State3dstateConstantAllDataFields>>,
 }
 
 /// `xe3.cmd.3dstate_constant_all`: genxml's 3DSTATE_CONSTANT_ALL.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_constant_all", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateConstantAll {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub shader_update_enable: Option<crate::dialect::image::Fill>,
-    pub vertex_shader_update_enable: Option<crate::dialect::image::Fill>,
-    pub hull_shader_update_enable: Option<crate::dialect::image::Fill>,
-    pub domain_shader_update_enable: Option<crate::dialect::image::Fill>,
-    pub geometry_shader_update_enable: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_update_enable: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub pointer_buffer_mask: Option<crate::dialect::image::Fill>,
-    pub update_mode: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateConstantAllElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub shader_update_enable: Option<crate::dialect::layout::Fill>,
+    pub vertex_shader_update_enable: Option<crate::dialect::layout::Fill>,
+    pub hull_shader_update_enable: Option<crate::dialect::layout::Fill>,
+    pub domain_shader_update_enable: Option<crate::dialect::layout::Fill>,
+    pub geometry_shader_update_enable: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_update_enable: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub pointer_buffer_mask: Option<crate::dialect::layout::Fill>,
+    pub update_mode: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateConstantAllElement>>>,
 }
 
 /// `xe3.cmd.3dstate_constant_ds`: genxml's 3DSTATE_CONSTANT_DS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_constant_ds", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateConstantDs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub constant_body: Option<crate::dialect::image::Fields<State3dstateConstantBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub constant_body: Option<crate::dialect::layout::Fields<State3dstateConstantBodyFields>>,
 }
 
 /// `xe3.cmd.3dstate_constant_gs`: genxml's 3DSTATE_CONSTANT_GS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_constant_gs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateConstantGs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub constant_body: Option<crate::dialect::image::Fields<State3dstateConstantBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub constant_body: Option<crate::dialect::layout::Fields<State3dstateConstantBodyFields>>,
 }
 
 /// `xe3.cmd.3dstate_constant_hs`: genxml's 3DSTATE_CONSTANT_HS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_constant_hs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateConstantHs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub constant_body: Option<crate::dialect::image::Fields<State3dstateConstantBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub constant_body: Option<crate::dialect::layout::Fields<State3dstateConstantBodyFields>>,
 }
 
 /// `xe3.cmd.3dstate_constant_ps`: genxml's 3DSTATE_CONSTANT_PS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_constant_ps", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateConstantPs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub disable_gather_at_set_shader_hint: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub constant_body: Option<crate::dialect::image::Fields<State3dstateConstantBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub disable_gather_at_set_shader_hint: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub constant_body: Option<crate::dialect::layout::Fields<State3dstateConstantBodyFields>>,
 }
 
 /// `xe3.cmd.3dstate_constant_vs`: genxml's 3DSTATE_CONSTANT_VS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_constant_vs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateConstantVs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub constant_body: Option<crate::dialect::image::Fields<State3dstateConstantBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub constant_body: Option<crate::dialect::layout::Fields<State3dstateConstantBodyFields>>,
 }
 
 /// `xe3.cmd.3dstate_cpsize_control_buffer`: genxml's 3DSTATE_CPSIZE_CONTROL_BUFFER.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_cpsize_control_buffer", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateCpsizeControlBuffer {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub surface_pitch: Option<crate::dialect::image::Fill>,
-    pub surface_type: Option<crate::dialect::image::Fill>,
-    pub surface_base_address: Option<crate::dialect::image::Fill>,
-    pub width: Option<crate::dialect::image::Fill>,
-    pub height: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub minimum_array_element: Option<crate::dialect::image::Fill>,
-    pub depth: Option<crate::dialect::image::Fill>,
-    pub compression_format: Option<crate::dialect::image::Fill>,
-    pub mip_tail_start_lod: Option<crate::dialect::image::Fill>,
-    pub tiled_mode: Option<crate::dialect::image::Fill>,
-    pub surface_qpitch: Option<crate::dialect::image::Fill>,
-    pub surf_lod: Option<crate::dialect::image::Fill>,
-    pub render_target_view_extent: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub surface_pitch: Option<crate::dialect::layout::Fill>,
+    pub surface_type: Option<crate::dialect::layout::Fill>,
+    pub surface_base_address: Option<crate::dialect::layout::Fill>,
+    pub width: Option<crate::dialect::layout::Fill>,
+    pub height: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub minimum_array_element: Option<crate::dialect::layout::Fill>,
+    pub depth: Option<crate::dialect::layout::Fill>,
+    pub compression_format: Option<crate::dialect::layout::Fill>,
+    pub mip_tail_start_lod: Option<crate::dialect::layout::Fill>,
+    pub tiled_mode: Option<crate::dialect::layout::Fill>,
+    pub surface_qpitch: Option<crate::dialect::layout::Fill>,
+    pub surf_lod: Option<crate::dialect::layout::Fill>,
+    pub render_target_view_extent: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_depth_bounds`: genxml's 3DSTATE_DEPTH_BOUNDS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_depth_bounds", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateDepthBounds {
-    pub length: Option<crate::dialect::image::Fill>,
-    pub depth_bounds_test_value_modify_disable: Option<crate::dialect::image::Fill>,
-    pub depth_bounds_test_enable_modify_disable: Option<crate::dialect::image::Fill>,
-    pub _3dstate_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub depth_bounds_test_enable: Option<crate::dialect::image::Fill>,
-    pub depth_bounds_test_min_value: Option<crate::dialect::image::Real>,
-    pub depth_bounds_test_max_value: Option<crate::dialect::image::Real>,
+    pub length: Option<crate::dialect::layout::Fill>,
+    pub depth_bounds_test_value_modify_disable: Option<crate::dialect::layout::Fill>,
+    pub depth_bounds_test_enable_modify_disable: Option<crate::dialect::layout::Fill>,
+    pub _3dstate_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub depth_bounds_test_enable: Option<crate::dialect::layout::Fill>,
+    pub depth_bounds_test_min_value: Option<crate::dialect::layout::Real>,
+    pub depth_bounds_test_max_value: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.cmd.3dstate_depth_buffer`: genxml's 3DSTATE_DEPTH_BUFFER.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_depth_buffer", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateDepthBuffer {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub surface_pitch: Option<crate::dialect::image::Fill>,
-    pub hierarchical_depth_buffer_enable: Option<crate::dialect::image::Fill>,
-    pub corner_texel_mode: Option<crate::dialect::image::Fill>,
-    pub surface_format: Option<crate::dialect::image::Fill>,
-    pub null_page_coherency_enable: Option<crate::dialect::image::Fill>,
-    pub depth_write_enable: Option<crate::dialect::image::Fill>,
-    pub surface_type: Option<crate::dialect::image::Fill>,
-    pub surface_base_address: Option<crate::dialect::image::Fill>,
-    pub width: Option<crate::dialect::image::Fill>,
-    pub height: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub minimum_array_element: Option<crate::dialect::image::Fill>,
-    pub depth: Option<crate::dialect::image::Fill>,
-    pub render_compression_format: Option<crate::dialect::image::Fill>,
-    pub mip_tail_start_lod: Option<crate::dialect::image::Fill>,
-    pub tiled_mode: Option<crate::dialect::image::Fill>,
-    pub surface_qpitch: Option<crate::dialect::image::Fill>,
-    pub lod: Option<crate::dialect::image::Fill>,
-    pub render_target_view_extent: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub surface_pitch: Option<crate::dialect::layout::Fill>,
+    pub hierarchical_depth_buffer_enable: Option<crate::dialect::layout::Fill>,
+    pub corner_texel_mode: Option<crate::dialect::layout::Fill>,
+    pub surface_format: Option<crate::dialect::layout::Fill>,
+    pub null_page_coherency_enable: Option<crate::dialect::layout::Fill>,
+    pub depth_write_enable: Option<crate::dialect::layout::Fill>,
+    pub surface_type: Option<crate::dialect::layout::Fill>,
+    pub surface_base_address: Option<crate::dialect::layout::Fill>,
+    pub width: Option<crate::dialect::layout::Fill>,
+    pub height: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub minimum_array_element: Option<crate::dialect::layout::Fill>,
+    pub depth: Option<crate::dialect::layout::Fill>,
+    pub render_compression_format: Option<crate::dialect::layout::Fill>,
+    pub mip_tail_start_lod: Option<crate::dialect::layout::Fill>,
+    pub tiled_mode: Option<crate::dialect::layout::Fill>,
+    pub surface_qpitch: Option<crate::dialect::layout::Fill>,
+    pub lod: Option<crate::dialect::layout::Fill>,
+    pub render_target_view_extent: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_drawing_rectangle`: genxml's 3DSTATE_DRAWING_RECTANGLE.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_drawing_rectangle", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateDrawingRectangle {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub core_mode_select: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub clipped_drawing_rectangle_x_min: Option<crate::dialect::image::Fill>,
-    pub clipped_drawing_rectangle_y_min: Option<crate::dialect::image::Fill>,
-    pub clipped_drawing_rectangle_x_max: Option<crate::dialect::image::Fill>,
-    pub clipped_drawing_rectangle_y_max: Option<crate::dialect::image::Fill>,
-    pub drawing_rectangle_origin_x: Option<crate::dialect::image::Fill>,
-    pub drawing_rectangle_origin_y: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub core_mode_select: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub clipped_drawing_rectangle_x_min: Option<crate::dialect::layout::Fill>,
+    pub clipped_drawing_rectangle_y_min: Option<crate::dialect::layout::Fill>,
+    pub clipped_drawing_rectangle_x_max: Option<crate::dialect::layout::Fill>,
+    pub clipped_drawing_rectangle_y_max: Option<crate::dialect::layout::Fill>,
+    pub drawing_rectangle_origin_x: Option<crate::dialect::layout::Fill>,
+    pub drawing_rectangle_origin_y: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_drawing_rectangle_fast`: genxml's 3DSTATE_DRAWING_RECTANGLE_FAST.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_drawing_rectangle_fast", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateDrawingRectangleFast {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub core_mode_select: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub clipped_drawing_rectangle_x_min: Option<crate::dialect::image::Fill>,
-    pub clipped_drawing_rectangle_y_min: Option<crate::dialect::image::Fill>,
-    pub clipped_drawing_rectangle_x_max: Option<crate::dialect::image::Fill>,
-    pub clipped_drawing_rectangle_y_max: Option<crate::dialect::image::Fill>,
-    pub drawing_rectangle_origin_x: Option<crate::dialect::image::Fill>,
-    pub drawing_rectangle_origin_y: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub core_mode_select: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub clipped_drawing_rectangle_x_min: Option<crate::dialect::layout::Fill>,
+    pub clipped_drawing_rectangle_y_min: Option<crate::dialect::layout::Fill>,
+    pub clipped_drawing_rectangle_x_max: Option<crate::dialect::layout::Fill>,
+    pub clipped_drawing_rectangle_y_max: Option<crate::dialect::layout::Fill>,
+    pub drawing_rectangle_origin_x: Option<crate::dialect::layout::Fill>,
+    pub drawing_rectangle_origin_y: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_ds`: genxml's 3DSTATE_DS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_ds", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateDs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub kernel_start_pointer: Option<crate::dialect::image::Fill>,
-    pub registers_per_thread: Option<crate::dialect::image::Fill>,
-    pub software_exception_enable: Option<crate::dialect::image::Fill>,
-    pub illegal_opcode_exception_enable: Option<crate::dialect::image::Fill>,
-    pub accesses_uav: Option<crate::dialect::image::Fill>,
-    pub floating_point_mode: Option<crate::dialect::image::Fill>,
-    pub thread_dispatch_priority: Option<crate::dialect::image::Fill>,
-    pub binding_table_entry_count: Option<crate::dialect::image::Fill>,
-    pub sampler_count: Option<crate::dialect::image::Fill>,
-    pub vector_mask_enable: Option<crate::dialect::image::Fill>,
-    pub scratch_space_buffer: Option<crate::dialect::image::Fill>,
-    pub patch_urb_entry_read_offset: Option<crate::dialect::image::Fill>,
-    pub patch_urb_entry_read_length: Option<crate::dialect::image::Fill>,
-    pub dispatch_grf_start_register_for_urb_data: Option<crate::dialect::image::Fill>,
-    pub enable: Option<crate::dialect::image::Fill>,
-    pub cache_disable: Option<crate::dialect::image::Fill>,
-    pub compute_w_coordinate_enable: Option<crate::dialect::image::Fill>,
-    pub dispatch_mode: Option<crate::dialect::image::Fill>,
-    pub primitive_id_not_required: Option<crate::dialect::image::Fill>,
-    pub statistics_enable: Option<crate::dialect::image::Fill>,
-    pub maximum_number_of_threads: Option<crate::dialect::image::Fill>,
-    pub user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_output_length: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_output_read_offset: Option<crate::dialect::image::Fill>,
-    pub quad_patch_kernel_start_pointer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub kernel_start_pointer: Option<crate::dialect::layout::Fill>,
+    pub registers_per_thread: Option<crate::dialect::layout::Fill>,
+    pub software_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub illegal_opcode_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub accesses_uav: Option<crate::dialect::layout::Fill>,
+    pub floating_point_mode: Option<crate::dialect::layout::Fill>,
+    pub thread_dispatch_priority: Option<crate::dialect::layout::Fill>,
+    pub binding_table_entry_count: Option<crate::dialect::layout::Fill>,
+    pub sampler_count: Option<crate::dialect::layout::Fill>,
+    pub vector_mask_enable: Option<crate::dialect::layout::Fill>,
+    pub scratch_space_buffer: Option<crate::dialect::layout::Fill>,
+    pub patch_urb_entry_read_offset: Option<crate::dialect::layout::Fill>,
+    pub patch_urb_entry_read_length: Option<crate::dialect::layout::Fill>,
+    pub dispatch_grf_start_register_for_urb_data: Option<crate::dialect::layout::Fill>,
+    pub enable: Option<crate::dialect::layout::Fill>,
+    pub cache_disable: Option<crate::dialect::layout::Fill>,
+    pub compute_w_coordinate_enable: Option<crate::dialect::layout::Fill>,
+    pub dispatch_mode: Option<crate::dialect::layout::Fill>,
+    pub primitive_id_not_required: Option<crate::dialect::layout::Fill>,
+    pub statistics_enable: Option<crate::dialect::layout::Fill>,
+    pub maximum_number_of_threads: Option<crate::dialect::layout::Fill>,
+    pub user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_output_length: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_output_read_offset: Option<crate::dialect::layout::Fill>,
+    pub quad_patch_kernel_start_pointer: Option<crate::dialect::layout::Fill>,
 }
 
 /// An element of `xe3.cmd.3dstate_gather_constant_ds`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateGatherConstantDsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_0: Option<crate::dialect::image::Fields<StateGatherConstantEntryFields>>,
+    pub entry_0: Option<crate::dialect::layout::Fields<StateGatherConstantEntryFields>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_1: Option<crate::dialect::image::Fields<StateGatherConstantEntryFields>>,
+    pub entry_1: Option<crate::dialect::layout::Fields<StateGatherConstantEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_gather_constant_ds`: genxml's 3DSTATE_GATHER_CONSTANT_DS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_gather_constant_ds", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateGatherConstantDs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub update_gather_table_only: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_binding_table_block: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_valid: Option<crate::dialect::image::Fill>,
-    pub on_die_table: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_dx9_generate_stall: Option<crate::dialect::image::Fill>,
-    pub gather_buffer_offset: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateGatherConstantDsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub update_gather_table_only: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_binding_table_block: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_valid: Option<crate::dialect::layout::Fill>,
+    pub on_die_table: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_dx9_generate_stall: Option<crate::dialect::layout::Fill>,
+    pub gather_buffer_offset: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateGatherConstantDsElement>>>,
 }
 
 /// An element of `xe3.cmd.3dstate_gather_constant_gs`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateGatherConstantGsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_0: Option<crate::dialect::image::Fields<StateGatherConstantEntryFields>>,
+    pub entry_0: Option<crate::dialect::layout::Fields<StateGatherConstantEntryFields>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_1: Option<crate::dialect::image::Fields<StateGatherConstantEntryFields>>,
+    pub entry_1: Option<crate::dialect::layout::Fields<StateGatherConstantEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_gather_constant_gs`: genxml's 3DSTATE_GATHER_CONSTANT_GS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_gather_constant_gs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateGatherConstantGs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub update_gather_table_only: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_binding_table_block: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_valid: Option<crate::dialect::image::Fill>,
-    pub on_die_table: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_dx9_generate_stall: Option<crate::dialect::image::Fill>,
-    pub gather_buffer_offset: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateGatherConstantGsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub update_gather_table_only: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_binding_table_block: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_valid: Option<crate::dialect::layout::Fill>,
+    pub on_die_table: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_dx9_generate_stall: Option<crate::dialect::layout::Fill>,
+    pub gather_buffer_offset: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateGatherConstantGsElement>>>,
 }
 
 /// An element of `xe3.cmd.3dstate_gather_constant_hs`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateGatherConstantHsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_0: Option<crate::dialect::image::Fields<StateGatherConstantEntryFields>>,
+    pub entry_0: Option<crate::dialect::layout::Fields<StateGatherConstantEntryFields>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_1: Option<crate::dialect::image::Fields<StateGatherConstantEntryFields>>,
+    pub entry_1: Option<crate::dialect::layout::Fields<StateGatherConstantEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_gather_constant_hs`: genxml's 3DSTATE_GATHER_CONSTANT_HS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_gather_constant_hs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateGatherConstantHs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub update_gather_table_only: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_binding_table_block: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_valid: Option<crate::dialect::image::Fill>,
-    pub on_die_table: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_dx9_generate_stall: Option<crate::dialect::image::Fill>,
-    pub gather_buffer_offset: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateGatherConstantHsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub update_gather_table_only: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_binding_table_block: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_valid: Option<crate::dialect::layout::Fill>,
+    pub on_die_table: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_dx9_generate_stall: Option<crate::dialect::layout::Fill>,
+    pub gather_buffer_offset: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateGatherConstantHsElement>>>,
 }
 
 /// An element of `xe3.cmd.3dstate_gather_constant_ps`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateGatherConstantPsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_0: Option<crate::dialect::image::Fields<StateGatherConstantEntryFields>>,
+    pub entry_0: Option<crate::dialect::layout::Fields<StateGatherConstantEntryFields>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_1: Option<crate::dialect::image::Fields<StateGatherConstantEntryFields>>,
+    pub entry_1: Option<crate::dialect::layout::Fields<StateGatherConstantEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_gather_constant_ps`: genxml's 3DSTATE_GATHER_CONSTANT_PS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_gather_constant_ps", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateGatherConstantPs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub dx9_on_die_register_read_enable: Option<crate::dialect::image::Fill>,
-    pub update_gather_table_only: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_binding_table_block: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_valid: Option<crate::dialect::image::Fill>,
-    pub on_die_table: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_dx9_enable: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_dx9_generate_stall: Option<crate::dialect::image::Fill>,
-    pub gather_buffer_offset: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateGatherConstantPsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub dx9_on_die_register_read_enable: Option<crate::dialect::layout::Fill>,
+    pub update_gather_table_only: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_binding_table_block: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_valid: Option<crate::dialect::layout::Fill>,
+    pub on_die_table: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_dx9_enable: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_dx9_generate_stall: Option<crate::dialect::layout::Fill>,
+    pub gather_buffer_offset: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateGatherConstantPsElement>>>,
 }
 
 /// An element of `xe3.cmd.3dstate_gather_constant_vs`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateGatherConstantVsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_0: Option<crate::dialect::image::Fields<StateGatherConstantEntryFields>>,
+    pub entry_0: Option<crate::dialect::layout::Fields<StateGatherConstantEntryFields>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry_1: Option<crate::dialect::image::Fields<StateGatherConstantEntryFields>>,
+    pub entry_1: Option<crate::dialect::layout::Fields<StateGatherConstantEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_gather_constant_vs`: genxml's 3DSTATE_GATHER_CONSTANT_VS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_gather_constant_vs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateGatherConstantVs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub dx9_on_die_register_read_enable: Option<crate::dialect::image::Fill>,
-    pub update_gather_table_only: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_binding_table_block: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_valid: Option<crate::dialect::image::Fill>,
-    pub on_die_table: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_dx9_enable: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_dx9_generate_stall: Option<crate::dialect::image::Fill>,
-    pub gather_buffer_offset: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateGatherConstantVsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub dx9_on_die_register_read_enable: Option<crate::dialect::layout::Fill>,
+    pub update_gather_table_only: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_binding_table_block: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_valid: Option<crate::dialect::layout::Fill>,
+    pub on_die_table: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_dx9_enable: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_dx9_generate_stall: Option<crate::dialect::layout::Fill>,
+    pub gather_buffer_offset: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateGatherConstantVsElement>>>,
 }
 
 /// `xe3.cmd.3dstate_gather_pool_alloc`: genxml's 3DSTATE_GATHER_POOL_ALLOC.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_gather_pool_alloc", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateGatherPoolAlloc {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub gather_pool_enable: Option<crate::dialect::image::Fill>,
-    pub gather_pool_base_address: Option<crate::dialect::image::Fill>,
-    pub gather_pool_buffer_size: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub gather_pool_enable: Option<crate::dialect::layout::Fill>,
+    pub gather_pool_base_address: Option<crate::dialect::layout::Fill>,
+    pub gather_pool_buffer_size: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_gs`: genxml's 3DSTATE_GS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_gs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateGs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub kernel_start_pointer: Option<crate::dialect::image::Fill>,
-    pub expected_vertex_count: Option<crate::dialect::image::Fill>,
-    pub software_exception_enable: Option<crate::dialect::image::Fill>,
-    pub mask_stack_exception_enable: Option<crate::dialect::image::Fill>,
-    pub accesses_uav: Option<crate::dialect::image::Fill>,
-    pub illegal_opcode_exception_enable: Option<crate::dialect::image::Fill>,
-    pub floating_point_mode: Option<crate::dialect::image::Fill>,
-    pub thread_dispatch_priority: Option<crate::dialect::image::Fill>,
-    pub binding_table_entry_count: Option<crate::dialect::image::Fill>,
-    pub sampler_count: Option<crate::dialect::image::Fill>,
-    pub vector_mask_enable: Option<crate::dialect::image::Fill>,
-    pub single_program_flow: Option<crate::dialect::image::Fill>,
-    pub scratch_space_buffer: Option<crate::dialect::image::Fill>,
-    pub dispatch_grf_start_register_for_urb_data: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_read_offset: Option<crate::dialect::image::Fill>,
-    pub include_vertex_handles: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_read_length: Option<crate::dialect::image::Fill>,
-    pub output_topology: Option<crate::dialect::image::Fill>,
-    pub output_vertex_size: Option<crate::dialect::image::Fill>,
-    pub dispatch_grf_start_register_for_urb_data_5_4: Option<crate::dialect::image::Fill>,
-    pub enable: Option<crate::dialect::image::Fill>,
-    pub discard_adjacency: Option<crate::dialect::image::Fill>,
-    pub reorder_mode: Option<crate::dialect::image::Fill>,
-    pub hint: Option<crate::dialect::image::Fill>,
-    pub include_primitive_id: Option<crate::dialect::image::Fill>,
-    pub invocations_increment_value: Option<crate::dialect::image::Fill>,
-    pub statistics_enable: Option<crate::dialect::image::Fill>,
-    pub default_stream_id: Option<crate::dialect::image::Fill>,
-    pub instance_control: Option<crate::dialect::image::Fill>,
-    pub control_data_header_size: Option<crate::dialect::image::Fill>,
-    pub registers_per_thread: Option<crate::dialect::image::Fill>,
-    pub maximum_number_of_threads: Option<crate::dialect::image::Fill>,
-    pub static_output_vertex_count: Option<crate::dialect::image::Fill>,
-    pub static_output: Option<crate::dialect::image::Fill>,
-    pub control_data_format: Option<crate::dialect::image::Fill>,
-    pub user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_output_length: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_output_read_offset: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub kernel_start_pointer: Option<crate::dialect::layout::Fill>,
+    pub expected_vertex_count: Option<crate::dialect::layout::Fill>,
+    pub software_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub mask_stack_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub accesses_uav: Option<crate::dialect::layout::Fill>,
+    pub illegal_opcode_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub floating_point_mode: Option<crate::dialect::layout::Fill>,
+    pub thread_dispatch_priority: Option<crate::dialect::layout::Fill>,
+    pub binding_table_entry_count: Option<crate::dialect::layout::Fill>,
+    pub sampler_count: Option<crate::dialect::layout::Fill>,
+    pub vector_mask_enable: Option<crate::dialect::layout::Fill>,
+    pub single_program_flow: Option<crate::dialect::layout::Fill>,
+    pub scratch_space_buffer: Option<crate::dialect::layout::Fill>,
+    pub dispatch_grf_start_register_for_urb_data: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_read_offset: Option<crate::dialect::layout::Fill>,
+    pub include_vertex_handles: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_read_length: Option<crate::dialect::layout::Fill>,
+    pub output_topology: Option<crate::dialect::layout::Fill>,
+    pub output_vertex_size: Option<crate::dialect::layout::Fill>,
+    pub dispatch_grf_start_register_for_urb_data_5_4: Option<crate::dialect::layout::Fill>,
+    pub enable: Option<crate::dialect::layout::Fill>,
+    pub discard_adjacency: Option<crate::dialect::layout::Fill>,
+    pub reorder_mode: Option<crate::dialect::layout::Fill>,
+    pub hint: Option<crate::dialect::layout::Fill>,
+    pub include_primitive_id: Option<crate::dialect::layout::Fill>,
+    pub invocations_increment_value: Option<crate::dialect::layout::Fill>,
+    pub statistics_enable: Option<crate::dialect::layout::Fill>,
+    pub default_stream_id: Option<crate::dialect::layout::Fill>,
+    pub instance_control: Option<crate::dialect::layout::Fill>,
+    pub control_data_header_size: Option<crate::dialect::layout::Fill>,
+    pub registers_per_thread: Option<crate::dialect::layout::Fill>,
+    pub maximum_number_of_threads: Option<crate::dialect::layout::Fill>,
+    pub static_output_vertex_count: Option<crate::dialect::layout::Fill>,
+    pub static_output: Option<crate::dialect::layout::Fill>,
+    pub control_data_format: Option<crate::dialect::layout::Fill>,
+    pub user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_output_length: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_output_read_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_hier_depth_buffer`: genxml's 3DSTATE_HIER_DEPTH_BUFFER.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_hier_depth_buffer", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateHierDepthBuffer {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub surface_pitch: Option<crate::dialect::image::Fill>,
-    pub hierarchical_depth_buffer_write_thru_enable: Option<crate::dialect::image::Fill>,
-    pub tiled_mode: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub surface_base_address: Option<crate::dialect::image::Fill>,
-    pub surface_qpitch: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub surface_pitch: Option<crate::dialect::layout::Fill>,
+    pub hierarchical_depth_buffer_write_thru_enable: Option<crate::dialect::layout::Fill>,
+    pub tiled_mode: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub surface_base_address: Option<crate::dialect::layout::Fill>,
+    pub surface_qpitch: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_hs`: genxml's 3DSTATE_HS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_hs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateHs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub patch_count_threshold: Option<crate::dialect::image::Fill>,
-    pub registers_per_thread: Option<crate::dialect::image::Fill>,
-    pub software_exception_enable: Option<crate::dialect::image::Fill>,
-    pub illegal_opcode_exception_enable: Option<crate::dialect::image::Fill>,
-    pub floating_point_mode: Option<crate::dialect::image::Fill>,
-    pub thread_dispatch_priority: Option<crate::dialect::image::Fill>,
-    pub binding_table_entry_count: Option<crate::dialect::image::Fill>,
-    pub sampler_count: Option<crate::dialect::image::Fill>,
-    pub instance_count: Option<crate::dialect::image::Fill>,
-    pub maximum_number_of_threads: Option<crate::dialect::image::Fill>,
-    pub statistics_enable: Option<crate::dialect::image::Fill>,
-    pub enable: Option<crate::dialect::image::Fill>,
-    pub kernel_start_pointer: Option<crate::dialect::image::Fill>,
-    pub scratch_space_buffer: Option<crate::dialect::image::Fill>,
-    pub include_primitive_id: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_read_offset: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_read_length: Option<crate::dialect::image::Fill>,
-    pub dispatch_grf_start_register_for_urb_data: Option<crate::dialect::image::Fill>,
-    pub include_vertex_handles: Option<crate::dialect::image::Fill>,
-    pub accesses_uav: Option<crate::dialect::image::Fill>,
-    pub vector_mask_enable: Option<crate::dialect::image::Fill>,
-    pub single_program_flow: Option<crate::dialect::image::Fill>,
-    pub dispatch_grf_start_register_for_urb_data_5: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub patch_count_threshold: Option<crate::dialect::layout::Fill>,
+    pub registers_per_thread: Option<crate::dialect::layout::Fill>,
+    pub software_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub illegal_opcode_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub floating_point_mode: Option<crate::dialect::layout::Fill>,
+    pub thread_dispatch_priority: Option<crate::dialect::layout::Fill>,
+    pub binding_table_entry_count: Option<crate::dialect::layout::Fill>,
+    pub sampler_count: Option<crate::dialect::layout::Fill>,
+    pub instance_count: Option<crate::dialect::layout::Fill>,
+    pub maximum_number_of_threads: Option<crate::dialect::layout::Fill>,
+    pub statistics_enable: Option<crate::dialect::layout::Fill>,
+    pub enable: Option<crate::dialect::layout::Fill>,
+    pub kernel_start_pointer: Option<crate::dialect::layout::Fill>,
+    pub scratch_space_buffer: Option<crate::dialect::layout::Fill>,
+    pub include_primitive_id: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_read_offset: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_read_length: Option<crate::dialect::layout::Fill>,
+    pub dispatch_grf_start_register_for_urb_data: Option<crate::dialect::layout::Fill>,
+    pub include_vertex_handles: Option<crate::dialect::layout::Fill>,
+    pub accesses_uav: Option<crate::dialect::layout::Fill>,
+    pub vector_mask_enable: Option<crate::dialect::layout::Fill>,
+    pub single_program_flow: Option<crate::dialect::layout::Fill>,
+    pub dispatch_grf_start_register_for_urb_data_5: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_index_buffer`: genxml's 3DSTATE_INDEX_BUFFER.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_index_buffer", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateIndexBuffer {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub index_format: Option<crate::dialect::image::Fill>,
-    pub l3_bypass_disable: Option<crate::dialect::image::Fill>,
-    pub buffer_starting_address: Option<crate::dialect::image::Fill>,
-    pub buffer_size: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub index_format: Option<crate::dialect::layout::Fill>,
+    pub l3_bypass_disable: Option<crate::dialect::layout::Fill>,
+    pub buffer_starting_address: Option<crate::dialect::layout::Fill>,
+    pub buffer_size: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_line_stipple`: genxml's 3DSTATE_LINE_STIPPLE.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_line_stipple", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateLineStipple {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub line_stipple_pattern: Option<crate::dialect::image::Fill>,
-    pub current_stipple_index: Option<crate::dialect::image::Fill>,
-    pub current_repeat_counter: Option<crate::dialect::image::Fill>,
-    pub modify_enable_current_repeat_counter_current_stipple_index: Option<crate::dialect::image::Fill>,
-    pub line_stipple_repeat_count: Option<crate::dialect::image::Fill>,
-    pub line_stipple_inverse_repeat_count: Option<crate::dialect::image::Real>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub line_stipple_pattern: Option<crate::dialect::layout::Fill>,
+    pub current_stipple_index: Option<crate::dialect::layout::Fill>,
+    pub current_repeat_counter: Option<crate::dialect::layout::Fill>,
+    pub modify_enable_current_repeat_counter_current_stipple_index: Option<crate::dialect::layout::Fill>,
+    pub line_stipple_repeat_count: Option<crate::dialect::layout::Fill>,
+    pub line_stipple_inverse_repeat_count: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.cmd.3dstate_mesh_control`: genxml's 3DSTATE_MESH_CONTROL.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_mesh_control", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateMeshControl {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub maximum_number_of_threadgroups: Option<crate::dialect::image::Fill>,
-    pub vp_and_rta_index_autostrip_enable: Option<crate::dialect::image::Fill>,
-    pub thread_dispatch_priority: Option<crate::dialect::image::Fill>,
-    pub fused_eu_dispatch: Option<crate::dialect::image::Fill>,
-    pub statistics_enable: Option<crate::dialect::image::Fill>,
-    pub meshshader_enable: Option<crate::dialect::image::Fill>,
-    pub scratch_space_buffer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub maximum_number_of_threadgroups: Option<crate::dialect::layout::Fill>,
+    pub vp_and_rta_index_autostrip_enable: Option<crate::dialect::layout::Fill>,
+    pub thread_dispatch_priority: Option<crate::dialect::layout::Fill>,
+    pub fused_eu_dispatch: Option<crate::dialect::layout::Fill>,
+    pub statistics_enable: Option<crate::dialect::layout::Fill>,
+    pub meshshader_enable: Option<crate::dialect::layout::Fill>,
+    pub scratch_space_buffer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_mesh_distrib`: genxml's 3DSTATE_MESH_DISTRIB.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_mesh_distrib", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateMeshDistrib {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub mesh_distribution_disable: Option<crate::dialect::image::Fill>,
-    pub task_distribution_disable: Option<crate::dialect::image::Fill>,
-    pub distribution_mode: Option<crate::dialect::image::Fill>,
-    pub mesh_distribution_batch_size: Option<crate::dialect::image::Fill>,
-    pub task_distribution_batch_size: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub mesh_distribution_disable: Option<crate::dialect::layout::Fill>,
+    pub task_distribution_disable: Option<crate::dialect::layout::Fill>,
+    pub distribution_mode: Option<crate::dialect::layout::Fill>,
+    pub mesh_distribution_batch_size: Option<crate::dialect::layout::Fill>,
+    pub task_distribution_batch_size: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_mesh_shader`: genxml's 3DSTATE_MESH_SHADER.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_mesh_shader", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateMeshShader {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub kernel_start_pointer: Option<crate::dialect::image::Fill>,
-    pub local_x_maximum: Option<crate::dialect::image::Fill>,
-    pub software_exception_enable: Option<crate::dialect::image::Fill>,
-    pub mask_stack_exception_enable: Option<crate::dialect::image::Fill>,
-    pub illegal_opcode_exception_enable: Option<crate::dialect::image::Fill>,
-    pub floating_point_mode: Option<crate::dialect::image::Fill>,
-    pub single_program_flow: Option<crate::dialect::image::Fill>,
-    pub denorm_mode: Option<crate::dialect::image::Fill>,
-    pub registers_per_thread: Option<crate::dialect::image::Fill>,
-    pub number_of_threads_in_gpgpu_thread_group: Option<crate::dialect::image::Fill>,
-    pub shared_local_memory_size: Option<crate::dialect::image::Fill>,
-    pub rounding_mode: Option<crate::dialect::image::Fill>,
-    pub preferred_slm_allocation_size: Option<crate::dialect::image::Fill>,
-    pub number_of_barriers: Option<crate::dialect::image::Fill>,
-    pub indirect_data_length: Option<crate::dialect::image::Fill>,
-    pub l3_prefetch_disable: Option<crate::dialect::image::Fill>,
-    pub emit_local_id_x: Option<crate::dialect::image::Fill>,
-    pub emit_inline_parameter: Option<crate::dialect::image::Fill>,
-    pub systolic_mode_enable: Option<crate::dialect::image::Fill>,
-    pub accesses_uav: Option<crate::dialect::image::Fill>,
-    pub xp0_required: Option<crate::dialect::image::Fill>,
-    pub message_simd: Option<crate::dialect::image::Fill>,
-    pub simd_size: Option<crate::dialect::image::Fill>,
-    pub execution_mask: Option<crate::dialect::image::Fill>,
-    pub maximum_primitive_count: Option<crate::dialect::image::Fill>,
-    pub per_primitive_data_pitch: Option<crate::dialect::image::Fill>,
-    pub per_vertex_data_pitch: Option<crate::dialect::image::Fill>,
-    pub index_format: Option<crate::dialect::image::Fill>,
-    pub output_topology: Option<crate::dialect::image::Fill>,
-    pub per_primitive_data_present: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub kernel_start_pointer: Option<crate::dialect::layout::Fill>,
+    pub local_x_maximum: Option<crate::dialect::layout::Fill>,
+    pub software_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub mask_stack_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub illegal_opcode_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub floating_point_mode: Option<crate::dialect::layout::Fill>,
+    pub single_program_flow: Option<crate::dialect::layout::Fill>,
+    pub denorm_mode: Option<crate::dialect::layout::Fill>,
+    pub registers_per_thread: Option<crate::dialect::layout::Fill>,
+    pub number_of_threads_in_gpgpu_thread_group: Option<crate::dialect::layout::Fill>,
+    pub shared_local_memory_size: Option<crate::dialect::layout::Fill>,
+    pub rounding_mode: Option<crate::dialect::layout::Fill>,
+    pub preferred_slm_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub number_of_barriers: Option<crate::dialect::layout::Fill>,
+    pub indirect_data_length: Option<crate::dialect::layout::Fill>,
+    pub l3_prefetch_disable: Option<crate::dialect::layout::Fill>,
+    pub emit_local_id_x: Option<crate::dialect::layout::Fill>,
+    pub emit_inline_parameter: Option<crate::dialect::layout::Fill>,
+    pub systolic_mode_enable: Option<crate::dialect::layout::Fill>,
+    pub accesses_uav: Option<crate::dialect::layout::Fill>,
+    pub xp0_required: Option<crate::dialect::layout::Fill>,
+    pub message_simd: Option<crate::dialect::layout::Fill>,
+    pub simd_size: Option<crate::dialect::layout::Fill>,
+    pub execution_mask: Option<crate::dialect::layout::Fill>,
+    pub maximum_primitive_count: Option<crate::dialect::layout::Fill>,
+    pub per_primitive_data_pitch: Option<crate::dialect::layout::Fill>,
+    pub per_vertex_data_pitch: Option<crate::dialect::layout::Fill>,
+    pub index_format: Option<crate::dialect::layout::Fill>,
+    pub output_topology: Option<crate::dialect::layout::Fill>,
+    pub per_primitive_data_present: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_mesh_shader_data`: genxml's 3DSTATE_MESH_SHADER_DATA.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_mesh_shader_data", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateMeshShaderData {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub indirect_data_start_address: Option<crate::dialect::image::Fill>,
-    pub inline_data: Option<Vec<crate::dialect::image::Fill>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub indirect_data_start_address: Option<crate::dialect::layout::Fill>,
+    pub inline_data: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.cmd.3dstate_monofilter_size`: genxml's 3DSTATE_MONOFILTER_SIZE.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_monofilter_size", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateMonofilterSize {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub monochrome_filter_height: Option<crate::dialect::image::Fill>,
-    pub monochrome_filter_width: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub monochrome_filter_height: Option<crate::dialect::layout::Fill>,
+    pub monochrome_filter_width: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_multisample`: genxml's 3DSTATE_MULTISAMPLE.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_multisample", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateMultisample {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub number_of_multisamples: Option<crate::dialect::image::Fill>,
-    pub pixel_location: Option<crate::dialect::image::Fill>,
-    pub pixel_position_offset_enable: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub number_of_multisamples: Option<crate::dialect::layout::Fill>,
+    pub pixel_location: Option<crate::dialect::layout::Fill>,
+    pub pixel_position_offset_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_poly_stipple_offset`: genxml's 3DSTATE_POLY_STIPPLE_OFFSET.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_poly_stipple_offset", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstatePolyStippleOffset {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub polygon_stipple_y_offset: Option<crate::dialect::image::Fill>,
-    pub polygon_stipple_x_offset: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub polygon_stipple_y_offset: Option<crate::dialect::layout::Fill>,
+    pub polygon_stipple_x_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_poly_stipple_pattern`: genxml's 3DSTATE_POLY_STIPPLE_PATTERN.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_poly_stipple_pattern", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstatePolyStipplePattern {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pattern_row: Option<Vec<crate::dialect::image::Fill>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pattern_row: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.cmd.3dstate_primitive_replication`: genxml's 3DSTATE_PRIMITIVE_REPLICATION.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_primitive_replication", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstatePrimitiveReplication {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub replication_count: Option<crate::dialect::image::Fill>,
-    pub replica_mask: Option<crate::dialect::image::Fill>,
-    pub viewport_offset: Option<Vec<crate::dialect::image::Fill>>,
-    pub rtai_offset: Option<Vec<crate::dialect::image::Fill>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub replication_count: Option<crate::dialect::layout::Fill>,
+    pub replica_mask: Option<crate::dialect::layout::Fill>,
+    pub viewport_offset: Option<Vec<crate::dialect::layout::Fill>>,
+    pub rtai_offset: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.cmd.3dstate_ps`: genxml's 3DSTATE_PS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_ps", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstatePs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub kernel_0_enable: Option<crate::dialect::image::Fill>,
-    pub kernel_0_simd_width: Option<crate::dialect::image::Fill>,
-    pub kernel_start_pointer_0: Option<crate::dialect::image::Fill>,
-    pub registers_per_thread: Option<crate::dialect::image::Fill>,
-    pub software_exception_enable: Option<crate::dialect::image::Fill>,
-    pub mask_stack_exception_enable: Option<crate::dialect::image::Fill>,
-    pub illegal_opcode_exception_enable: Option<crate::dialect::image::Fill>,
-    pub rounding_mode: Option<crate::dialect::image::Fill>,
-    pub floating_point_mode: Option<crate::dialect::image::Fill>,
-    pub thread_dispatch_priority: Option<crate::dialect::image::Fill>,
-    pub binding_table_entry_count: Option<crate::dialect::image::Fill>,
-    pub single_precision_denormal_mode: Option<crate::dialect::image::Fill>,
-    pub sampler_count: Option<crate::dialect::image::Fill>,
-    pub vector_mask_enable: Option<crate::dialect::image::Fill>,
-    pub single_program_flow: Option<crate::dialect::image::Fill>,
-    pub scratch_space_buffer: Option<crate::dialect::image::Fill>,
-    pub position_xy_offset_select: Option<crate::dialect::image::Fill>,
-    pub render_target_resolve_type: Option<crate::dialect::image::Fill>,
-    pub render_target_fast_clear_enable: Option<crate::dialect::image::Fill>,
-    pub overlapping_subspans_enable: Option<crate::dialect::image::Fill>,
-    pub _3d_scoreboard_address_size_select: Option<crate::dialect::image::Fill>,
-    pub clear_resolve_bti_for_render_target: Option<crate::dialect::image::Fill>,
-    pub pixel_scoreboard_disable: Option<crate::dialect::image::Fill>,
-    pub maximum_number_of_threads_per_psd: Option<crate::dialect::image::Fill>,
-    pub dispatch_grf_start_register_for_constant_setup_data_1: Option<crate::dialect::image::Fill>,
-    pub dispatch_grf_start_register_for_constant_setup_data_0: Option<crate::dialect::image::Fill>,
-    pub kernel_0_poly_packing_policy: Option<crate::dialect::image::Fill>,
-    pub kernel_0_maximum_polys_per_thread: Option<crate::dialect::image::Fill>,
-    pub kernel_1_selection_priority: Option<crate::dialect::image::Fill>,
-    pub kernel_1_enable: Option<crate::dialect::image::Fill>,
-    pub kernel_1_simd_width: Option<crate::dialect::image::Fill>,
-    pub kernel_start_pointer_1: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub kernel_0_enable: Option<crate::dialect::layout::Fill>,
+    pub kernel_0_simd_width: Option<crate::dialect::layout::Fill>,
+    pub kernel_start_pointer_0: Option<crate::dialect::layout::Fill>,
+    pub registers_per_thread: Option<crate::dialect::layout::Fill>,
+    pub software_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub mask_stack_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub illegal_opcode_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub rounding_mode: Option<crate::dialect::layout::Fill>,
+    pub floating_point_mode: Option<crate::dialect::layout::Fill>,
+    pub thread_dispatch_priority: Option<crate::dialect::layout::Fill>,
+    pub binding_table_entry_count: Option<crate::dialect::layout::Fill>,
+    pub single_precision_denormal_mode: Option<crate::dialect::layout::Fill>,
+    pub sampler_count: Option<crate::dialect::layout::Fill>,
+    pub vector_mask_enable: Option<crate::dialect::layout::Fill>,
+    pub single_program_flow: Option<crate::dialect::layout::Fill>,
+    pub scratch_space_buffer: Option<crate::dialect::layout::Fill>,
+    pub position_xy_offset_select: Option<crate::dialect::layout::Fill>,
+    pub render_target_resolve_type: Option<crate::dialect::layout::Fill>,
+    pub render_target_fast_clear_enable: Option<crate::dialect::layout::Fill>,
+    pub overlapping_subspans_enable: Option<crate::dialect::layout::Fill>,
+    pub _3d_scoreboard_address_size_select: Option<crate::dialect::layout::Fill>,
+    pub clear_resolve_bti_for_render_target: Option<crate::dialect::layout::Fill>,
+    pub pixel_scoreboard_disable: Option<crate::dialect::layout::Fill>,
+    pub maximum_number_of_threads_per_psd: Option<crate::dialect::layout::Fill>,
+    pub dispatch_grf_start_register_for_constant_setup_data_1: Option<crate::dialect::layout::Fill>,
+    pub dispatch_grf_start_register_for_constant_setup_data_0: Option<crate::dialect::layout::Fill>,
+    pub kernel_0_poly_packing_policy: Option<crate::dialect::layout::Fill>,
+    pub kernel_0_maximum_polys_per_thread: Option<crate::dialect::layout::Fill>,
+    pub kernel_1_selection_priority: Option<crate::dialect::layout::Fill>,
+    pub kernel_1_enable: Option<crate::dialect::layout::Fill>,
+    pub kernel_1_simd_width: Option<crate::dialect::layout::Fill>,
+    pub kernel_start_pointer_1: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_ps_blend`: genxml's 3DSTATE_PS_BLEND.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_ps_blend", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstatePsBlend {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub independent_alpha_blend_enable: Option<crate::dialect::image::Fill>,
-    pub alpha_test_enable: Option<crate::dialect::image::Fill>,
-    pub destination_blend_factor: Option<crate::dialect::image::Fill>,
-    pub source_blend_factor: Option<crate::dialect::image::Fill>,
-    pub destination_alpha_blend_factor: Option<crate::dialect::image::Fill>,
-    pub source_alpha_blend_factor: Option<crate::dialect::image::Fill>,
-    pub color_buffer_blend_enable: Option<crate::dialect::image::Fill>,
-    pub has_writeable_rt: Option<crate::dialect::image::Fill>,
-    pub alpha_to_coverage_enable: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub independent_alpha_blend_enable: Option<crate::dialect::layout::Fill>,
+    pub alpha_test_enable: Option<crate::dialect::layout::Fill>,
+    pub destination_blend_factor: Option<crate::dialect::layout::Fill>,
+    pub source_blend_factor: Option<crate::dialect::layout::Fill>,
+    pub destination_alpha_blend_factor: Option<crate::dialect::layout::Fill>,
+    pub source_alpha_blend_factor: Option<crate::dialect::layout::Fill>,
+    pub color_buffer_blend_enable: Option<crate::dialect::layout::Fill>,
+    pub has_writeable_rt: Option<crate::dialect::layout::Fill>,
+    pub alpha_to_coverage_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_ps_extra`: genxml's 3DSTATE_PS_EXTRA.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_ps_extra", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstatePsExtra {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub input_coverage_mask_state: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_has_uav: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_is_per_coarse_pixel: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_computes_stencil: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_is_per_sample: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_disables_alpha_to_coverage: Option<crate::dialect::image::Fill>,
-    pub simple_ps_hint: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_requires_centroid_offsets: Option<crate::dialect::image::Fill>,
-    pub enable_ps_dependency_on_cpsize_change: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_requires_subpixel_sample_offsets: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_requires_non_perspective_bary_plane_coefficients: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_requires_perspective_bary_plane_coefficients: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_requires_source_depth_and_or_w_plane_coefficients: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_requires_requested_coarse_pixel_shading_size: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_uses_source_w: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_uses_source_depth: Option<crate::dialect::image::Fill>,
-    pub force_computed_depth: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_computed_depth_mode: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_kills_pixel: Option<crate::dialect::image::Fill>,
-    pub omask_present_to_render_target: Option<crate::dialect::image::Fill>,
-    pub pixel_shader_valid: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub input_coverage_mask_state: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_has_uav: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_is_per_coarse_pixel: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_computes_stencil: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_is_per_sample: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_disables_alpha_to_coverage: Option<crate::dialect::layout::Fill>,
+    pub simple_ps_hint: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_requires_centroid_offsets: Option<crate::dialect::layout::Fill>,
+    pub enable_ps_dependency_on_cpsize_change: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_requires_subpixel_sample_offsets: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_requires_non_perspective_bary_plane_coefficients: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_requires_perspective_bary_plane_coefficients: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_requires_source_depth_and_or_w_plane_coefficients: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_requires_requested_coarse_pixel_shading_size: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_uses_source_w: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_uses_source_depth: Option<crate::dialect::layout::Fill>,
+    pub force_computed_depth: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_computed_depth_mode: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_kills_pixel: Option<crate::dialect::layout::Fill>,
+    pub omask_present_to_render_target: Option<crate::dialect::layout::Fill>,
+    pub pixel_shader_valid: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_push_constant_alloc_ds`: genxml's 3DSTATE_PUSH_CONSTANT_ALLOC_DS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_push_constant_alloc_ds", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstatePushConstantAllocDs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_size: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_offset: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_size: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_push_constant_alloc_gs`: genxml's 3DSTATE_PUSH_CONSTANT_ALLOC_GS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_push_constant_alloc_gs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstatePushConstantAllocGs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_size: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_offset: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_size: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_push_constant_alloc_hs`: genxml's 3DSTATE_PUSH_CONSTANT_ALLOC_HS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_push_constant_alloc_hs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstatePushConstantAllocHs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_size: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_offset: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_size: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_push_constant_alloc_vs`: genxml's 3DSTATE_PUSH_CONSTANT_ALLOC_VS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_push_constant_alloc_vs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstatePushConstantAllocVs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_size: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_offset: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_size: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_raster`: genxml's 3DSTATE_RASTER.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_raster", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateRaster {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub viewport_z_near_clip_test_enable: Option<crate::dialect::image::Fill>,
-    pub scissor_rectangle_enable: Option<crate::dialect::image::Fill>,
-    pub antialiasing_enable: Option<crate::dialect::image::Fill>,
-    pub back_face_fill_mode: Option<crate::dialect::image::Fill>,
-    pub front_face_fill_mode: Option<crate::dialect::image::Fill>,
-    pub global_depth_offset_enable_point: Option<crate::dialect::image::Fill>,
-    pub global_depth_offset_enable_wireframe: Option<crate::dialect::image::Fill>,
-    pub global_depth_offset_enable_solid: Option<crate::dialect::image::Fill>,
-    pub dx_multisample_rasterization_mode: Option<crate::dialect::image::Fill>,
-    pub dx_multisample_rasterization_enable: Option<crate::dialect::image::Fill>,
-    pub smooth_point_enable: Option<crate::dialect::image::Fill>,
-    pub force_multisampling: Option<crate::dialect::image::Fill>,
-    pub cull_mode: Option<crate::dialect::image::Fill>,
-    pub forced_sample_count: Option<crate::dialect::image::Fill>,
-    pub front_winding: Option<crate::dialect::image::Fill>,
-    pub api_mode: Option<crate::dialect::image::Fill>,
-    pub conservative_rasterization_enable: Option<crate::dialect::image::Fill>,
-    pub viewport_z_far_clip_test_enable: Option<crate::dialect::image::Fill>,
-    pub legacy_bary_assignment_disable: Option<crate::dialect::image::Fill>,
-    pub global_depth_offset_constant: Option<crate::dialect::image::Real>,
-    pub global_depth_offset_scale: Option<crate::dialect::image::Real>,
-    pub global_depth_offset_clamp: Option<crate::dialect::image::Real>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub viewport_z_near_clip_test_enable: Option<crate::dialect::layout::Fill>,
+    pub scissor_rectangle_enable: Option<crate::dialect::layout::Fill>,
+    pub antialiasing_enable: Option<crate::dialect::layout::Fill>,
+    pub back_face_fill_mode: Option<crate::dialect::layout::Fill>,
+    pub front_face_fill_mode: Option<crate::dialect::layout::Fill>,
+    pub global_depth_offset_enable_point: Option<crate::dialect::layout::Fill>,
+    pub global_depth_offset_enable_wireframe: Option<crate::dialect::layout::Fill>,
+    pub global_depth_offset_enable_solid: Option<crate::dialect::layout::Fill>,
+    pub dx_multisample_rasterization_mode: Option<crate::dialect::layout::Fill>,
+    pub dx_multisample_rasterization_enable: Option<crate::dialect::layout::Fill>,
+    pub smooth_point_enable: Option<crate::dialect::layout::Fill>,
+    pub force_multisampling: Option<crate::dialect::layout::Fill>,
+    pub cull_mode: Option<crate::dialect::layout::Fill>,
+    pub forced_sample_count: Option<crate::dialect::layout::Fill>,
+    pub front_winding: Option<crate::dialect::layout::Fill>,
+    pub api_mode: Option<crate::dialect::layout::Fill>,
+    pub conservative_rasterization_enable: Option<crate::dialect::layout::Fill>,
+    pub viewport_z_far_clip_test_enable: Option<crate::dialect::layout::Fill>,
+    pub legacy_bary_assignment_disable: Option<crate::dialect::layout::Fill>,
+    pub global_depth_offset_constant: Option<crate::dialect::layout::Real>,
+    pub global_depth_offset_scale: Option<crate::dialect::layout::Real>,
+    pub global_depth_offset_clamp: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.cmd.3dstate_rs_constant_pointer`: genxml's 3DSTATE_RS_CONSTANT_POINTER.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_rs_constant_pointer", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateRsConstantPointer {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub operation_load_or_store: Option<crate::dialect::image::Fill>,
-    pub shader_select: Option<crate::dialect::image::Fill>,
-    pub global_constant_buffer_address: Option<crate::dialect::image::Fill>,
-    pub global_constant_buffer_address_high: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub operation_load_or_store: Option<crate::dialect::layout::Fill>,
+    pub shader_select: Option<crate::dialect::layout::Fill>,
+    pub global_constant_buffer_address: Option<crate::dialect::layout::Fill>,
+    pub global_constant_buffer_address_high: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_sample_mask`: genxml's 3DSTATE_SAMPLE_MASK.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sample_mask", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSampleMask {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub sample_mask: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub sample_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_sample_pattern`: genxml's 3DSTATE_SAMPLE_PATTERN.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sample_pattern", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSamplePattern {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub _16x_sample0_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample0_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample1_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample1_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample2_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample2_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample3_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample3_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample4_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample4_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample5_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample5_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample6_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample6_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample7_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample7_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample8_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample8_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample9_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample9_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample10_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample10_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample11_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample11_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample12_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample12_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample13_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample13_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample14_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample14_x_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample15_y_offset: Option<crate::dialect::image::Real>,
-    pub _16x_sample15_x_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample4_y_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample4_x_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample5_y_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample5_x_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample6_y_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample6_x_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample7_y_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample7_x_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample0_y_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample0_x_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample1_y_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample1_x_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample2_y_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample2_x_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample3_y_offset: Option<crate::dialect::image::Real>,
-    pub _8x_sample3_x_offset: Option<crate::dialect::image::Real>,
-    pub _4x_sample0_y_offset: Option<crate::dialect::image::Real>,
-    pub _4x_sample0_x_offset: Option<crate::dialect::image::Real>,
-    pub _4x_sample1_y_offset: Option<crate::dialect::image::Real>,
-    pub _4x_sample1_x_offset: Option<crate::dialect::image::Real>,
-    pub _4x_sample2_y_offset: Option<crate::dialect::image::Real>,
-    pub _4x_sample2_x_offset: Option<crate::dialect::image::Real>,
-    pub _4x_sample3_y_offset: Option<crate::dialect::image::Real>,
-    pub _4x_sample3_x_offset: Option<crate::dialect::image::Real>,
-    pub _2x_sample0_y_offset: Option<crate::dialect::image::Real>,
-    pub _2x_sample0_x_offset: Option<crate::dialect::image::Real>,
-    pub _2x_sample1_y_offset: Option<crate::dialect::image::Real>,
-    pub _2x_sample1_x_offset: Option<crate::dialect::image::Real>,
-    pub _1x_sample0_y_offset: Option<crate::dialect::image::Real>,
-    pub _1x_sample0_x_offset: Option<crate::dialect::image::Real>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub _16x_sample0_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample0_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample1_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample1_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample2_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample2_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample3_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample3_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample4_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample4_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample5_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample5_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample6_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample6_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample7_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample7_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample8_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample8_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample9_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample9_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample10_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample10_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample11_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample11_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample12_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample12_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample13_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample13_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample14_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample14_x_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample15_y_offset: Option<crate::dialect::layout::Real>,
+    pub _16x_sample15_x_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample4_y_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample4_x_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample5_y_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample5_x_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample6_y_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample6_x_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample7_y_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample7_x_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample0_y_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample0_x_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample1_y_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample1_x_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample2_y_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample2_x_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample3_y_offset: Option<crate::dialect::layout::Real>,
+    pub _8x_sample3_x_offset: Option<crate::dialect::layout::Real>,
+    pub _4x_sample0_y_offset: Option<crate::dialect::layout::Real>,
+    pub _4x_sample0_x_offset: Option<crate::dialect::layout::Real>,
+    pub _4x_sample1_y_offset: Option<crate::dialect::layout::Real>,
+    pub _4x_sample1_x_offset: Option<crate::dialect::layout::Real>,
+    pub _4x_sample2_y_offset: Option<crate::dialect::layout::Real>,
+    pub _4x_sample2_x_offset: Option<crate::dialect::layout::Real>,
+    pub _4x_sample3_y_offset: Option<crate::dialect::layout::Real>,
+    pub _4x_sample3_x_offset: Option<crate::dialect::layout::Real>,
+    pub _2x_sample0_y_offset: Option<crate::dialect::layout::Real>,
+    pub _2x_sample0_x_offset: Option<crate::dialect::layout::Real>,
+    pub _2x_sample1_y_offset: Option<crate::dialect::layout::Real>,
+    pub _2x_sample1_x_offset: Option<crate::dialect::layout::Real>,
+    pub _1x_sample0_y_offset: Option<crate::dialect::layout::Real>,
+    pub _1x_sample0_x_offset: Option<crate::dialect::layout::Real>,
 }
 
 /// An element of `xe3.cmd.3dstate_sampler_palette_load0`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateSamplerPaletteLoad0Element {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry: Option<crate::dialect::image::Fields<StatePaletteEntryFields>>,
+    pub entry: Option<crate::dialect::layout::Fields<StatePaletteEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_sampler_palette_load0`: genxml's 3DSTATE_SAMPLER_PALETTE_LOAD0.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sampler_palette_load0", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSamplerPaletteLoad0 {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateSamplerPaletteLoad0Element>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateSamplerPaletteLoad0Element>>>,
 }
 
 /// An element of `xe3.cmd.3dstate_sampler_palette_load1`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateSamplerPaletteLoad1Element {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub palette_alpha_0_n_1: Option<crate::dialect::image::Fill>,
+    pub palette_alpha_0_n_1: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub palette_red_0_n_1: Option<crate::dialect::image::Fill>,
+    pub palette_red_0_n_1: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub palette_green_0_n_1: Option<crate::dialect::image::Fill>,
+    pub palette_green_0_n_1: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub palette_blue_0_n_1: Option<crate::dialect::image::Fill>,
+    pub palette_blue_0_n_1: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_sampler_palette_load1`: genxml's 3DSTATE_SAMPLER_PALETTE_LOAD1.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sampler_palette_load1", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSamplerPaletteLoad1 {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateSamplerPaletteLoad1Element>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateSamplerPaletteLoad1Element>>>,
 }
 
 /// `xe3.cmd.3dstate_sampler_state_pointers_ds`: genxml's 3DSTATE_SAMPLER_STATE_POINTERS_DS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sampler_state_pointers_ds", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSamplerStatePointersDs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pointer_to_ds_sampler_state: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_ds_sampler_state: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_sampler_state_pointers_gs`: genxml's 3DSTATE_SAMPLER_STATE_POINTERS_GS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sampler_state_pointers_gs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSamplerStatePointersGs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pointer_to_gs_sampler_state: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_gs_sampler_state: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_sampler_state_pointers_hs`: genxml's 3DSTATE_SAMPLER_STATE_POINTERS_HS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sampler_state_pointers_hs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSamplerStatePointersHs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pointer_to_hs_sampler_state: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_hs_sampler_state: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_sampler_state_pointers_ps`: genxml's 3DSTATE_SAMPLER_STATE_POINTERS_PS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sampler_state_pointers_ps", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSamplerStatePointersPs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pointer_to_ps_sampler_state: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_ps_sampler_state: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_sampler_state_pointers_vs`: genxml's 3DSTATE_SAMPLER_STATE_POINTERS_VS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sampler_state_pointers_vs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSamplerStatePointersVs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub pointer_to_vs_sampler_state: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_vs_sampler_state: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_sbe`: genxml's 3DSTATE_SBE.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sbe", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSbe {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub primitive_id_override_attribute_select: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_read_offset: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_read_length: Option<crate::dialect::image::Fill>,
-    pub primitive_id_override_component_x: Option<crate::dialect::image::Fill>,
-    pub primitive_id_override_component_y: Option<crate::dialect::image::Fill>,
-    pub primitive_id_override_component_z: Option<crate::dialect::image::Fill>,
-    pub primitive_id_override_component_w: Option<crate::dialect::image::Fill>,
-    pub point_sprite_texture_coordinate_origin: Option<crate::dialect::image::Fill>,
-    pub attribute_swizzle_enable: Option<crate::dialect::image::Fill>,
-    pub number_of_sf_output_attributes: Option<crate::dialect::image::Fill>,
-    pub force_vertex_urb_entry_read_offset: Option<crate::dialect::image::Fill>,
-    pub force_vertex_urb_entry_read_length: Option<crate::dialect::image::Fill>,
-    pub vertex_attributes_bypass: Option<crate::dialect::image::Fill>,
-    pub point_sprite_texture_coordinate_enable: Option<crate::dialect::image::Fill>,
-    pub constant_interpolation_enable: Option<crate::dialect::image::Fill>,
-    pub attribute_active_component_format: Option<Vec<crate::dialect::image::Fill>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub primitive_id_override_attribute_select: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_read_offset: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_read_length: Option<crate::dialect::layout::Fill>,
+    pub primitive_id_override_component_x: Option<crate::dialect::layout::Fill>,
+    pub primitive_id_override_component_y: Option<crate::dialect::layout::Fill>,
+    pub primitive_id_override_component_z: Option<crate::dialect::layout::Fill>,
+    pub primitive_id_override_component_w: Option<crate::dialect::layout::Fill>,
+    pub point_sprite_texture_coordinate_origin: Option<crate::dialect::layout::Fill>,
+    pub attribute_swizzle_enable: Option<crate::dialect::layout::Fill>,
+    pub number_of_sf_output_attributes: Option<crate::dialect::layout::Fill>,
+    pub force_vertex_urb_entry_read_offset: Option<crate::dialect::layout::Fill>,
+    pub force_vertex_urb_entry_read_length: Option<crate::dialect::layout::Fill>,
+    pub vertex_attributes_bypass: Option<crate::dialect::layout::Fill>,
+    pub point_sprite_texture_coordinate_enable: Option<crate::dialect::layout::Fill>,
+    pub constant_interpolation_enable: Option<crate::dialect::layout::Fill>,
+    pub attribute_active_component_format: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.cmd.3dstate_sbe_mesh`: genxml's 3DSTATE_SBE_MESH.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sbe_mesh", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSbeMesh {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub per_vertex_urb_entry_output_read_length: Option<crate::dialect::image::Fill>,
-    pub per_vertex_urb_entry_output_read_offset: Option<crate::dialect::image::Fill>,
-    pub per_primitive_urb_entry_output_read_length: Option<crate::dialect::image::Fill>,
-    pub per_primitive_urb_entry_output_read_offset: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub per_vertex_urb_entry_output_read_length: Option<crate::dialect::layout::Fill>,
+    pub per_vertex_urb_entry_output_read_offset: Option<crate::dialect::layout::Fill>,
+    pub per_primitive_urb_entry_output_read_length: Option<crate::dialect::layout::Fill>,
+    pub per_primitive_urb_entry_output_read_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_sbe_swiz`: genxml's 3DSTATE_SBE_SWIZ.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sbe_swiz", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSbeSwiz {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub attribute: Option<Vec<crate::dialect::image::Fields<StateSfOutputAttributeDetailFields>>>,
-    pub attribute_wrap_shortest_enables: Option<Vec<crate::dialect::image::Fill>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub attribute: Option<Vec<crate::dialect::layout::Fields<StateSfOutputAttributeDetailFields>>>,
+    pub attribute_wrap_shortest_enables: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.cmd.3dstate_scissor_state_pointers`: genxml's 3DSTATE_SCISSOR_STATE_POINTERS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_scissor_state_pointers", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateScissorStatePointers {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub scissor_rect_pointer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub scissor_rect_pointer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_sf`: genxml's 3DSTATE_SF.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_sf", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSf {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub viewport_transform_enable: Option<crate::dialect::image::Fill>,
-    pub statistics_enable: Option<crate::dialect::image::Fill>,
-    pub legacy_global_depth_bias_enable: Option<crate::dialect::image::Fill>,
-    pub line_width: Option<crate::dialect::image::Real>,
-    pub line_end_cap_antialiasing_region_width: Option<crate::dialect::image::Fill>,
-    pub deref_block_size: Option<crate::dialect::image::Fill>,
-    pub point_width: Option<crate::dialect::image::Real>,
-    pub point_width_source: Option<crate::dialect::image::Fill>,
-    pub vertex_sub_pixel_precision_select: Option<crate::dialect::image::Fill>,
-    pub smooth_point_enable: Option<crate::dialect::image::Fill>,
-    pub aa_line_distance_mode: Option<crate::dialect::image::Fill>,
-    pub triangle_strip_odd_provoking_vertex_select: Option<crate::dialect::image::Fill>,
-    pub triangle_fan_provoking_vertex_select: Option<crate::dialect::image::Fill>,
-    pub line_strip_list_provoking_vertex_select: Option<crate::dialect::image::Fill>,
-    pub triangle_strip_list_provoking_vertex_select: Option<crate::dialect::image::Fill>,
-    pub last_pixel_enable: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub viewport_transform_enable: Option<crate::dialect::layout::Fill>,
+    pub statistics_enable: Option<crate::dialect::layout::Fill>,
+    pub legacy_global_depth_bias_enable: Option<crate::dialect::layout::Fill>,
+    pub line_width: Option<crate::dialect::layout::Real>,
+    pub line_end_cap_antialiasing_region_width: Option<crate::dialect::layout::Fill>,
+    pub deref_block_size: Option<crate::dialect::layout::Fill>,
+    pub point_width: Option<crate::dialect::layout::Real>,
+    pub point_width_source: Option<crate::dialect::layout::Fill>,
+    pub vertex_sub_pixel_precision_select: Option<crate::dialect::layout::Fill>,
+    pub smooth_point_enable: Option<crate::dialect::layout::Fill>,
+    pub aa_line_distance_mode: Option<crate::dialect::layout::Fill>,
+    pub triangle_strip_odd_provoking_vertex_select: Option<crate::dialect::layout::Fill>,
+    pub triangle_fan_provoking_vertex_select: Option<crate::dialect::layout::Fill>,
+    pub line_strip_list_provoking_vertex_select: Option<crate::dialect::layout::Fill>,
+    pub triangle_strip_list_provoking_vertex_select: Option<crate::dialect::layout::Fill>,
+    pub last_pixel_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_slice_table_state_pointers`: genxml's 3DSTATE_SLICE_TABLE_STATE_POINTERS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_slice_table_state_pointers", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSliceTableStatePointers {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub slice_hash_state_pointer_valid: Option<crate::dialect::image::Fill>,
-    pub slice_hash_table_state_pointer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub slice_hash_state_pointer_valid: Option<crate::dialect::layout::Fill>,
+    pub slice_hash_table_state_pointer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_so_buffer`: genxml's 3DSTATE_SO_BUFFER.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_so_buffer", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSoBuffer {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub stream_output_buffer_offset_address_enable: Option<crate::dialect::image::Fill>,
-    pub stream_offset_write_enable: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub so_buffer_index: Option<crate::dialect::image::Fill>,
-    pub so_buffer_enable: Option<crate::dialect::image::Fill>,
-    pub surface_base_address: Option<crate::dialect::image::Fill>,
-    pub surface_size: Option<crate::dialect::image::Fill>,
-    pub stream_output_buffer_offset_address: Option<crate::dialect::image::Fill>,
-    pub stream_offset: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub stream_output_buffer_offset_address_enable: Option<crate::dialect::layout::Fill>,
+    pub stream_offset_write_enable: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub so_buffer_index: Option<crate::dialect::layout::Fill>,
+    pub so_buffer_enable: Option<crate::dialect::layout::Fill>,
+    pub surface_base_address: Option<crate::dialect::layout::Fill>,
+    pub surface_size: Option<crate::dialect::layout::Fill>,
+    pub stream_output_buffer_offset_address: Option<crate::dialect::layout::Fill>,
+    pub stream_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_so_buffer_index_0`: genxml's 3DSTATE_SO_BUFFER_INDEX_0.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_so_buffer_index_0", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSoBufferIndex0 {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub so_buffer_index_state_body: Option<crate::dialect::image::Fields<State3dstateSoBufferIndexBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub so_buffer_index_state_body: Option<crate::dialect::layout::Fields<State3dstateSoBufferIndexBodyFields>>,
 }
 
 /// `xe3.cmd.3dstate_so_buffer_index_1`: genxml's 3DSTATE_SO_BUFFER_INDEX_1.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_so_buffer_index_1", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSoBufferIndex1 {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub so_buffer_index_state_body: Option<crate::dialect::image::Fields<State3dstateSoBufferIndexBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub so_buffer_index_state_body: Option<crate::dialect::layout::Fields<State3dstateSoBufferIndexBodyFields>>,
 }
 
 /// `xe3.cmd.3dstate_so_buffer_index_2`: genxml's 3DSTATE_SO_BUFFER_INDEX_2.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_so_buffer_index_2", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSoBufferIndex2 {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub so_buffer_index_state_body: Option<crate::dialect::image::Fields<State3dstateSoBufferIndexBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub so_buffer_index_state_body: Option<crate::dialect::layout::Fields<State3dstateSoBufferIndexBodyFields>>,
 }
 
 /// `xe3.cmd.3dstate_so_buffer_index_3`: genxml's 3DSTATE_SO_BUFFER_INDEX_3.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_so_buffer_index_3", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSoBufferIndex3 {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub so_buffer_index_state_body: Option<crate::dialect::image::Fields<State3dstateSoBufferIndexBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub so_buffer_index_state_body: Option<crate::dialect::layout::Fields<State3dstateSoBufferIndexBodyFields>>,
 }
 
 /// An element of `xe3.cmd.3dstate_so_decl_list`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateSoDeclListElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry: Option<crate::dialect::image::Fields<StateSoDeclEntryFields>>,
+    pub entry: Option<crate::dialect::layout::Fields<StateSoDeclEntryFields>>,
 }
 
 /// `xe3.cmd.3dstate_so_decl_list`: genxml's 3DSTATE_SO_DECL_LIST.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_so_decl_list", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSoDeclList {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub stream_to_buffer_selects_0: Option<crate::dialect::image::Fill>,
-    pub stream_to_buffer_selects_1: Option<crate::dialect::image::Fill>,
-    pub stream_to_buffer_selects_2: Option<crate::dialect::image::Fill>,
-    pub stream_to_buffer_selects_3: Option<crate::dialect::image::Fill>,
-    pub num_entries_0: Option<crate::dialect::image::Fill>,
-    pub num_entries_1: Option<crate::dialect::image::Fill>,
-    pub num_entries_2: Option<crate::dialect::image::Fill>,
-    pub num_entries_3: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateSoDeclListElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub stream_to_buffer_selects_0: Option<crate::dialect::layout::Fill>,
+    pub stream_to_buffer_selects_1: Option<crate::dialect::layout::Fill>,
+    pub stream_to_buffer_selects_2: Option<crate::dialect::layout::Fill>,
+    pub stream_to_buffer_selects_3: Option<crate::dialect::layout::Fill>,
+    pub num_entries_0: Option<crate::dialect::layout::Fill>,
+    pub num_entries_1: Option<crate::dialect::layout::Fill>,
+    pub num_entries_2: Option<crate::dialect::layout::Fill>,
+    pub num_entries_3: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateSoDeclListElement>>>,
 }
 
 /// `xe3.cmd.3dstate_stencil_buffer`: genxml's 3DSTATE_STENCIL_BUFFER.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_stencil_buffer", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateStencilBuffer {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub surface_pitch: Option<crate::dialect::image::Fill>,
-    pub corner_texel_mode: Option<crate::dialect::image::Fill>,
-    pub null_page_coherency_enable: Option<crate::dialect::image::Fill>,
-    pub stencil_write_enable: Option<crate::dialect::image::Fill>,
-    pub surface_type: Option<crate::dialect::image::Fill>,
-    pub surface_base_address: Option<crate::dialect::image::Fill>,
-    pub width: Option<crate::dialect::image::Fill>,
-    pub height: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub minimum_array_element: Option<crate::dialect::image::Fill>,
-    pub depth: Option<crate::dialect::image::Fill>,
-    pub compression_format: Option<crate::dialect::image::Fill>,
-    pub mip_tail_start_lod: Option<crate::dialect::image::Fill>,
-    pub tiled_mode: Option<crate::dialect::image::Fill>,
-    pub surface_qpitch: Option<crate::dialect::image::Fill>,
-    pub surf_lod: Option<crate::dialect::image::Fill>,
-    pub render_target_view_extent: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub surface_pitch: Option<crate::dialect::layout::Fill>,
+    pub corner_texel_mode: Option<crate::dialect::layout::Fill>,
+    pub null_page_coherency_enable: Option<crate::dialect::layout::Fill>,
+    pub stencil_write_enable: Option<crate::dialect::layout::Fill>,
+    pub surface_type: Option<crate::dialect::layout::Fill>,
+    pub surface_base_address: Option<crate::dialect::layout::Fill>,
+    pub width: Option<crate::dialect::layout::Fill>,
+    pub height: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub minimum_array_element: Option<crate::dialect::layout::Fill>,
+    pub depth: Option<crate::dialect::layout::Fill>,
+    pub compression_format: Option<crate::dialect::layout::Fill>,
+    pub mip_tail_start_lod: Option<crate::dialect::layout::Fill>,
+    pub tiled_mode: Option<crate::dialect::layout::Fill>,
+    pub surface_qpitch: Option<crate::dialect::layout::Fill>,
+    pub surf_lod: Option<crate::dialect::layout::Fill>,
+    pub render_target_view_extent: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_streamout`: genxml's 3DSTATE_STREAMOUT.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_streamout", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateStreamout {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub force_rendering: Option<crate::dialect::image::Fill>,
-    pub so_statistics_enable: Option<crate::dialect::image::Fill>,
-    pub reorder_mode: Option<crate::dialect::image::Fill>,
-    pub render_stream_select: Option<crate::dialect::image::Fill>,
-    pub rendering_disable: Option<crate::dialect::image::Fill>,
-    pub so_function_enable: Option<crate::dialect::image::Fill>,
-    pub stream_0_vertex_read_length: Option<crate::dialect::image::Fill>,
-    pub stream_0_vertex_read_offset: Option<crate::dialect::image::Fill>,
-    pub stream_1_vertex_read_length: Option<crate::dialect::image::Fill>,
-    pub stream_1_vertex_read_offset: Option<crate::dialect::image::Fill>,
-    pub stream_2_vertex_read_length: Option<crate::dialect::image::Fill>,
-    pub stream_2_vertex_read_offset: Option<crate::dialect::image::Fill>,
-    pub stream_3_vertex_read_length: Option<crate::dialect::image::Fill>,
-    pub stream_3_vertex_read_offset: Option<crate::dialect::image::Fill>,
-    pub buffer_0_surface_pitch: Option<crate::dialect::image::Fill>,
-    pub buffer_1_surface_pitch: Option<crate::dialect::image::Fill>,
-    pub buffer_2_surface_pitch: Option<crate::dialect::image::Fill>,
-    pub buffer_3_surface_pitch: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub force_rendering: Option<crate::dialect::layout::Fill>,
+    pub so_statistics_enable: Option<crate::dialect::layout::Fill>,
+    pub reorder_mode: Option<crate::dialect::layout::Fill>,
+    pub render_stream_select: Option<crate::dialect::layout::Fill>,
+    pub rendering_disable: Option<crate::dialect::layout::Fill>,
+    pub so_function_enable: Option<crate::dialect::layout::Fill>,
+    pub stream_0_vertex_read_length: Option<crate::dialect::layout::Fill>,
+    pub stream_0_vertex_read_offset: Option<crate::dialect::layout::Fill>,
+    pub stream_1_vertex_read_length: Option<crate::dialect::layout::Fill>,
+    pub stream_1_vertex_read_offset: Option<crate::dialect::layout::Fill>,
+    pub stream_2_vertex_read_length: Option<crate::dialect::layout::Fill>,
+    pub stream_2_vertex_read_offset: Option<crate::dialect::layout::Fill>,
+    pub stream_3_vertex_read_length: Option<crate::dialect::layout::Fill>,
+    pub stream_3_vertex_read_offset: Option<crate::dialect::layout::Fill>,
+    pub buffer_0_surface_pitch: Option<crate::dialect::layout::Fill>,
+    pub buffer_1_surface_pitch: Option<crate::dialect::layout::Fill>,
+    pub buffer_2_surface_pitch: Option<crate::dialect::layout::Fill>,
+    pub buffer_3_surface_pitch: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_subslice_hash_table`: genxml's 3DSTATE_SUBSLICE_HASH_TABLE.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_subslice_hash_table", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateSubsliceHashTable {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub slice_hash_control: Option<Vec<crate::dialect::image::Fill>>,
-    pub slice_table_mode: Option<crate::dialect::image::Fill>,
-    pub two_way_table_entry: Option<Vec<Vec<crate::dialect::image::Fill>>>,
-    pub three_way_table_entry: Option<Vec<Vec<crate::dialect::image::Fill>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub slice_hash_control: Option<Vec<crate::dialect::layout::Fill>>,
+    pub slice_table_mode: Option<crate::dialect::layout::Fill>,
+    pub two_way_table_entry: Option<Vec<Vec<crate::dialect::layout::Fill>>>,
+    pub three_way_table_entry: Option<Vec<Vec<crate::dialect::layout::Fill>>>,
 }
 
 /// `xe3.cmd.3dstate_task_control`: genxml's 3DSTATE_TASK_CONTROL.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_task_control", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateTaskControl {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub maximum_number_of_threadgroups: Option<crate::dialect::image::Fill>,
-    pub thread_dispatch_priority: Option<crate::dialect::image::Fill>,
-    pub fused_eu_dispatch: Option<crate::dialect::image::Fill>,
-    pub statistics_enable: Option<crate::dialect::image::Fill>,
-    pub taskshader_enable: Option<crate::dialect::image::Fill>,
-    pub scratch_space_buffer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub maximum_number_of_threadgroups: Option<crate::dialect::layout::Fill>,
+    pub thread_dispatch_priority: Option<crate::dialect::layout::Fill>,
+    pub fused_eu_dispatch: Option<crate::dialect::layout::Fill>,
+    pub statistics_enable: Option<crate::dialect::layout::Fill>,
+    pub taskshader_enable: Option<crate::dialect::layout::Fill>,
+    pub scratch_space_buffer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_task_redistrib`: genxml's 3DSTATE_TASK_REDISTRIB.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_task_redistrib", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateTaskRedistrib {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub task_redistribution_mode: Option<crate::dialect::image::Fill>,
-    pub task_redistribution_level: Option<crate::dialect::image::Fill>,
-    pub target_mesh_batch_size: Option<crate::dialect::image::Fill>,
-    pub small_taskthreshold: Option<crate::dialect::image::Fill>,
-    pub local_bot_accumulator_threshold: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub task_redistribution_mode: Option<crate::dialect::layout::Fill>,
+    pub task_redistribution_level: Option<crate::dialect::layout::Fill>,
+    pub target_mesh_batch_size: Option<crate::dialect::layout::Fill>,
+    pub small_taskthreshold: Option<crate::dialect::layout::Fill>,
+    pub local_bot_accumulator_threshold: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_task_shader`: genxml's 3DSTATE_TASK_SHADER.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_task_shader", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateTaskShader {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub kernel_start_pointer: Option<crate::dialect::image::Fill>,
-    pub local_x_maximum: Option<crate::dialect::image::Fill>,
-    pub software_exception_enable: Option<crate::dialect::image::Fill>,
-    pub mask_stack_exception_enable: Option<crate::dialect::image::Fill>,
-    pub illegal_opcode_exception_enable: Option<crate::dialect::image::Fill>,
-    pub floating_point_mode: Option<crate::dialect::image::Fill>,
-    pub single_program_flow: Option<crate::dialect::image::Fill>,
-    pub denorm_mode: Option<crate::dialect::image::Fill>,
-    pub registers_per_thread: Option<crate::dialect::image::Fill>,
-    pub number_of_threads_in_gpgpu_thread_group: Option<crate::dialect::image::Fill>,
-    pub shared_local_memory_size: Option<crate::dialect::image::Fill>,
-    pub barrier_enable: Option<crate::dialect::image::Fill>,
-    pub rounding_mode: Option<crate::dialect::image::Fill>,
-    pub preferred_slm_allocation_size: Option<crate::dialect::image::Fill>,
-    pub number_of_barriers: Option<crate::dialect::image::Fill>,
-    pub indirect_data_length: Option<crate::dialect::image::Fill>,
-    pub l3_prefetch_disable: Option<crate::dialect::image::Fill>,
-    pub emit_local_id_x: Option<crate::dialect::image::Fill>,
-    pub emit_inline_parameter: Option<crate::dialect::image::Fill>,
-    pub systolic_mode_enable: Option<crate::dialect::image::Fill>,
-    pub accesses_uav: Option<crate::dialect::image::Fill>,
-    pub xp0_required: Option<crate::dialect::image::Fill>,
-    pub message_simd: Option<crate::dialect::image::Fill>,
-    pub simd_size: Option<crate::dialect::image::Fill>,
-    pub execution_mask: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub kernel_start_pointer: Option<crate::dialect::layout::Fill>,
+    pub local_x_maximum: Option<crate::dialect::layout::Fill>,
+    pub software_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub mask_stack_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub illegal_opcode_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub floating_point_mode: Option<crate::dialect::layout::Fill>,
+    pub single_program_flow: Option<crate::dialect::layout::Fill>,
+    pub denorm_mode: Option<crate::dialect::layout::Fill>,
+    pub registers_per_thread: Option<crate::dialect::layout::Fill>,
+    pub number_of_threads_in_gpgpu_thread_group: Option<crate::dialect::layout::Fill>,
+    pub shared_local_memory_size: Option<crate::dialect::layout::Fill>,
+    pub barrier_enable: Option<crate::dialect::layout::Fill>,
+    pub rounding_mode: Option<crate::dialect::layout::Fill>,
+    pub preferred_slm_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub number_of_barriers: Option<crate::dialect::layout::Fill>,
+    pub indirect_data_length: Option<crate::dialect::layout::Fill>,
+    pub l3_prefetch_disable: Option<crate::dialect::layout::Fill>,
+    pub emit_local_id_x: Option<crate::dialect::layout::Fill>,
+    pub emit_inline_parameter: Option<crate::dialect::layout::Fill>,
+    pub systolic_mode_enable: Option<crate::dialect::layout::Fill>,
+    pub accesses_uav: Option<crate::dialect::layout::Fill>,
+    pub xp0_required: Option<crate::dialect::layout::Fill>,
+    pub message_simd: Option<crate::dialect::layout::Fill>,
+    pub simd_size: Option<crate::dialect::layout::Fill>,
+    pub execution_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_task_shader_data`: genxml's 3DSTATE_TASK_SHADER_DATA.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_task_shader_data", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateTaskShaderData {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub indirect_data_start_address: Option<crate::dialect::image::Fill>,
-    pub inline_data: Option<Vec<crate::dialect::image::Fill>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub indirect_data_start_address: Option<crate::dialect::layout::Fill>,
+    pub inline_data: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.cmd.3dstate_tbimr_tile_pass_info`: genxml's 3DSTATE_TBIMR_TILE_PASS_INFO.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_tbimr_tile_pass_info", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateTbimrTilePassInfo {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub tile_rectangle_height: Option<crate::dialect::image::Fill>,
-    pub tile_rectangle_width: Option<crate::dialect::image::Fill>,
-    pub vertical_tile_count: Option<crate::dialect::image::Fill>,
-    pub horizontal_tile_count: Option<crate::dialect::image::Fill>,
-    pub walk_pattern: Option<crate::dialect::image::Fill>,
-    pub tile_box_check: Option<crate::dialect::image::Fill>,
-    pub tbimr_batch_size: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub tile_rectangle_height: Option<crate::dialect::layout::Fill>,
+    pub tile_rectangle_width: Option<crate::dialect::layout::Fill>,
+    pub vertical_tile_count: Option<crate::dialect::layout::Fill>,
+    pub horizontal_tile_count: Option<crate::dialect::layout::Fill>,
+    pub walk_pattern: Option<crate::dialect::layout::Fill>,
+    pub tile_box_check: Option<crate::dialect::layout::Fill>,
+    pub tbimr_batch_size: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_te`: genxml's 3DSTATE_TE.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_te", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateTe {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub te_enable: Option<crate::dialect::image::Fill>,
-    pub te_mode: Option<crate::dialect::image::Fill>,
-    pub te_domain: Option<crate::dialect::image::Fill>,
-    pub output_topology: Option<crate::dialect::image::Fill>,
-    pub number_of_regions_per_patch: Option<crate::dialect::image::Fill>,
-    pub partitioning: Option<crate::dialect::image::Fill>,
-    pub tessellation_distribution_mode: Option<crate::dialect::image::Fill>,
-    pub tessellation_distribution_level: Option<crate::dialect::image::Fill>,
-    pub tessellation_scale_factor_enable: Option<crate::dialect::image::Fill>,
-    pub tessellation_factor_format: Option<crate::dialect::image::Fill>,
-    pub patch_header_layout: Option<crate::dialect::image::Fill>,
-    pub small_patch_threshold: Option<crate::dialect::image::Fill>,
-    pub target_block_size: Option<crate::dialect::image::Fill>,
-    pub local_bop_accumulator_threshold: Option<crate::dialect::image::Fill>,
-    pub maximum_tessellation_factor_odd: Option<crate::dialect::image::Real>,
-    pub maximum_tessellation_factor_not_odd: Option<crate::dialect::image::Real>,
-    pub tessellation_scale_factor: Option<crate::dialect::image::Real>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub te_enable: Option<crate::dialect::layout::Fill>,
+    pub te_mode: Option<crate::dialect::layout::Fill>,
+    pub te_domain: Option<crate::dialect::layout::Fill>,
+    pub output_topology: Option<crate::dialect::layout::Fill>,
+    pub number_of_regions_per_patch: Option<crate::dialect::layout::Fill>,
+    pub partitioning: Option<crate::dialect::layout::Fill>,
+    pub tessellation_distribution_mode: Option<crate::dialect::layout::Fill>,
+    pub tessellation_distribution_level: Option<crate::dialect::layout::Fill>,
+    pub tessellation_scale_factor_enable: Option<crate::dialect::layout::Fill>,
+    pub tessellation_factor_format: Option<crate::dialect::layout::Fill>,
+    pub patch_header_layout: Option<crate::dialect::layout::Fill>,
+    pub small_patch_threshold: Option<crate::dialect::layout::Fill>,
+    pub target_block_size: Option<crate::dialect::layout::Fill>,
+    pub local_bop_accumulator_threshold: Option<crate::dialect::layout::Fill>,
+    pub maximum_tessellation_factor_odd: Option<crate::dialect::layout::Real>,
+    pub maximum_tessellation_factor_not_odd: Option<crate::dialect::layout::Real>,
+    pub tessellation_scale_factor: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.cmd.3dstate_urb_alloc_ds`: genxml's 3DSTATE_URB_ALLOC_DS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_alloc_ds", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbAllocDs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub ds_urb_entry_allocation_size: Option<crate::dialect::image::Fill>,
-    pub ds_urb_starting_address_slice0: Option<crate::dialect::image::Fill>,
-    pub ds_urb_starting_address_slice_n: Option<crate::dialect::image::Fill>,
-    pub ds_number_of_urb_entries_slice0: Option<crate::dialect::image::Fill>,
-    pub ds_number_of_urb_entries_slice_n: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub ds_urb_entry_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub ds_urb_starting_address_slice0: Option<crate::dialect::layout::Fill>,
+    pub ds_urb_starting_address_slice_n: Option<crate::dialect::layout::Fill>,
+    pub ds_number_of_urb_entries_slice0: Option<crate::dialect::layout::Fill>,
+    pub ds_number_of_urb_entries_slice_n: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_urb_alloc_gs`: genxml's 3DSTATE_URB_ALLOC_GS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_alloc_gs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbAllocGs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub gs_urb_entry_allocation_size: Option<crate::dialect::image::Fill>,
-    pub gs_urb_starting_address_slice0: Option<crate::dialect::image::Fill>,
-    pub gs_urb_starting_address_slice_n: Option<crate::dialect::image::Fill>,
-    pub gs_number_of_urb_entries_slice0: Option<crate::dialect::image::Fill>,
-    pub gs_number_of_urb_entries_slice_n: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub gs_urb_entry_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub gs_urb_starting_address_slice0: Option<crate::dialect::layout::Fill>,
+    pub gs_urb_starting_address_slice_n: Option<crate::dialect::layout::Fill>,
+    pub gs_number_of_urb_entries_slice0: Option<crate::dialect::layout::Fill>,
+    pub gs_number_of_urb_entries_slice_n: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_urb_alloc_hs`: genxml's 3DSTATE_URB_ALLOC_HS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_alloc_hs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbAllocHs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub hs_urb_entry_allocation_size: Option<crate::dialect::image::Fill>,
-    pub hs_urb_starting_address_slice0: Option<crate::dialect::image::Fill>,
-    pub hs_urb_starting_address_slice_n: Option<crate::dialect::image::Fill>,
-    pub hs_number_of_urb_entries_slice0: Option<crate::dialect::image::Fill>,
-    pub hs_number_of_urb_entries_slice_n: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub hs_urb_entry_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub hs_urb_starting_address_slice0: Option<crate::dialect::layout::Fill>,
+    pub hs_urb_starting_address_slice_n: Option<crate::dialect::layout::Fill>,
+    pub hs_number_of_urb_entries_slice0: Option<crate::dialect::layout::Fill>,
+    pub hs_number_of_urb_entries_slice_n: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_urb_alloc_mesh`: genxml's 3DSTATE_URB_ALLOC_MESH.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_alloc_mesh", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbAllocMesh {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub mesh_urb_entry_allocation_size: Option<crate::dialect::image::Fill>,
-    pub mesh_urb_starting_address_slice0: Option<crate::dialect::image::Fill>,
-    pub mesh_urb_starting_address_slicen: Option<crate::dialect::image::Fill>,
-    pub mesh_number_of_urb_entries_slice0: Option<crate::dialect::image::Fill>,
-    pub mesh_number_of_urb_entries_slicen: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub mesh_urb_entry_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub mesh_urb_starting_address_slice0: Option<crate::dialect::layout::Fill>,
+    pub mesh_urb_starting_address_slicen: Option<crate::dialect::layout::Fill>,
+    pub mesh_number_of_urb_entries_slice0: Option<crate::dialect::layout::Fill>,
+    pub mesh_number_of_urb_entries_slicen: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_urb_alloc_task`: genxml's 3DSTATE_URB_ALLOC_TASK.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_alloc_task", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbAllocTask {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub task_urb_entry_allocation_size: Option<crate::dialect::image::Fill>,
-    pub task_urb_starting_address_slice0: Option<crate::dialect::image::Fill>,
-    pub task_urb_starting_address_slicen: Option<crate::dialect::image::Fill>,
-    pub task_number_of_urb_entries_slice0: Option<crate::dialect::image::Fill>,
-    pub task_number_of_urb_entries_slicen: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub task_urb_entry_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub task_urb_starting_address_slice0: Option<crate::dialect::layout::Fill>,
+    pub task_urb_starting_address_slicen: Option<crate::dialect::layout::Fill>,
+    pub task_number_of_urb_entries_slice0: Option<crate::dialect::layout::Fill>,
+    pub task_number_of_urb_entries_slicen: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_urb_alloc_vs`: genxml's 3DSTATE_URB_ALLOC_VS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_alloc_vs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbAllocVs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub vs_urb_entry_allocation_size: Option<crate::dialect::image::Fill>,
-    pub vs_urb_starting_address_slice0: Option<crate::dialect::image::Fill>,
-    pub vs_urb_starting_address_slice_n: Option<crate::dialect::image::Fill>,
-    pub vs_number_of_urb_entries_slice0: Option<crate::dialect::image::Fill>,
-    pub vs_number_of_urb_entries_slice_n: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub vs_urb_entry_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub vs_urb_starting_address_slice0: Option<crate::dialect::layout::Fill>,
+    pub vs_urb_starting_address_slice_n: Option<crate::dialect::layout::Fill>,
+    pub vs_number_of_urb_entries_slice0: Option<crate::dialect::layout::Fill>,
+    pub vs_number_of_urb_entries_slice_n: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_urb_clear`: genxml's 3DSTATE_URB_CLEAR.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_clear", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbClear {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub urb_address: Option<crate::dialect::image::Fill>,
-    pub urb_clear_length: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub urb_address: Option<crate::dialect::layout::Fill>,
+    pub urb_clear_length: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_urb_ds`: genxml's 3DSTATE_URB_DS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_ds", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbDs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub ds_number_of_urb_entries: Option<crate::dialect::image::Fill>,
-    pub ds_urb_entry_allocation_size: Option<crate::dialect::image::Fill>,
-    pub ds_urb_starting_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub ds_number_of_urb_entries: Option<crate::dialect::layout::Fill>,
+    pub ds_urb_entry_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub ds_urb_starting_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_urb_gs`: genxml's 3DSTATE_URB_GS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_gs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbGs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub gs_number_of_urb_entries: Option<crate::dialect::image::Fill>,
-    pub gs_urb_entry_allocation_size: Option<crate::dialect::image::Fill>,
-    pub gs_urb_starting_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub gs_number_of_urb_entries: Option<crate::dialect::layout::Fill>,
+    pub gs_urb_entry_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub gs_urb_starting_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_urb_hs`: genxml's 3DSTATE_URB_HS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_hs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbHs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub hs_number_of_urb_entries: Option<crate::dialect::image::Fill>,
-    pub hs_urb_entry_allocation_size: Option<crate::dialect::image::Fill>,
-    pub hs_urb_starting_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub hs_number_of_urb_entries: Option<crate::dialect::layout::Fill>,
+    pub hs_urb_entry_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub hs_urb_starting_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_urb_vs`: genxml's 3DSTATE_URB_VS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_urb_vs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateUrbVs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub vs_number_of_urb_entries: Option<crate::dialect::image::Fill>,
-    pub vs_urb_entry_allocation_size: Option<crate::dialect::image::Fill>,
-    pub vs_urb_starting_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub vs_number_of_urb_entries: Option<crate::dialect::layout::Fill>,
+    pub vs_urb_entry_allocation_size: Option<crate::dialect::layout::Fill>,
+    pub vs_urb_starting_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// An element of `xe3.cmd.3dstate_vertex_buffers`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateVertexBuffersElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub vertex_buffer_state: Option<crate::dialect::image::Fields<StateVertexBufferStateFields>>,
+    pub vertex_buffer_state: Option<crate::dialect::layout::Fields<StateVertexBufferStateFields>>,
 }
 
 /// `xe3.cmd.3dstate_vertex_buffers`: genxml's 3DSTATE_VERTEX_BUFFERS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vertex_buffers", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVertexBuffers {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateVertexBuffersElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateVertexBuffersElement>>>,
 }
 
 /// An element of `xe3.cmd.3dstate_vertex_elements`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Cmd3dstateVertexElementsElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub element: Option<crate::dialect::image::Fields<StateVertexElementStateFields>>,
+    pub element: Option<crate::dialect::layout::Fields<StateVertexElementStateFields>>,
 }
 
 /// `xe3.cmd.3dstate_vertex_elements`: genxml's 3DSTATE_VERTEX_ELEMENTS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vertex_elements", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVertexElements {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<Cmd3dstateVertexElementsElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<Cmd3dstateVertexElementsElement>>>,
 }
 
 /// `xe3.cmd.3dstate_vf`: genxml's 3DSTATE_VF.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vf", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVf {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub indexed_draw_cut_index_enable: Option<crate::dialect::image::Fill>,
-    pub component_packing_enable: Option<crate::dialect::image::Fill>,
-    pub sequential_draw_cut_index_enable: Option<crate::dialect::image::Fill>,
-    pub vertexid_offset_enable: Option<crate::dialect::image::Fill>,
-    pub geometry_distribution_enable: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub cut_index: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub indexed_draw_cut_index_enable: Option<crate::dialect::layout::Fill>,
+    pub component_packing_enable: Option<crate::dialect::layout::Fill>,
+    pub sequential_draw_cut_index_enable: Option<crate::dialect::layout::Fill>,
+    pub vertexid_offset_enable: Option<crate::dialect::layout::Fill>,
+    pub geometry_distribution_enable: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub cut_index: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_vf_component_packing`: genxml's 3DSTATE_VF_COMPONENT_PACKING.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vf_component_packing", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVfComponentPacking {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub vertex_element_enables: Option<Vec<crate::dialect::image::Fill>>,
-    pub vertex_element_enables_dw: Option<Vec<crate::dialect::image::Fill>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub vertex_element_enables: Option<Vec<crate::dialect::layout::Fill>>,
+    pub vertex_element_enables_dw: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.cmd.3dstate_vf_instancing`: genxml's 3DSTATE_VF_INSTANCING.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vf_instancing", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVfInstancing {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub vertex_element_index: Option<crate::dialect::image::Fill>,
-    pub instancing_enable: Option<crate::dialect::image::Fill>,
-    pub instance_data_step_rate: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub vertex_element_index: Option<crate::dialect::layout::Fill>,
+    pub instancing_enable: Option<crate::dialect::layout::Fill>,
+    pub instance_data_step_rate: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_vf_sgvs`: genxml's 3DSTATE_VF_SGVS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vf_sgvs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVfSgvs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub vertexid_element_offset: Option<crate::dialect::image::Fill>,
-    pub vertexid_component_number: Option<crate::dialect::image::Fill>,
-    pub vertexid_enable: Option<crate::dialect::image::Fill>,
-    pub instanceid_element_offset: Option<crate::dialect::image::Fill>,
-    pub instanceid_component_number: Option<crate::dialect::image::Fill>,
-    pub instanceid_enable: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub vertexid_element_offset: Option<crate::dialect::layout::Fill>,
+    pub vertexid_component_number: Option<crate::dialect::layout::Fill>,
+    pub vertexid_enable: Option<crate::dialect::layout::Fill>,
+    pub instanceid_element_offset: Option<crate::dialect::layout::Fill>,
+    pub instanceid_component_number: Option<crate::dialect::layout::Fill>,
+    pub instanceid_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_vf_sgvs_2`: genxml's 3DSTATE_VF_SGVS_2.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vf_sgvs_2", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVfSgvs2 {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub xp0_element_offset: Option<crate::dialect::image::Fill>,
-    pub xp0_source_select: Option<crate::dialect::image::Fill>,
-    pub xp0_component_number: Option<crate::dialect::image::Fill>,
-    pub xp0_enable: Option<crate::dialect::image::Fill>,
-    pub xp1_element_offset: Option<crate::dialect::image::Fill>,
-    pub xp1_source_select: Option<crate::dialect::image::Fill>,
-    pub xp1_component_number: Option<crate::dialect::image::Fill>,
-    pub xp1_enable: Option<crate::dialect::image::Fill>,
-    pub xp2_element_offset: Option<crate::dialect::image::Fill>,
-    pub xp2_component_number: Option<crate::dialect::image::Fill>,
-    pub xp2_enable: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub xp0_element_offset: Option<crate::dialect::layout::Fill>,
+    pub xp0_source_select: Option<crate::dialect::layout::Fill>,
+    pub xp0_component_number: Option<crate::dialect::layout::Fill>,
+    pub xp0_enable: Option<crate::dialect::layout::Fill>,
+    pub xp1_element_offset: Option<crate::dialect::layout::Fill>,
+    pub xp1_source_select: Option<crate::dialect::layout::Fill>,
+    pub xp1_component_number: Option<crate::dialect::layout::Fill>,
+    pub xp1_enable: Option<crate::dialect::layout::Fill>,
+    pub xp2_element_offset: Option<crate::dialect::layout::Fill>,
+    pub xp2_component_number: Option<crate::dialect::layout::Fill>,
+    pub xp2_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_vf_statistics`: genxml's 3DSTATE_VF_STATISTICS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vf_statistics", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVfStatistics {
-    pub statistics_enable: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub statistics_enable: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_vf_topology`: genxml's 3DSTATE_VF_TOPOLOGY.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vf_topology", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVfTopology {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub primitive_topology_type: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub primitive_topology_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_vfg`: genxml's 3DSTATE_VFG.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vfg", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVfg {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub distribution_granularity: Option<crate::dialect::image::Fill>,
-    pub granularity_threshold_disable: Option<crate::dialect::image::Fill>,
-    pub list_cut_index_enable: Option<crate::dialect::image::Fill>,
-    pub distribution_mode: Option<crate::dialect::image::Fill>,
-    pub list_1_batch_size_scale: Option<crate::dialect::image::Fill>,
-    pub list_2_batch_size_scale: Option<crate::dialect::image::Fill>,
-    pub list_3_batch_size_scale: Option<crate::dialect::image::Fill>,
-    pub list_n_batch_size_scale: Option<crate::dialect::image::Fill>,
-    pub strip_batch_size_scale: Option<crate::dialect::image::Fill>,
-    pub patch_batch_size_scale: Option<crate::dialect::image::Fill>,
-    pub patch_batch_size_multiplier: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub distribution_granularity: Option<crate::dialect::layout::Fill>,
+    pub granularity_threshold_disable: Option<crate::dialect::layout::Fill>,
+    pub list_cut_index_enable: Option<crate::dialect::layout::Fill>,
+    pub distribution_mode: Option<crate::dialect::layout::Fill>,
+    pub list_1_batch_size_scale: Option<crate::dialect::layout::Fill>,
+    pub list_2_batch_size_scale: Option<crate::dialect::layout::Fill>,
+    pub list_3_batch_size_scale: Option<crate::dialect::layout::Fill>,
+    pub list_n_batch_size_scale: Option<crate::dialect::layout::Fill>,
+    pub strip_batch_size_scale: Option<crate::dialect::layout::Fill>,
+    pub patch_batch_size_scale: Option<crate::dialect::layout::Fill>,
+    pub patch_batch_size_multiplier: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_viewport_state_pointers_cc`: genxml's 3DSTATE_VIEWPORT_STATE_POINTERS_CC.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_viewport_state_pointers_cc", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateViewportStatePointersCc {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub cc_viewport_pointer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub cc_viewport_pointer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_viewport_state_pointers_sf_clip`: genxml's 3DSTATE_VIEWPORT_STATE_POINTERS_SF_CLIP.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_viewport_state_pointers_sf_clip", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateViewportStatePointersSfClip {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub sf_clip_viewport_pointer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub sf_clip_viewport_pointer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_vs`: genxml's 3DSTATE_VS.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_vs", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateVs {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub kernel_start_pointer: Option<crate::dialect::image::Fill>,
-    pub registers_per_thread: Option<crate::dialect::image::Fill>,
-    pub software_exception_enable: Option<crate::dialect::image::Fill>,
-    pub accesses_uav: Option<crate::dialect::image::Fill>,
-    pub illegal_opcode_exception_enable: Option<crate::dialect::image::Fill>,
-    pub floating_point_mode: Option<crate::dialect::image::Fill>,
-    pub thread_dispatch_priority: Option<crate::dialect::image::Fill>,
-    pub binding_table_entry_count: Option<crate::dialect::image::Fill>,
-    pub sampler_count: Option<crate::dialect::image::Fill>,
-    pub vector_mask_enable: Option<crate::dialect::image::Fill>,
-    pub scratch_space_buffer: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_read_offset: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_read_length: Option<crate::dialect::image::Fill>,
-    pub dispatch_grf_start_register_for_urb_data: Option<crate::dialect::image::Fill>,
-    pub enable: Option<crate::dialect::image::Fill>,
-    pub vertex_cache_disable: Option<crate::dialect::image::Fill>,
-    pub single_instance_dispatch_enable: Option<crate::dialect::image::Fill>,
-    pub statistics_enable: Option<crate::dialect::image::Fill>,
-    pub maximum_number_of_threads: Option<crate::dialect::image::Fill>,
-    pub user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_output_length: Option<crate::dialect::image::Fill>,
-    pub vertex_urb_entry_output_read_offset: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub kernel_start_pointer: Option<crate::dialect::layout::Fill>,
+    pub registers_per_thread: Option<crate::dialect::layout::Fill>,
+    pub software_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub accesses_uav: Option<crate::dialect::layout::Fill>,
+    pub illegal_opcode_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub floating_point_mode: Option<crate::dialect::layout::Fill>,
+    pub thread_dispatch_priority: Option<crate::dialect::layout::Fill>,
+    pub binding_table_entry_count: Option<crate::dialect::layout::Fill>,
+    pub sampler_count: Option<crate::dialect::layout::Fill>,
+    pub vector_mask_enable: Option<crate::dialect::layout::Fill>,
+    pub scratch_space_buffer: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_read_offset: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_read_length: Option<crate::dialect::layout::Fill>,
+    pub dispatch_grf_start_register_for_urb_data: Option<crate::dialect::layout::Fill>,
+    pub enable: Option<crate::dialect::layout::Fill>,
+    pub vertex_cache_disable: Option<crate::dialect::layout::Fill>,
+    pub single_instance_dispatch_enable: Option<crate::dialect::layout::Fill>,
+    pub statistics_enable: Option<crate::dialect::layout::Fill>,
+    pub maximum_number_of_threads: Option<crate::dialect::layout::Fill>,
+    pub user_clip_distance_cull_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub user_clip_distance_clip_test_enable_bitmask: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_output_length: Option<crate::dialect::layout::Fill>,
+    pub vertex_urb_entry_output_read_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_wm`: genxml's 3DSTATE_WM.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_wm", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateWm {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub force_kill_pixel_enable: Option<crate::dialect::image::Fill>,
-    pub point_rasterization_rule: Option<crate::dialect::image::Fill>,
-    pub line_stipple_enable: Option<crate::dialect::image::Fill>,
-    pub polygon_stipple_enable: Option<crate::dialect::image::Fill>,
-    pub line_antialiasing_region_width: Option<crate::dialect::image::Fill>,
-    pub line_end_cap_antialiasing_region_width: Option<crate::dialect::image::Fill>,
-    pub barycentric_interpolation_mode: Option<crate::dialect::image::Fill>,
-    pub position_zw_interpolation_mode: Option<crate::dialect::image::Fill>,
-    pub force_thread_dispatch_enable: Option<crate::dialect::image::Fill>,
-    pub early_depth_stencil_control: Option<crate::dialect::image::Fill>,
-    pub walker_direction: Option<crate::dialect::image::Fill>,
-    pub walking_granularity: Option<crate::dialect::image::Fill>,
-    pub legacy_diamond_line_rasterization: Option<crate::dialect::image::Fill>,
-    pub legacy_hierarchical_depth_buffer_resolve_enable: Option<crate::dialect::image::Fill>,
-    pub legacy_depth_buffer_resolve_enable: Option<crate::dialect::image::Fill>,
-    pub legacy_depth_buffer_clear_enable: Option<crate::dialect::image::Fill>,
-    pub statistics_enable: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub force_kill_pixel_enable: Option<crate::dialect::layout::Fill>,
+    pub point_rasterization_rule: Option<crate::dialect::layout::Fill>,
+    pub line_stipple_enable: Option<crate::dialect::layout::Fill>,
+    pub polygon_stipple_enable: Option<crate::dialect::layout::Fill>,
+    pub line_antialiasing_region_width: Option<crate::dialect::layout::Fill>,
+    pub line_end_cap_antialiasing_region_width: Option<crate::dialect::layout::Fill>,
+    pub barycentric_interpolation_mode: Option<crate::dialect::layout::Fill>,
+    pub position_zw_interpolation_mode: Option<crate::dialect::layout::Fill>,
+    pub force_thread_dispatch_enable: Option<crate::dialect::layout::Fill>,
+    pub early_depth_stencil_control: Option<crate::dialect::layout::Fill>,
+    pub walker_direction: Option<crate::dialect::layout::Fill>,
+    pub walking_granularity: Option<crate::dialect::layout::Fill>,
+    pub legacy_diamond_line_rasterization: Option<crate::dialect::layout::Fill>,
+    pub legacy_hierarchical_depth_buffer_resolve_enable: Option<crate::dialect::layout::Fill>,
+    pub legacy_depth_buffer_resolve_enable: Option<crate::dialect::layout::Fill>,
+    pub legacy_depth_buffer_clear_enable: Option<crate::dialect::layout::Fill>,
+    pub statistics_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_wm_chromakey`: genxml's 3DSTATE_WM_CHROMAKEY.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_wm_chromakey", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateWmChromakey {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub chromakey_kill_enable: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub chromakey_kill_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_wm_depth_stencil`: genxml's 3DSTATE_WM_DEPTH_STENCIL.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_wm_depth_stencil", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateWmDepthStencil {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub stencil_reference_value_modify_disable: Option<crate::dialect::image::Fill>,
-    pub stencil_test_mask_modify_disable: Option<crate::dialect::image::Fill>,
-    pub stencil_write_mask_modify_disable: Option<crate::dialect::image::Fill>,
-    pub stencil_state_modify_disable: Option<crate::dialect::image::Fill>,
-    pub depth_state_modify_disable: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub depth_buffer_write_enable: Option<crate::dialect::image::Fill>,
-    pub depth_test_enable: Option<crate::dialect::image::Fill>,
-    pub stencil_buffer_write_enable: Option<crate::dialect::image::Fill>,
-    pub stencil_test_enable: Option<crate::dialect::image::Fill>,
-    pub double_sided_stencil_enable: Option<crate::dialect::image::Fill>,
-    pub depth_test_function: Option<crate::dialect::image::Fill>,
-    pub stencil_test_function: Option<crate::dialect::image::Fill>,
-    pub backface_stencil_pass_depth_pass_op: Option<crate::dialect::image::Fill>,
-    pub backface_stencil_pass_depth_fail_op: Option<crate::dialect::image::Fill>,
-    pub backface_stencil_fail_op: Option<crate::dialect::image::Fill>,
-    pub backface_stencil_test_function: Option<crate::dialect::image::Fill>,
-    pub stencil_pass_depth_pass_op: Option<crate::dialect::image::Fill>,
-    pub stencil_pass_depth_fail_op: Option<crate::dialect::image::Fill>,
-    pub stencil_fail_op: Option<crate::dialect::image::Fill>,
-    pub backface_stencil_write_mask: Option<crate::dialect::image::Fill>,
-    pub backface_stencil_test_mask: Option<crate::dialect::image::Fill>,
-    pub stencil_write_mask: Option<crate::dialect::image::Fill>,
-    pub stencil_test_mask: Option<crate::dialect::image::Fill>,
-    pub backface_stencil_reference_value: Option<crate::dialect::image::Fill>,
-    pub stencil_reference_value: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub stencil_reference_value_modify_disable: Option<crate::dialect::layout::Fill>,
+    pub stencil_test_mask_modify_disable: Option<crate::dialect::layout::Fill>,
+    pub stencil_write_mask_modify_disable: Option<crate::dialect::layout::Fill>,
+    pub stencil_state_modify_disable: Option<crate::dialect::layout::Fill>,
+    pub depth_state_modify_disable: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub depth_buffer_write_enable: Option<crate::dialect::layout::Fill>,
+    pub depth_test_enable: Option<crate::dialect::layout::Fill>,
+    pub stencil_buffer_write_enable: Option<crate::dialect::layout::Fill>,
+    pub stencil_test_enable: Option<crate::dialect::layout::Fill>,
+    pub double_sided_stencil_enable: Option<crate::dialect::layout::Fill>,
+    pub depth_test_function: Option<crate::dialect::layout::Fill>,
+    pub stencil_test_function: Option<crate::dialect::layout::Fill>,
+    pub backface_stencil_pass_depth_pass_op: Option<crate::dialect::layout::Fill>,
+    pub backface_stencil_pass_depth_fail_op: Option<crate::dialect::layout::Fill>,
+    pub backface_stencil_fail_op: Option<crate::dialect::layout::Fill>,
+    pub backface_stencil_test_function: Option<crate::dialect::layout::Fill>,
+    pub stencil_pass_depth_pass_op: Option<crate::dialect::layout::Fill>,
+    pub stencil_pass_depth_fail_op: Option<crate::dialect::layout::Fill>,
+    pub stencil_fail_op: Option<crate::dialect::layout::Fill>,
+    pub backface_stencil_write_mask: Option<crate::dialect::layout::Fill>,
+    pub backface_stencil_test_mask: Option<crate::dialect::layout::Fill>,
+    pub stencil_write_mask: Option<crate::dialect::layout::Fill>,
+    pub stencil_test_mask: Option<crate::dialect::layout::Fill>,
+    pub backface_stencil_reference_value: Option<crate::dialect::layout::Fill>,
+    pub stencil_reference_value: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.3dstate_wm_hz_op`: genxml's 3DSTATE_WM_HZ_OP.
 #[mlirformat::mlir::op("xe3.cmd.3dstate_wm_hz_op", format = "attr-dict")]
 #[derive(Default)]
 pub struct Cmd3dstateWmHzOp {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub depth_buffer_partial_resolve_enable: Option<crate::dialect::image::Fill>,
-    pub number_of_multisamples: Option<crate::dialect::image::Fill>,
-    pub stencil_clear_value: Option<crate::dialect::image::Fill>,
-    pub stencil_buffer_resolve_enable: Option<crate::dialect::image::Fill>,
-    pub full_surface_depth_and_stencil_clear: Option<crate::dialect::image::Fill>,
-    pub pixel_position_offset_enable: Option<crate::dialect::image::Fill>,
-    pub hierarchical_depth_buffer_resolve_enable: Option<crate::dialect::image::Fill>,
-    pub depth_buffer_resolve_enable: Option<crate::dialect::image::Fill>,
-    pub scissor_rectangle_enable: Option<crate::dialect::image::Fill>,
-    pub depth_buffer_clear_enable: Option<crate::dialect::image::Fill>,
-    pub stencil_buffer_clear_enable: Option<crate::dialect::image::Fill>,
-    pub clear_rectangle_x_min: Option<crate::dialect::image::Fill>,
-    pub clear_rectangle_y_min: Option<crate::dialect::image::Fill>,
-    pub clear_rectangle_x_max: Option<crate::dialect::image::Fill>,
-    pub clear_rectangle_y_max: Option<crate::dialect::image::Fill>,
-    pub sample_mask: Option<crate::dialect::image::Fill>,
-    pub depth_clear_value: Option<crate::dialect::image::Real>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub depth_buffer_partial_resolve_enable: Option<crate::dialect::layout::Fill>,
+    pub number_of_multisamples: Option<crate::dialect::layout::Fill>,
+    pub stencil_clear_value: Option<crate::dialect::layout::Fill>,
+    pub stencil_buffer_resolve_enable: Option<crate::dialect::layout::Fill>,
+    pub full_surface_depth_and_stencil_clear: Option<crate::dialect::layout::Fill>,
+    pub pixel_position_offset_enable: Option<crate::dialect::layout::Fill>,
+    pub hierarchical_depth_buffer_resolve_enable: Option<crate::dialect::layout::Fill>,
+    pub depth_buffer_resolve_enable: Option<crate::dialect::layout::Fill>,
+    pub scissor_rectangle_enable: Option<crate::dialect::layout::Fill>,
+    pub depth_buffer_clear_enable: Option<crate::dialect::layout::Fill>,
+    pub stencil_buffer_clear_enable: Option<crate::dialect::layout::Fill>,
+    pub clear_rectangle_x_min: Option<crate::dialect::layout::Fill>,
+    pub clear_rectangle_y_min: Option<crate::dialect::layout::Fill>,
+    pub clear_rectangle_x_max: Option<crate::dialect::layout::Fill>,
+    pub clear_rectangle_y_max: Option<crate::dialect::layout::Fill>,
+    pub sample_mask: Option<crate::dialect::layout::Fill>,
+    pub depth_clear_value: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.cmd.cfe_state`: genxml's CFE_STATE.
 #[mlirformat::mlir::op("xe3.cmd.cfe_state", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdCfeState {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub cfe_subopcode_variant: Option<crate::dialect::image::Fill>,
-    pub cfe_subopcode: Option<crate::dialect::image::Fill>,
-    pub compute_command_opcode: Option<crate::dialect::image::Fill>,
-    pub pipeline: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub scratch_space_buffer: Option<crate::dialect::image::Fill>,
-    pub stack_id_control: Option<crate::dialect::image::Fill>,
-    pub dynamic_stack_id_control: Option<crate::dialect::image::Fill>,
-    pub compute_dispatch_all_walker_enable: Option<crate::dialect::image::Fill>,
-    pub single_slice_dispatch_ccs_mode: Option<crate::dialect::image::Fill>,
-    pub over_dispatch_control: Option<crate::dialect::image::Fill>,
-    pub maximum_number_of_threads: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub cfe_subopcode_variant: Option<crate::dialect::layout::Fill>,
+    pub cfe_subopcode: Option<crate::dialect::layout::Fill>,
+    pub compute_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub pipeline: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub scratch_space_buffer: Option<crate::dialect::layout::Fill>,
+    pub stack_id_control: Option<crate::dialect::layout::Fill>,
+    pub dynamic_stack_id_control: Option<crate::dialect::layout::Fill>,
+    pub compute_dispatch_all_walker_enable: Option<crate::dialect::layout::Fill>,
+    pub single_slice_dispatch_ccs_mode: Option<crate::dialect::layout::Fill>,
+    pub over_dispatch_control: Option<crate::dialect::layout::Fill>,
+    pub maximum_number_of_threads: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.compute_walker`: genxml's COMPUTE_WALKER.
 #[mlirformat::mlir::op("xe3.cmd.compute_walker", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdComputeWalker {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub workload_partition_enable: Option<crate::dialect::image::Fill>,
-    pub indirect_parameter_enable: Option<crate::dialect::image::Fill>,
-    pub systolic_mode_enable: Option<crate::dialect::image::Fill>,
-    pub cfe_subopcode_variant: Option<crate::dialect::image::Fill>,
-    pub cfe_subopcode: Option<crate::dialect::image::Fill>,
-    pub compute_command_opcode: Option<crate::dialect::image::Fill>,
-    pub pipeline: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub body: Option<crate::dialect::image::Fields<StateComputeWalkerBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub workload_partition_enable: Option<crate::dialect::layout::Fill>,
+    pub indirect_parameter_enable: Option<crate::dialect::layout::Fill>,
+    pub systolic_mode_enable: Option<crate::dialect::layout::Fill>,
+    pub cfe_subopcode_variant: Option<crate::dialect::layout::Fill>,
+    pub cfe_subopcode: Option<crate::dialect::layout::Fill>,
+    pub compute_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub pipeline: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub body: Option<crate::dialect::layout::Fields<StateComputeWalkerBodyFields>>,
 }
 
 /// `xe3.cmd.execute_indirect_dispatch`: genxml's EXECUTE_INDIRECT_DISPATCH.
 #[mlirformat::mlir::op("xe3.cmd.execute_indirect_dispatch", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdExecuteIndirectDispatch {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub mocs_index: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub max_count: Option<crate::dialect::image::Fill>,
-    pub count_buffer_indirect_enable: Option<crate::dialect::image::Fill>,
-    pub count_buffer_address: Option<crate::dialect::image::Fill>,
-    pub argument_buffer_start_address: Option<crate::dialect::image::Fill>,
-    pub body: Option<crate::dialect::image::Fields<StateComputeWalkerBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub mocs_index: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub max_count: Option<crate::dialect::layout::Fill>,
+    pub count_buffer_indirect_enable: Option<crate::dialect::layout::Fill>,
+    pub count_buffer_address: Option<crate::dialect::layout::Fill>,
+    pub argument_buffer_start_address: Option<crate::dialect::layout::Fill>,
+    pub body: Option<crate::dialect::layout::Fields<StateComputeWalkerBodyFields>>,
 }
 
 /// `xe3.cmd.execute_indirect_draw`: genxml's EXECUTE_INDIRECT_DRAW.
 #[mlirformat::mlir::op("xe3.cmd.execute_indirect_draw", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdExecuteIndirectDraw {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub tbimr_enabled: Option<crate::dialect::image::Fill>,
-    pub argument_format: Option<crate::dialect::image::Fill>,
-    pub mocs_index: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub max_count: Option<crate::dialect::image::Fill>,
-    pub count_buffer_indirect_enable: Option<crate::dialect::image::Fill>,
-    pub count_buffer_address: Option<crate::dialect::image::Fill>,
-    pub argument_buffer_start_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub tbimr_enabled: Option<crate::dialect::layout::Fill>,
+    pub argument_format: Option<crate::dialect::layout::Fill>,
+    pub mocs_index: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub max_count: Option<crate::dialect::layout::Fill>,
+    pub count_buffer_indirect_enable: Option<crate::dialect::layout::Fill>,
+    pub count_buffer_address: Option<crate::dialect::layout::Fill>,
+    pub argument_buffer_start_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_arb_check`: genxml's MI_ARB_CHECK.
 #[mlirformat::mlir::op("xe3.cmd.mi_arb_check", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiArbCheck {
-    pub pre_parser_disable: Option<crate::dialect::image::Fill>,
-    pub pre_parser_disable_mask: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub pre_parser_disable: Option<crate::dialect::layout::Fill>,
+    pub pre_parser_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_arb_on_off`: genxml's MI_ARB_ON_OFF.
 #[mlirformat::mlir::op("xe3.cmd.mi_arb_on_off", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiArbOnOff {
-    pub arbitration_enable: Option<crate::dialect::image::Fill>,
-    pub allow_lite_restore: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub arbitration_enable: Option<crate::dialect::layout::Fill>,
+    pub allow_lite_restore: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_atomic`: genxml's MI_ATOMIC.
 #[mlirformat::mlir::op("xe3.cmd.mi_atomic", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiAtomic {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub atomic_opcode: Option<crate::dialect::image::Fill>,
-    pub return_data_control: Option<crate::dialect::image::Fill>,
-    pub cs_stall: Option<crate::dialect::image::Fill>,
-    pub inline_data: Option<crate::dialect::image::Fill>,
-    pub data_size: Option<crate::dialect::image::Fill>,
-    pub post_sync_operation: Option<crate::dialect::image::Fill>,
-    pub memory_type: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub memory_address: Option<crate::dialect::image::Fill>,
-    pub operand1_data_dword_0: Option<crate::dialect::image::Fill>,
-    pub operand2_data_dword_0: Option<crate::dialect::image::Fill>,
-    pub operand1_data_dword_1: Option<crate::dialect::image::Fill>,
-    pub operand2_data_dword_1: Option<crate::dialect::image::Fill>,
-    pub operand1_data_dword_2: Option<crate::dialect::image::Fill>,
-    pub operand2_data_dword_2: Option<crate::dialect::image::Fill>,
-    pub operand1_data_dword_3: Option<crate::dialect::image::Fill>,
-    pub operand2_data_dword_3: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub atomic_opcode: Option<crate::dialect::layout::Fill>,
+    pub return_data_control: Option<crate::dialect::layout::Fill>,
+    pub cs_stall: Option<crate::dialect::layout::Fill>,
+    pub inline_data: Option<crate::dialect::layout::Fill>,
+    pub data_size: Option<crate::dialect::layout::Fill>,
+    pub post_sync_operation: Option<crate::dialect::layout::Fill>,
+    pub memory_type: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub memory_address: Option<crate::dialect::layout::Fill>,
+    pub operand1_data_dword_0: Option<crate::dialect::layout::Fill>,
+    pub operand2_data_dword_0: Option<crate::dialect::layout::Fill>,
+    pub operand1_data_dword_1: Option<crate::dialect::layout::Fill>,
+    pub operand2_data_dword_1: Option<crate::dialect::layout::Fill>,
+    pub operand1_data_dword_2: Option<crate::dialect::layout::Fill>,
+    pub operand2_data_dword_2: Option<crate::dialect::layout::Fill>,
+    pub operand1_data_dword_3: Option<crate::dialect::layout::Fill>,
+    pub operand2_data_dword_3: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_batch_buffer_end`: genxml's MI_BATCH_BUFFER_END.
 #[mlirformat::mlir::op("xe3.cmd.mi_batch_buffer_end", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiBatchBufferEnd {
-    pub end_context: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub end_context: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_batch_buffer_start`: genxml's MI_BATCH_BUFFER_START.
 #[mlirformat::mlir::op("xe3.cmd.mi_batch_buffer_start", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiBatchBufferStart {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub address_space_indicator: Option<crate::dialect::image::Fill>,
-    pub resource_streamer_enable: Option<crate::dialect::image::Fill>,
-    pub predication_enable: Option<crate::dialect::image::Fill>,
-    pub second_level_batch_buffer: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub batch_buffer_start_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub address_space_indicator: Option<crate::dialect::layout::Fill>,
+    pub resource_streamer_enable: Option<crate::dialect::layout::Fill>,
+    pub predication_enable: Option<crate::dialect::layout::Fill>,
+    pub second_level_batch_buffer: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub batch_buffer_start_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// An element of `xe3.cmd.mi_clflush`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CmdMiClflushElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dw_representing_a_half_cache_line: Option<crate::dialect::image::Fill>,
+    pub dw_representing_a_half_cache_line: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_clflush`: genxml's MI_CLFLUSH.
 #[mlirformat::mlir::op("xe3.cmd.mi_clflush", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiClflush {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub use_global_gtt: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub starting_cacheline_offset: Option<crate::dialect::image::Fill>,
-    pub page_base_address: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<CmdMiClflushElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub use_global_gtt: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub starting_cacheline_offset: Option<crate::dialect::layout::Fill>,
+    pub page_base_address: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<CmdMiClflushElement>>>,
 }
 
 /// `xe3.cmd.mi_conditional_batch_buffer_end`: genxml's MI_CONDITIONAL_BATCH_BUFFER_END.
 #[mlirformat::mlir::op("xe3.cmd.mi_conditional_batch_buffer_end", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiConditionalBatchBufferEnd {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub compare_operation: Option<crate::dialect::image::Fill>,
-    pub end_current_batch_buffer_level: Option<crate::dialect::image::Fill>,
-    pub compare_mask_mode: Option<crate::dialect::image::Fill>,
-    pub compare_semaphore: Option<crate::dialect::image::Fill>,
-    pub use_global_gtt: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub compare_data_dword: Option<crate::dialect::image::Fill>,
-    pub compare_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub compare_operation: Option<crate::dialect::layout::Fill>,
+    pub end_current_batch_buffer_level: Option<crate::dialect::layout::Fill>,
+    pub compare_mask_mode: Option<crate::dialect::layout::Fill>,
+    pub compare_semaphore: Option<crate::dialect::layout::Fill>,
+    pub use_global_gtt: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub compare_data_dword: Option<crate::dialect::layout::Fill>,
+    pub compare_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_copy_mem_mem`: genxml's MI_COPY_MEM_MEM.
 #[mlirformat::mlir::op("xe3.cmd.mi_copy_mem_mem", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiCopyMemMem {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub use_global_gtt_destination: Option<crate::dialect::image::Fill>,
-    pub use_global_gtt_source: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub destination_memory_address: Option<crate::dialect::image::Fill>,
-    pub source_memory_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub use_global_gtt_destination: Option<crate::dialect::layout::Fill>,
+    pub use_global_gtt_source: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub destination_memory_address: Option<crate::dialect::layout::Fill>,
+    pub source_memory_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_display_flip`: genxml's MI_DISPLAY_FLIP.
 #[mlirformat::mlir::op("xe3.cmd.mi_display_flip", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiDisplayFlip {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub display_plane_select: Option<crate::dialect::image::Fill>,
-    pub async_flip_indicator: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub tile_parameter: Option<crate::dialect::image::Fill>,
-    pub display_buffer_pitch: Option<crate::dialect::image::Fill>,
-    pub stereoscopic_3d_mode: Option<crate::dialect::image::Fill>,
-    pub flip_type: Option<crate::dialect::image::Fill>,
-    pub vrr_master_flip: Option<crate::dialect::image::Fill>,
-    pub display_buffer_base_address: Option<crate::dialect::image::Fill>,
-    pub left_eye_display_buffer_base_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub display_plane_select: Option<crate::dialect::layout::Fill>,
+    pub async_flip_indicator: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub tile_parameter: Option<crate::dialect::layout::Fill>,
+    pub display_buffer_pitch: Option<crate::dialect::layout::Fill>,
+    pub stereoscopic_3d_mode: Option<crate::dialect::layout::Fill>,
+    pub flip_type: Option<crate::dialect::layout::Fill>,
+    pub vrr_master_flip: Option<crate::dialect::layout::Fill>,
+    pub display_buffer_base_address: Option<crate::dialect::layout::Fill>,
+    pub left_eye_display_buffer_base_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_flush_dw`: genxml's MI_FLUSH_DW.
 #[mlirformat::mlir::op("xe3.cmd.mi_flush_dw", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiFlushDw {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub video_pipeline_cache_invalidate: Option<crate::dialect::image::Fill>,
-    pub notify_enable: Option<crate::dialect::image::Fill>,
-    pub flush_llc: Option<crate::dialect::image::Fill>,
-    pub post_sync_operation: Option<crate::dialect::image::Fill>,
-    pub flush_ccs: Option<crate::dialect::image::Fill>,
-    pub tlb_invalidate: Option<crate::dialect::image::Fill>,
-    pub store_data_index: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub destination_address_type: Option<crate::dialect::image::Fill>,
-    pub address: Option<crate::dialect::image::Fill>,
-    pub immediate_data: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub video_pipeline_cache_invalidate: Option<crate::dialect::layout::Fill>,
+    pub notify_enable: Option<crate::dialect::layout::Fill>,
+    pub flush_llc: Option<crate::dialect::layout::Fill>,
+    pub post_sync_operation: Option<crate::dialect::layout::Fill>,
+    pub flush_ccs: Option<crate::dialect::layout::Fill>,
+    pub tlb_invalidate: Option<crate::dialect::layout::Fill>,
+    pub store_data_index: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub destination_address_type: Option<crate::dialect::layout::Fill>,
+    pub address: Option<crate::dialect::layout::Fill>,
+    pub immediate_data: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_force_wakeup`: genxml's MI_FORCE_WAKEUP.
 #[mlirformat::mlir::op("xe3.cmd.mi_force_wakeup", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiForceWakeup {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub force_media_slice0_awake: Option<crate::dialect::image::Fill>,
-    pub force_render_awake: Option<crate::dialect::image::Fill>,
-    pub force_media_slice1_awake: Option<crate::dialect::image::Fill>,
-    pub force_media_slice2_awake: Option<crate::dialect::image::Fill>,
-    pub force_media_slice3_awake: Option<crate::dialect::image::Fill>,
-    pub hevc_power_well_control: Option<crate::dialect::image::Fill>,
-    pub mfx_power_well_control: Option<crate::dialect::image::Fill>,
-    pub mask_bits: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub force_media_slice0_awake: Option<crate::dialect::layout::Fill>,
+    pub force_render_awake: Option<crate::dialect::layout::Fill>,
+    pub force_media_slice1_awake: Option<crate::dialect::layout::Fill>,
+    pub force_media_slice2_awake: Option<crate::dialect::layout::Fill>,
+    pub force_media_slice3_awake: Option<crate::dialect::layout::Fill>,
+    pub hevc_power_well_control: Option<crate::dialect::layout::Fill>,
+    pub mfx_power_well_control: Option<crate::dialect::layout::Fill>,
+    pub mask_bits: Option<crate::dialect::layout::Fill>,
 }
 
 /// An element of `xe3.cmd.mi_load_register_imm`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CmdMiLoadRegisterImmElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub register_offset: Option<crate::dialect::image::Fill>,
+    pub register_offset: Option<crate::dialect::layout::Fill>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub data_dword: Option<crate::dialect::image::Fill>,
+    pub data_dword: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_load_register_imm`: genxml's MI_LOAD_REGISTER_IMM.
 #[mlirformat::mlir::op("xe3.cmd.mi_load_register_imm", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiLoadRegisterImm {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub byte_write_disables: Option<crate::dialect::image::Fill>,
-    pub add_cs_mmio_start_offset: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub register_offset: Option<crate::dialect::image::Fill>,
-    pub data_dword: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<CmdMiLoadRegisterImmElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub byte_write_disables: Option<crate::dialect::layout::Fill>,
+    pub add_cs_mmio_start_offset: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub register_offset: Option<crate::dialect::layout::Fill>,
+    pub data_dword: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<CmdMiLoadRegisterImmElement>>>,
 }
 
 /// `xe3.cmd.mi_load_register_mem`: genxml's MI_LOAD_REGISTER_MEM.
 #[mlirformat::mlir::op("xe3.cmd.mi_load_register_mem", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiLoadRegisterMem {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub add_cs_mmio_start_offset: Option<crate::dialect::image::Fill>,
-    pub add_loop_variable: Option<crate::dialect::image::Fill>,
-    pub async_mode_enable: Option<crate::dialect::image::Fill>,
-    pub use_global_gtt: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub register_address: Option<crate::dialect::image::Fill>,
-    pub memory_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub add_cs_mmio_start_offset: Option<crate::dialect::layout::Fill>,
+    pub add_loop_variable: Option<crate::dialect::layout::Fill>,
+    pub async_mode_enable: Option<crate::dialect::layout::Fill>,
+    pub use_global_gtt: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub register_address: Option<crate::dialect::layout::Fill>,
+    pub memory_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_load_register_reg`: genxml's MI_LOAD_REGISTER_REG.
 #[mlirformat::mlir::op("xe3.cmd.mi_load_register_reg", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiLoadRegisterReg {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub add_cs_mmio_start_offset_source: Option<crate::dialect::image::Fill>,
-    pub add_cs_mmio_start_offset_destination: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub source_register_address: Option<crate::dialect::image::Fill>,
-    pub destination_register_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub add_cs_mmio_start_offset_source: Option<crate::dialect::layout::Fill>,
+    pub add_cs_mmio_start_offset_destination: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub source_register_address: Option<crate::dialect::layout::Fill>,
+    pub destination_register_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_load_scan_lines_excl`: genxml's MI_LOAD_SCAN_LINES_EXCL.
 #[mlirformat::mlir::op("xe3.cmd.mi_load_scan_lines_excl", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiLoadScanLinesExcl {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub display_plane_select: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub end_scan_line_number: Option<crate::dialect::image::Fill>,
-    pub start_scan_line_number: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub display_plane_select: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub end_scan_line_number: Option<crate::dialect::layout::Fill>,
+    pub start_scan_line_number: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_load_scan_lines_incl`: genxml's MI_LOAD_SCAN_LINES_INCL.
 #[mlirformat::mlir::op("xe3.cmd.mi_load_scan_lines_incl", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiLoadScanLinesIncl {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub scan_line_event_done_forward: Option<crate::dialect::image::Fill>,
-    pub display_plane_select: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub end_scan_line_number: Option<crate::dialect::image::Fill>,
-    pub start_scan_line_number: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub scan_line_event_done_forward: Option<crate::dialect::layout::Fill>,
+    pub display_plane_select: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub end_scan_line_number: Option<crate::dialect::layout::Fill>,
+    pub start_scan_line_number: Option<crate::dialect::layout::Fill>,
 }
 
 /// An element of `xe3.cmd.mi_math`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CmdMiMathElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub instruction: Option<crate::dialect::image::Fields<StateMiMathAluInstructionFields>>,
+    pub instruction: Option<crate::dialect::layout::Fields<StateMiMathAluInstructionFields>>,
 }
 
 /// `xe3.cmd.mi_math`: genxml's MI_MATH.
 #[mlirformat::mlir::op("xe3.cmd.mi_math", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiMath {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub predication_enable: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<CmdMiMathElement>>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub predication_enable: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<CmdMiMathElement>>>,
 }
 
 /// `xe3.cmd.mi_mem_fence`: genxml's MI_MEM_FENCE.
 #[mlirformat::mlir::op("xe3.cmd.mi_mem_fence", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiMemFence {
-    pub fence_type: Option<crate::dialect::image::Fill>,
-    pub mi_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub fence_type: Option<crate::dialect::layout::Fill>,
+    pub mi_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_noop`: genxml's MI_NOOP.
 #[mlirformat::mlir::op("xe3.cmd.mi_noop", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiNoop {
-    pub identification_number: Option<crate::dialect::image::Fill>,
-    pub identification_number_register_write_enable: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub identification_number: Option<crate::dialect::layout::Fill>,
+    pub identification_number_register_write_enable: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_predicate`: genxml's MI_PREDICATE.
 #[mlirformat::mlir::op("xe3.cmd.mi_predicate", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiPredicate {
-    pub compare_operation: Option<crate::dialect::image::Fill>,
-    pub combine_operation: Option<crate::dialect::image::Fill>,
-    pub load_operation: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub compare_operation: Option<crate::dialect::layout::Fill>,
+    pub combine_operation: Option<crate::dialect::layout::Fill>,
+    pub load_operation: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_report_head`: genxml's MI_REPORT_HEAD.
 #[mlirformat::mlir::op("xe3.cmd.mi_report_head", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiReportHead {
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_report_perf_count`: genxml's MI_REPORT_PERF_COUNT.
 #[mlirformat::mlir::op("xe3.cmd.mi_report_perf_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiReportPerfCount {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub use_global_gtt: Option<crate::dialect::image::Fill>,
-    pub core_mode_enable: Option<crate::dialect::image::Fill>,
-    pub memory_address: Option<crate::dialect::image::Fill>,
-    pub report_id: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub use_global_gtt: Option<crate::dialect::layout::Fill>,
+    pub core_mode_enable: Option<crate::dialect::layout::Fill>,
+    pub memory_address: Option<crate::dialect::layout::Fill>,
+    pub report_id: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_rs_context`: genxml's MI_RS_CONTEXT.
 #[mlirformat::mlir::op("xe3.cmd.mi_rs_context", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiRsContext {
-    pub resource_streamer_save: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub resource_streamer_save: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_rs_control`: genxml's MI_RS_CONTROL.
 #[mlirformat::mlir::op("xe3.cmd.mi_rs_control", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiRsControl {
-    pub resource_streamer_control: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub resource_streamer_control: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_rs_store_data_imm`: genxml's MI_RS_STORE_DATA_IMM.
 #[mlirformat::mlir::op("xe3.cmd.mi_rs_store_data_imm", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiRsStoreDataImm {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub core_mode_enable: Option<crate::dialect::image::Fill>,
-    pub destination_address: Option<crate::dialect::image::Fill>,
-    pub data_dword_0: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub core_mode_enable: Option<crate::dialect::layout::Fill>,
+    pub destination_address: Option<crate::dialect::layout::Fill>,
+    pub data_dword_0: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_semaphore_signal`: genxml's MI_SEMAPHORE_SIGNAL.
 #[mlirformat::mlir::op("xe3.cmd.mi_semaphore_signal", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiSemaphoreSignal {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub target_engine_select: Option<crate::dialect::image::Fill>,
-    pub post_sync_operation: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub target_context_id: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub target_engine_select: Option<crate::dialect::layout::Fill>,
+    pub post_sync_operation: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub target_context_id: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_semaphore_wait`: genxml's MI_SEMAPHORE_WAIT.
 #[mlirformat::mlir::op("xe3.cmd.mi_semaphore_wait", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiSemaphoreWait {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub compare_operation: Option<crate::dialect::image::Fill>,
-    pub wait_mode: Option<crate::dialect::image::Fill>,
-    pub register_poll_mode: Option<crate::dialect::image::Fill>,
-    pub indirect_semaphore_data_dword: Option<crate::dialect::image::Fill>,
-    pub workload_partition_id_offset_enable: Option<crate::dialect::image::Fill>,
-    pub memory_type: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub semaphore_data_dword: Option<crate::dialect::image::Fill>,
-    pub semaphore_address: Option<crate::dialect::image::Fill>,
-    pub wait_token_number: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub compare_operation: Option<crate::dialect::layout::Fill>,
+    pub wait_mode: Option<crate::dialect::layout::Fill>,
+    pub register_poll_mode: Option<crate::dialect::layout::Fill>,
+    pub indirect_semaphore_data_dword: Option<crate::dialect::layout::Fill>,
+    pub workload_partition_id_offset_enable: Option<crate::dialect::layout::Fill>,
+    pub memory_type: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub semaphore_data_dword: Option<crate::dialect::layout::Fill>,
+    pub semaphore_address: Option<crate::dialect::layout::Fill>,
+    pub wait_token_number: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_set_appid`: genxml's MI_SET_APPID.
 #[mlirformat::mlir::op("xe3.cmd.mi_set_appid", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiSetAppid {
-    pub protected_memory_application_id: Option<crate::dialect::image::Fill>,
-    pub protected_memory_application_id_type: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub protected_memory_application_id: Option<crate::dialect::layout::Fill>,
+    pub protected_memory_application_id_type: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_set_context`: genxml's MI_SET_CONTEXT.
 #[mlirformat::mlir::op("xe3.cmd.mi_set_context", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiSetContext {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub restore_inhibit: Option<crate::dialect::image::Fill>,
-    pub force_restore: Option<crate::dialect::image::Fill>,
-    pub resource_streamer_state_restore_enable: Option<crate::dialect::image::Fill>,
-    pub resource_streamer_state_save_enable: Option<crate::dialect::image::Fill>,
-    pub core_mode_enable: Option<crate::dialect::image::Fill>,
-    pub reserved_must_be_1: Option<crate::dialect::image::Fill>,
-    pub logical_context_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub restore_inhibit: Option<crate::dialect::layout::Fill>,
+    pub force_restore: Option<crate::dialect::layout::Fill>,
+    pub resource_streamer_state_restore_enable: Option<crate::dialect::layout::Fill>,
+    pub resource_streamer_state_save_enable: Option<crate::dialect::layout::Fill>,
+    pub core_mode_enable: Option<crate::dialect::layout::Fill>,
+    pub reserved_must_be_1: Option<crate::dialect::layout::Fill>,
+    pub logical_context_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_set_predicate`: genxml's MI_SET_PREDICATE.
 #[mlirformat::mlir::op("xe3.cmd.mi_set_predicate", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiSetPredicate {
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_store_data_imm`: genxml's MI_STORE_DATA_IMM.
 #[mlirformat::mlir::op("xe3.cmd.mi_store_data_imm", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiStoreDataImm {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub force_write_completion_check: Option<crate::dialect::image::Fill>,
-    pub store_qword: Option<crate::dialect::image::Fill>,
-    pub use_global_gtt: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub core_mode_enable: Option<crate::dialect::image::Fill>,
-    pub address: Option<crate::dialect::image::Fill>,
-    pub immediate_data: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub force_write_completion_check: Option<crate::dialect::layout::Fill>,
+    pub store_qword: Option<crate::dialect::layout::Fill>,
+    pub use_global_gtt: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub core_mode_enable: Option<crate::dialect::layout::Fill>,
+    pub address: Option<crate::dialect::layout::Fill>,
+    pub immediate_data: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_store_data_index`: genxml's MI_STORE_DATA_INDEX.
 #[mlirformat::mlir::op("xe3.cmd.mi_store_data_index", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiStoreDataIndex {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub use_per_process_hardware_status_page: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub offset: Option<crate::dialect::image::Fill>,
-    pub data_dword_0: Option<crate::dialect::image::Fill>,
-    pub data_dword_1: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub use_per_process_hardware_status_page: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub offset: Option<crate::dialect::layout::Fill>,
+    pub data_dword_0: Option<crate::dialect::layout::Fill>,
+    pub data_dword_1: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_store_register_mem`: genxml's MI_STORE_REGISTER_MEM.
 #[mlirformat::mlir::op("xe3.cmd.mi_store_register_mem", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiStoreRegisterMem {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub add_cs_mmio_start_offset: Option<crate::dialect::image::Fill>,
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub use_global_gtt: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub register_address: Option<crate::dialect::image::Fill>,
-    pub memory_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub add_cs_mmio_start_offset: Option<crate::dialect::layout::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub use_global_gtt: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub register_address: Option<crate::dialect::layout::Fill>,
+    pub memory_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_suspend_flush`: genxml's MI_SUSPEND_FLUSH.
 #[mlirformat::mlir::op("xe3.cmd.mi_suspend_flush", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiSuspendFlush {
-    pub suspend_flush: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub suspend_flush: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_topology_filter`: genxml's MI_TOPOLOGY_FILTER.
 #[mlirformat::mlir::op("xe3.cmd.mi_topology_filter", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiTopologyFilter {
-    pub topology_filter_value: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub topology_filter_value: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_user_interrupt`: genxml's MI_USER_INTERRUPT.
 #[mlirformat::mlir::op("xe3.cmd.mi_user_interrupt", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiUserInterrupt {
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_wait_for_event`: genxml's MI_WAIT_FOR_EVENT.
 #[mlirformat::mlir::op("xe3.cmd.mi_wait_for_event", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiWaitForEvent {
-    pub display_plnae_1_a_scan_line_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_1_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_4_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_1_a_vertical_blank_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_7_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_8_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_1_b_scan_line_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_2_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_5_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_1_b_vertical_blank_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_1_c_scan_line_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_3_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_9_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_10_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_11_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_12_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_6_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_plane_1_c_vertical_blank_wait_enable: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub display_plnae_1_a_scan_line_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_1_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_4_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_1_a_vertical_blank_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_7_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_8_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_1_b_scan_line_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_2_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_5_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_1_b_vertical_blank_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_1_c_scan_line_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_3_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_9_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_10_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_11_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_12_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_6_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_plane_1_c_vertical_blank_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.mi_wait_for_event_2`: genxml's MI_WAIT_FOR_EVENT_2.
 #[mlirformat::mlir::op("xe3.cmd.mi_wait_for_event_2", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdMiWaitForEvent2 {
-    pub display_plane_flip_pending_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_pipe_vertical_blank_wait_enable: Option<crate::dialect::image::Fill>,
-    pub display_pipe_scan_line_wait_enable: Option<crate::dialect::image::Fill>,
-    pub mi_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub display_plane_flip_pending_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_pipe_vertical_blank_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub display_pipe_scan_line_wait_enable: Option<crate::dialect::layout::Fill>,
+    pub mi_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.pipe_control`: genxml's PIPE_CONTROL.
 #[mlirformat::mlir::op("xe3.cmd.pipe_control", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdPipeControl {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub hdc_pipeline_flush_enable: Option<crate::dialect::image::Fill>,
-    pub l3_read_only_cache_invalidation_enable: Option<crate::dialect::image::Fill>,
-    pub untyped_data_port_cache_flush_enable: Option<crate::dialect::image::Fill>,
-    pub ccs_flush_enable: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub depth_cache_flush_enable: Option<crate::dialect::image::Fill>,
-    pub stall_at_pixel_scoreboard: Option<crate::dialect::image::Fill>,
-    pub state_cache_invalidation_enable: Option<crate::dialect::image::Fill>,
-    pub constant_cache_invalidation_enable: Option<crate::dialect::image::Fill>,
-    pub vf_cache_invalidation_enable: Option<crate::dialect::image::Fill>,
-    pub force_device_coherency: Option<crate::dialect::image::Fill>,
-    pub pipe_control_flush_enable: Option<crate::dialect::image::Fill>,
-    pub notify_enable: Option<crate::dialect::image::Fill>,
-    pub indirect_state_pointers_disable: Option<crate::dialect::image::Fill>,
-    pub texture_cache_invalidation_enable: Option<crate::dialect::image::Fill>,
-    pub instruction_cache_invalidate_enable: Option<crate::dialect::image::Fill>,
-    pub render_target_cache_flush_enable: Option<crate::dialect::image::Fill>,
-    pub depth_stall_enable: Option<crate::dialect::image::Fill>,
-    pub post_sync_operation: Option<crate::dialect::image::Fill>,
-    pub pss_stall_sync_enable: Option<crate::dialect::image::Fill>,
-    pub tlb_invalidate: Option<crate::dialect::image::Fill>,
-    pub depth_stall_sync_enable: Option<crate::dialect::image::Fill>,
-    pub command_streamer_stall_enable: Option<crate::dialect::image::Fill>,
-    pub store_data_index: Option<crate::dialect::image::Fill>,
-    pub protected_memory_enable: Option<crate::dialect::image::Fill>,
-    pub lri_post_sync_operation: Option<crate::dialect::image::Fill>,
-    pub destination_address_type: Option<crate::dialect::image::Fill>,
-    pub flush_llc: Option<crate::dialect::image::Fill>,
-    pub protected_memory_disable: Option<crate::dialect::image::Fill>,
-    pub command_cache_invalidate_enable: Option<crate::dialect::image::Fill>,
-    pub address: Option<crate::dialect::image::Fill>,
-    pub immediate_data: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub hdc_pipeline_flush_enable: Option<crate::dialect::layout::Fill>,
+    pub l3_read_only_cache_invalidation_enable: Option<crate::dialect::layout::Fill>,
+    pub untyped_data_port_cache_flush_enable: Option<crate::dialect::layout::Fill>,
+    pub ccs_flush_enable: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub depth_cache_flush_enable: Option<crate::dialect::layout::Fill>,
+    pub stall_at_pixel_scoreboard: Option<crate::dialect::layout::Fill>,
+    pub state_cache_invalidation_enable: Option<crate::dialect::layout::Fill>,
+    pub constant_cache_invalidation_enable: Option<crate::dialect::layout::Fill>,
+    pub vf_cache_invalidation_enable: Option<crate::dialect::layout::Fill>,
+    pub force_device_coherency: Option<crate::dialect::layout::Fill>,
+    pub pipe_control_flush_enable: Option<crate::dialect::layout::Fill>,
+    pub notify_enable: Option<crate::dialect::layout::Fill>,
+    pub indirect_state_pointers_disable: Option<crate::dialect::layout::Fill>,
+    pub texture_cache_invalidation_enable: Option<crate::dialect::layout::Fill>,
+    pub instruction_cache_invalidate_enable: Option<crate::dialect::layout::Fill>,
+    pub render_target_cache_flush_enable: Option<crate::dialect::layout::Fill>,
+    pub depth_stall_enable: Option<crate::dialect::layout::Fill>,
+    pub post_sync_operation: Option<crate::dialect::layout::Fill>,
+    pub pss_stall_sync_enable: Option<crate::dialect::layout::Fill>,
+    pub tlb_invalidate: Option<crate::dialect::layout::Fill>,
+    pub depth_stall_sync_enable: Option<crate::dialect::layout::Fill>,
+    pub command_streamer_stall_enable: Option<crate::dialect::layout::Fill>,
+    pub store_data_index: Option<crate::dialect::layout::Fill>,
+    pub protected_memory_enable: Option<crate::dialect::layout::Fill>,
+    pub lri_post_sync_operation: Option<crate::dialect::layout::Fill>,
+    pub destination_address_type: Option<crate::dialect::layout::Fill>,
+    pub flush_llc: Option<crate::dialect::layout::Fill>,
+    pub protected_memory_disable: Option<crate::dialect::layout::Fill>,
+    pub command_cache_invalidate_enable: Option<crate::dialect::layout::Fill>,
+    pub address: Option<crate::dialect::layout::Fill>,
+    pub immediate_data: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.pipeline_select`: genxml's PIPELINE_SELECT.
 #[mlirformat::mlir::op("xe3.cmd.pipeline_select", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdPipelineSelect {
-    pub pipeline_selection: Option<crate::dialect::image::Fill>,
-    pub mask_bits: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
+    pub pipeline_selection: Option<crate::dialect::layout::Fill>,
+    pub mask_bits: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.resource_barrier`: genxml's RESOURCE_BARRIER.
 #[mlirformat::mlir::op("xe3.cmd.resource_barrier", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdResourceBarrier {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub predicate_enable: Option<crate::dialect::image::Fill>,
-    pub opcode: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub resource_barrier_body: Option<crate::dialect::image::Fields<StateResourceBarrierBodyFields>>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub predicate_enable: Option<crate::dialect::layout::Fill>,
+    pub opcode: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub resource_barrier_body: Option<crate::dialect::layout::Fields<StateResourceBarrierBodyFields>>,
 }
 
 /// `xe3.cmd.state_base_address`: genxml's STATE_BASE_ADDRESS.
 #[mlirformat::mlir::op("xe3.cmd.state_base_address", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdStateBaseAddress {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub general_state_base_address_modify_enable: Option<crate::dialect::image::Fill>,
-    pub general_state_mocs: Option<crate::dialect::image::Fill>,
-    pub general_state_base_address: Option<crate::dialect::image::Fill>,
-    pub stateless_data_port_access_mocs: Option<crate::dialect::image::Fill>,
-    pub l1_cache_control: Option<crate::dialect::image::Fill>,
-    pub surface_state_base_address_modify_enable: Option<crate::dialect::image::Fill>,
-    pub surface_state_mocs: Option<crate::dialect::image::Fill>,
-    pub surface_state_base_address: Option<crate::dialect::image::Fill>,
-    pub dynamic_state_base_address_modify_enable: Option<crate::dialect::image::Fill>,
-    pub dynamic_state_mocs: Option<crate::dialect::image::Fill>,
-    pub dynamic_state_base_address: Option<crate::dialect::image::Fill>,
-    pub indirect_object_base_address_modify_enable: Option<crate::dialect::image::Fill>,
-    pub indirect_object_mocs: Option<crate::dialect::image::Fill>,
-    pub indirect_object_base_address: Option<crate::dialect::image::Fill>,
-    pub instruction_base_address_modify_enable: Option<crate::dialect::image::Fill>,
-    pub instruction_mocs: Option<crate::dialect::image::Fill>,
-    pub instruction_base_address: Option<crate::dialect::image::Fill>,
-    pub general_state_buffer_size_modify_enable: Option<crate::dialect::image::Fill>,
-    pub general_state_buffer_size: Option<crate::dialect::image::Fill>,
-    pub dynamic_state_buffer_size_modify_enable: Option<crate::dialect::image::Fill>,
-    pub dynamic_state_buffer_size: Option<crate::dialect::image::Fill>,
-    pub indirect_object_buffer_size_modify_enable: Option<crate::dialect::image::Fill>,
-    pub indirect_object_buffer_size: Option<crate::dialect::image::Fill>,
-    pub instruction_buffer_size_modify_enable: Option<crate::dialect::image::Fill>,
-    pub instruction_buffer_size: Option<crate::dialect::image::Fill>,
-    pub bindless_surface_state_base_address_modify_enable: Option<crate::dialect::image::Fill>,
-    pub bindless_surface_state_mocs: Option<crate::dialect::image::Fill>,
-    pub bindless_surface_state_base_address: Option<crate::dialect::image::Fill>,
-    pub bindless_surface_state_size: Option<crate::dialect::image::Fill>,
-    pub bindless_sampler_state_base_address_modify_enable: Option<crate::dialect::image::Fill>,
-    pub bindless_sampler_state_mocs: Option<crate::dialect::image::Fill>,
-    pub bindless_sampler_state_base_address: Option<crate::dialect::image::Fill>,
-    pub bindless_sampler_state_buffer_size: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub general_state_base_address_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub general_state_mocs: Option<crate::dialect::layout::Fill>,
+    pub general_state_base_address: Option<crate::dialect::layout::Fill>,
+    pub stateless_data_port_access_mocs: Option<crate::dialect::layout::Fill>,
+    pub l1_cache_control: Option<crate::dialect::layout::Fill>,
+    pub surface_state_base_address_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub surface_state_mocs: Option<crate::dialect::layout::Fill>,
+    pub surface_state_base_address: Option<crate::dialect::layout::Fill>,
+    pub dynamic_state_base_address_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub dynamic_state_mocs: Option<crate::dialect::layout::Fill>,
+    pub dynamic_state_base_address: Option<crate::dialect::layout::Fill>,
+    pub indirect_object_base_address_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub indirect_object_mocs: Option<crate::dialect::layout::Fill>,
+    pub indirect_object_base_address: Option<crate::dialect::layout::Fill>,
+    pub instruction_base_address_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub instruction_mocs: Option<crate::dialect::layout::Fill>,
+    pub instruction_base_address: Option<crate::dialect::layout::Fill>,
+    pub general_state_buffer_size_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub general_state_buffer_size: Option<crate::dialect::layout::Fill>,
+    pub dynamic_state_buffer_size_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub dynamic_state_buffer_size: Option<crate::dialect::layout::Fill>,
+    pub indirect_object_buffer_size_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub indirect_object_buffer_size: Option<crate::dialect::layout::Fill>,
+    pub instruction_buffer_size_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub instruction_buffer_size: Option<crate::dialect::layout::Fill>,
+    pub bindless_surface_state_base_address_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub bindless_surface_state_mocs: Option<crate::dialect::layout::Fill>,
+    pub bindless_surface_state_base_address: Option<crate::dialect::layout::Fill>,
+    pub bindless_surface_state_size: Option<crate::dialect::layout::Fill>,
+    pub bindless_sampler_state_base_address_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub bindless_sampler_state_mocs: Option<crate::dialect::layout::Fill>,
+    pub bindless_sampler_state_base_address: Option<crate::dialect::layout::Fill>,
+    pub bindless_sampler_state_buffer_size: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.state_byte_stride`: genxml's STATE_BYTE_STRIDE.
 #[mlirformat::mlir::op("xe3.cmd.state_byte_stride", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdStateByteStride {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub byte_stride_enable: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub byte_stride: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub byte_stride_enable: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub byte_stride: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.state_compute_mode`: genxml's STATE_COMPUTE_MODE.
 #[mlirformat::mlir::op("xe3.cmd.state_compute_mode", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdStateComputeMode {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub z_pass_async_compute_thread_limit: Option<crate::dialect::image::Fill>,
-    pub z_async_throttle_settings: Option<crate::dialect::image::Fill>,
-    pub async_compute_thread_limit: Option<crate::dialect::image::Fill>,
-    pub enable_variable_register_size_allocation: Option<crate::dialect::image::Fill>,
-    pub eu_thread_scheduling_mode_override: Option<crate::dialect::image::Fill>,
-    pub large_grf_mode: Option<crate::dialect::image::Fill>,
-    pub z_pass_async_compute_thread_limit_mask: Option<crate::dialect::image::Fill>,
-    pub mask1: Option<crate::dialect::image::Fill>,
-    pub z_async_throttle_settings_mask: Option<crate::dialect::image::Fill>,
-    pub async_compute_thread_limit_mask: Option<crate::dialect::image::Fill>,
-    pub enable_variable_register_size_allocation_mask: Option<crate::dialect::image::Fill>,
-    pub eu_thread_scheduling_mode_override_mask: Option<crate::dialect::image::Fill>,
-    pub large_grf_mode_mask: Option<crate::dialect::image::Fill>,
-    pub midthread_preemption_delay_timer: Option<crate::dialect::image::Fill>,
-    pub midthread_preemption_overdispatch_thread_group_count: Option<crate::dialect::image::Fill>,
-    pub midthread_preemption_overdispatch_test_mode: Option<crate::dialect::image::Fill>,
-    pub uav_coherency_mode: Option<crate::dialect::image::Fill>,
-    pub midthread_preemption_delay_timer_mask: Option<crate::dialect::image::Fill>,
-    pub mask2: Option<crate::dialect::image::Fill>,
-    pub midthread_preemption_overdispatch_thread_group_count_mask: Option<crate::dialect::image::Fill>,
-    pub midthread_preemption_overdispatch_test_mode_mask: Option<crate::dialect::image::Fill>,
-    pub uav_coherency_mode_mask: Option<crate::dialect::image::Fill>,
-    pub memory_allocation_for_scratch_and_midthread_preemption_buffers_mask: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub z_pass_async_compute_thread_limit: Option<crate::dialect::layout::Fill>,
+    pub z_async_throttle_settings: Option<crate::dialect::layout::Fill>,
+    pub async_compute_thread_limit: Option<crate::dialect::layout::Fill>,
+    pub enable_variable_register_size_allocation: Option<crate::dialect::layout::Fill>,
+    pub eu_thread_scheduling_mode_override: Option<crate::dialect::layout::Fill>,
+    pub large_grf_mode: Option<crate::dialect::layout::Fill>,
+    pub z_pass_async_compute_thread_limit_mask: Option<crate::dialect::layout::Fill>,
+    pub mask1: Option<crate::dialect::layout::Fill>,
+    pub z_async_throttle_settings_mask: Option<crate::dialect::layout::Fill>,
+    pub async_compute_thread_limit_mask: Option<crate::dialect::layout::Fill>,
+    pub enable_variable_register_size_allocation_mask: Option<crate::dialect::layout::Fill>,
+    pub eu_thread_scheduling_mode_override_mask: Option<crate::dialect::layout::Fill>,
+    pub large_grf_mode_mask: Option<crate::dialect::layout::Fill>,
+    pub midthread_preemption_delay_timer: Option<crate::dialect::layout::Fill>,
+    pub midthread_preemption_overdispatch_thread_group_count: Option<crate::dialect::layout::Fill>,
+    pub midthread_preemption_overdispatch_test_mode: Option<crate::dialect::layout::Fill>,
+    pub uav_coherency_mode: Option<crate::dialect::layout::Fill>,
+    pub midthread_preemption_delay_timer_mask: Option<crate::dialect::layout::Fill>,
+    pub mask2: Option<crate::dialect::layout::Fill>,
+    pub midthread_preemption_overdispatch_thread_group_count_mask: Option<crate::dialect::layout::Fill>,
+    pub midthread_preemption_overdispatch_test_mode_mask: Option<crate::dialect::layout::Fill>,
+    pub uav_coherency_mode_mask: Option<crate::dialect::layout::Fill>,
+    pub memory_allocation_for_scratch_and_midthread_preemption_buffers_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.state_sip`: genxml's STATE_SIP.
 #[mlirformat::mlir::op("xe3.cmd.state_sip", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdStateSip {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub system_instruction_pointer: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub system_instruction_pointer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.state_system_mem_fence_address`: genxml's STATE_SYSTEM_MEM_FENCE_ADDRESS.
 #[mlirformat::mlir::op("xe3.cmd.state_system_mem_fence_address", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdStateSystemMemFenceAddress {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub context_restore_invalid: Option<crate::dialect::image::Fill>,
-    pub _3d_command_sub_opcode: Option<crate::dialect::image::Fill>,
-    pub _3d_command_opcode: Option<crate::dialect::image::Fill>,
-    pub command_subtype: Option<crate::dialect::image::Fill>,
-    pub command_type: Option<crate::dialect::image::Fill>,
-    pub system_memory_fence_address: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub context_restore_invalid: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_sub_opcode: Option<crate::dialect::layout::Fill>,
+    pub _3d_command_opcode: Option<crate::dialect::layout::Fill>,
+    pub command_subtype: Option<crate::dialect::layout::Fill>,
+    pub command_type: Option<crate::dialect::layout::Fill>,
+    pub system_memory_fence_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.xy_block_copy_blt`: genxml's XY_BLOCK_COPY_BLT.
 #[mlirformat::mlir::op("xe3.cmd.xy_block_copy_blt", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdXyBlockCopyBlt {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub special_mode_of_operation: Option<crate::dialect::image::Fill>,
-    pub color_depth: Option<crate::dialect::image::Fill>,
-    pub opcode: Option<crate::dialect::image::Fill>,
-    pub client: Option<crate::dialect::image::Fill>,
-    pub destination_pitch: Option<crate::dialect::image::Fill>,
-    pub destination_encrypt_en: Option<crate::dialect::image::Fill>,
-    pub destination_mocs_index: Option<crate::dialect::image::Fill>,
-    pub destination_tiling: Option<crate::dialect::image::Fill>,
-    pub destination_x1: Option<crate::dialect::image::Fill>,
-    pub destination_y1: Option<crate::dialect::image::Fill>,
-    pub destination_x2: Option<crate::dialect::image::Fill>,
-    pub destination_y2: Option<crate::dialect::image::Fill>,
-    pub destination_base_address: Option<crate::dialect::image::Fill>,
-    pub destination_x_offset: Option<crate::dialect::image::Fill>,
-    pub destination_y_offset: Option<crate::dialect::image::Fill>,
-    pub destination_target_memory: Option<crate::dialect::image::Fill>,
-    pub source_x1: Option<crate::dialect::image::Fill>,
-    pub source_y1: Option<crate::dialect::image::Fill>,
-    pub source_pitch: Option<crate::dialect::image::Fill>,
-    pub source_encrypt_en: Option<crate::dialect::image::Fill>,
-    pub source_mocs_index: Option<crate::dialect::image::Fill>,
-    pub source_tiling: Option<crate::dialect::image::Fill>,
-    pub source_base_address: Option<crate::dialect::image::Fill>,
-    pub source_x_offset: Option<crate::dialect::image::Fill>,
-    pub source_y_offset: Option<crate::dialect::image::Fill>,
-    pub source_target_memory: Option<crate::dialect::image::Fill>,
-    pub source_compression_format: Option<crate::dialect::image::Fill>,
-    pub source_clear_value_enable: Option<crate::dialect::image::Fill>,
-    pub source_clear_address: Option<crate::dialect::image::Fill>,
-    pub destination_compression_format: Option<crate::dialect::image::Fill>,
-    pub destination_clear_value_enable: Option<crate::dialect::image::Fill>,
-    pub destination_clear_address: Option<crate::dialect::image::Fill>,
-    pub destination_surface_height: Option<crate::dialect::image::Fill>,
-    pub destination_surface_width: Option<crate::dialect::image::Fill>,
-    pub destination_surface_type: Option<crate::dialect::image::Fill>,
-    pub destination_lod: Option<crate::dialect::image::Fill>,
-    pub destination_surface_qpitch: Option<crate::dialect::image::Fill>,
-    pub destination_surface_depth: Option<crate::dialect::image::Fill>,
-    pub destination_horizontal_align: Option<crate::dialect::image::Fill>,
-    pub destination_vertical_align: Option<crate::dialect::image::Fill>,
-    pub destination_mip_tail_start_lod: Option<crate::dialect::image::Fill>,
-    pub destination_array_index: Option<crate::dialect::image::Fill>,
-    pub source_surface_height: Option<crate::dialect::image::Fill>,
-    pub source_surface_width: Option<crate::dialect::image::Fill>,
-    pub source_surface_type: Option<crate::dialect::image::Fill>,
-    pub source_lod: Option<crate::dialect::image::Fill>,
-    pub source_surface_qpitch: Option<crate::dialect::image::Fill>,
-    pub source_surface_depth: Option<crate::dialect::image::Fill>,
-    pub source_horizontal_align: Option<crate::dialect::image::Fill>,
-    pub source_vertical_align: Option<crate::dialect::image::Fill>,
-    pub source_mip_tail_start_lod: Option<crate::dialect::image::Fill>,
-    pub source_array_index: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub special_mode_of_operation: Option<crate::dialect::layout::Fill>,
+    pub color_depth: Option<crate::dialect::layout::Fill>,
+    pub opcode: Option<crate::dialect::layout::Fill>,
+    pub client: Option<crate::dialect::layout::Fill>,
+    pub destination_pitch: Option<crate::dialect::layout::Fill>,
+    pub destination_encrypt_en: Option<crate::dialect::layout::Fill>,
+    pub destination_mocs_index: Option<crate::dialect::layout::Fill>,
+    pub destination_tiling: Option<crate::dialect::layout::Fill>,
+    pub destination_x1: Option<crate::dialect::layout::Fill>,
+    pub destination_y1: Option<crate::dialect::layout::Fill>,
+    pub destination_x2: Option<crate::dialect::layout::Fill>,
+    pub destination_y2: Option<crate::dialect::layout::Fill>,
+    pub destination_base_address: Option<crate::dialect::layout::Fill>,
+    pub destination_x_offset: Option<crate::dialect::layout::Fill>,
+    pub destination_y_offset: Option<crate::dialect::layout::Fill>,
+    pub destination_target_memory: Option<crate::dialect::layout::Fill>,
+    pub source_x1: Option<crate::dialect::layout::Fill>,
+    pub source_y1: Option<crate::dialect::layout::Fill>,
+    pub source_pitch: Option<crate::dialect::layout::Fill>,
+    pub source_encrypt_en: Option<crate::dialect::layout::Fill>,
+    pub source_mocs_index: Option<crate::dialect::layout::Fill>,
+    pub source_tiling: Option<crate::dialect::layout::Fill>,
+    pub source_base_address: Option<crate::dialect::layout::Fill>,
+    pub source_x_offset: Option<crate::dialect::layout::Fill>,
+    pub source_y_offset: Option<crate::dialect::layout::Fill>,
+    pub source_target_memory: Option<crate::dialect::layout::Fill>,
+    pub source_compression_format: Option<crate::dialect::layout::Fill>,
+    pub source_clear_value_enable: Option<crate::dialect::layout::Fill>,
+    pub source_clear_address: Option<crate::dialect::layout::Fill>,
+    pub destination_compression_format: Option<crate::dialect::layout::Fill>,
+    pub destination_clear_value_enable: Option<crate::dialect::layout::Fill>,
+    pub destination_clear_address: Option<crate::dialect::layout::Fill>,
+    pub destination_surface_height: Option<crate::dialect::layout::Fill>,
+    pub destination_surface_width: Option<crate::dialect::layout::Fill>,
+    pub destination_surface_type: Option<crate::dialect::layout::Fill>,
+    pub destination_lod: Option<crate::dialect::layout::Fill>,
+    pub destination_surface_qpitch: Option<crate::dialect::layout::Fill>,
+    pub destination_surface_depth: Option<crate::dialect::layout::Fill>,
+    pub destination_horizontal_align: Option<crate::dialect::layout::Fill>,
+    pub destination_vertical_align: Option<crate::dialect::layout::Fill>,
+    pub destination_mip_tail_start_lod: Option<crate::dialect::layout::Fill>,
+    pub destination_array_index: Option<crate::dialect::layout::Fill>,
+    pub source_surface_height: Option<crate::dialect::layout::Fill>,
+    pub source_surface_width: Option<crate::dialect::layout::Fill>,
+    pub source_surface_type: Option<crate::dialect::layout::Fill>,
+    pub source_lod: Option<crate::dialect::layout::Fill>,
+    pub source_surface_qpitch: Option<crate::dialect::layout::Fill>,
+    pub source_surface_depth: Option<crate::dialect::layout::Fill>,
+    pub source_horizontal_align: Option<crate::dialect::layout::Fill>,
+    pub source_vertical_align: Option<crate::dialect::layout::Fill>,
+    pub source_mip_tail_start_lod: Option<crate::dialect::layout::Fill>,
+    pub source_array_index: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.cmd.xy_fast_color_blt`: genxml's XY_FAST_COLOR_BLT.
 #[mlirformat::mlir::op("xe3.cmd.xy_fast_color_blt", format = "attr-dict")]
 #[derive(Default)]
 pub struct CmdXyFastColorBlt {
-    pub dword_length: Option<crate::dialect::image::Fill>,
-    pub number_of_multisamples: Option<crate::dialect::image::Fill>,
-    pub special_mode_of_operation: Option<crate::dialect::image::Fill>,
-    pub color_depth: Option<crate::dialect::image::Fill>,
-    pub instruction_target_opcode: Option<crate::dialect::image::Fill>,
-    pub client: Option<crate::dialect::image::Fill>,
-    pub destination_pitch: Option<crate::dialect::image::Fill>,
-    pub destination_encrypt_en: Option<crate::dialect::image::Fill>,
-    pub destination_mocs_index: Option<crate::dialect::image::Fill>,
-    pub destination_tiling: Option<crate::dialect::image::Fill>,
-    pub destination_x1: Option<crate::dialect::image::Fill>,
-    pub destination_y1: Option<crate::dialect::image::Fill>,
-    pub destination_x2: Option<crate::dialect::image::Fill>,
-    pub destination_y2: Option<crate::dialect::image::Fill>,
-    pub destination_base_address: Option<crate::dialect::image::Fill>,
-    pub destination_x_offset: Option<crate::dialect::image::Fill>,
-    pub destination_y_offset: Option<crate::dialect::image::Fill>,
-    pub destination_target_memory: Option<crate::dialect::image::Fill>,
-    pub fill_color: Option<Vec<crate::dialect::image::Fill>>,
-    pub destination_compression_format: Option<crate::dialect::image::Fill>,
-    pub surface_format: Option<crate::dialect::image::Fill>,
-    pub aux_special_operations_mode: Option<crate::dialect::image::Fill>,
-    pub destination_surface_height: Option<crate::dialect::image::Fill>,
-    pub destination_surface_width: Option<crate::dialect::image::Fill>,
-    pub destination_surface_type: Option<crate::dialect::image::Fill>,
-    pub destination_lod: Option<crate::dialect::image::Fill>,
-    pub destination_surface_qpitch: Option<crate::dialect::image::Fill>,
-    pub destination_surface_depth: Option<crate::dialect::image::Fill>,
-    pub destination_horizontal_align: Option<crate::dialect::image::Fill>,
-    pub destination_vertical_align: Option<crate::dialect::image::Fill>,
-    pub destination_mip_tail_start_lod: Option<crate::dialect::image::Fill>,
-    pub destination_depth_stencil_resource: Option<crate::dialect::image::Fill>,
-    pub destination_array_index: Option<crate::dialect::image::Fill>,
+    pub dword_length: Option<crate::dialect::layout::Fill>,
+    pub number_of_multisamples: Option<crate::dialect::layout::Fill>,
+    pub special_mode_of_operation: Option<crate::dialect::layout::Fill>,
+    pub color_depth: Option<crate::dialect::layout::Fill>,
+    pub instruction_target_opcode: Option<crate::dialect::layout::Fill>,
+    pub client: Option<crate::dialect::layout::Fill>,
+    pub destination_pitch: Option<crate::dialect::layout::Fill>,
+    pub destination_encrypt_en: Option<crate::dialect::layout::Fill>,
+    pub destination_mocs_index: Option<crate::dialect::layout::Fill>,
+    pub destination_tiling: Option<crate::dialect::layout::Fill>,
+    pub destination_x1: Option<crate::dialect::layout::Fill>,
+    pub destination_y1: Option<crate::dialect::layout::Fill>,
+    pub destination_x2: Option<crate::dialect::layout::Fill>,
+    pub destination_y2: Option<crate::dialect::layout::Fill>,
+    pub destination_base_address: Option<crate::dialect::layout::Fill>,
+    pub destination_x_offset: Option<crate::dialect::layout::Fill>,
+    pub destination_y_offset: Option<crate::dialect::layout::Fill>,
+    pub destination_target_memory: Option<crate::dialect::layout::Fill>,
+    pub fill_color: Option<Vec<crate::dialect::layout::Fill>>,
+    pub destination_compression_format: Option<crate::dialect::layout::Fill>,
+    pub surface_format: Option<crate::dialect::layout::Fill>,
+    pub aux_special_operations_mode: Option<crate::dialect::layout::Fill>,
+    pub destination_surface_height: Option<crate::dialect::layout::Fill>,
+    pub destination_surface_width: Option<crate::dialect::layout::Fill>,
+    pub destination_surface_type: Option<crate::dialect::layout::Fill>,
+    pub destination_lod: Option<crate::dialect::layout::Fill>,
+    pub destination_surface_qpitch: Option<crate::dialect::layout::Fill>,
+    pub destination_surface_depth: Option<crate::dialect::layout::Fill>,
+    pub destination_horizontal_align: Option<crate::dialect::layout::Fill>,
+    pub destination_vertical_align: Option<crate::dialect::layout::Fill>,
+    pub destination_mip_tail_start_lod: Option<crate::dialect::layout::Fill>,
+    pub destination_depth_stencil_resource: Option<crate::dialect::layout::Fill>,
+    pub destination_array_index: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.bcs_aux_table_base_addr`: genxml's BCS_AUX_TABLE_BASE_ADDR.
 #[mlirformat::mlir::op("xe3.reg.bcs_aux_table_base_addr", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegBcsAuxTableBaseAddr {
-    pub address: Option<crate::dialect::image::Fill>,
+    pub address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.bcs_ccs_aux_inv`: genxml's BCS_CCS_AUX_INV.
 #[mlirformat::mlir::op("xe3.reg.bcs_ccs_aux_inv", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegBcsCcsAuxInv {
-    pub aux_inv: Option<crate::dialect::image::Fill>,
+    pub aux_inv: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.bcs_instdone`: genxml's BCS_INSTDONE.
 #[mlirformat::mlir::op("xe3.reg.bcs_instdone", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegBcsInstdone {
-    pub ring_enable: Option<crate::dialect::image::Fill>,
-    pub blitter_idle: Option<crate::dialect::image::Fill>,
-    pub gab_idle: Option<crate::dialect::image::Fill>,
-    pub bcs_done: Option<crate::dialect::image::Fill>,
+    pub ring_enable: Option<crate::dialect::layout::Fill>,
+    pub blitter_idle: Option<crate::dialect::layout::Fill>,
+    pub gab_idle: Option<crate::dialect::layout::Fill>,
+    pub bcs_done: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.blt_trtt_cr`: genxml's BLT_TRTT_CR.
 #[mlirformat::mlir::op("xe3.reg.blt_trtt_cr", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegBltTrttCr {
-    pub tr_tt_enable: Option<crate::dialect::image::Fill>,
+    pub tr_tt_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.blt_trtt_inval`: genxml's BLT_TRTT_INVAL.
 #[mlirformat::mlir::op("xe3.reg.blt_trtt_inval", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegBltTrttInval {
-    pub invalid_tile_detection_value: Option<crate::dialect::image::Fill>,
+    pub invalid_tile_detection_value: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.blt_trtt_l3_base_high`: genxml's BLT_TRTT_L3_BASE_HIGH.
 #[mlirformat::mlir::op("xe3.reg.blt_trtt_l3_base_high", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegBltTrttL3BaseHigh {
-    pub tr_va_l3_pointer_upper_address: Option<crate::dialect::image::Fill>,
+    pub tr_va_l3_pointer_upper_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.blt_trtt_l3_base_low`: genxml's BLT_TRTT_L3_BASE_LOW.
 #[mlirformat::mlir::op("xe3.reg.blt_trtt_l3_base_low", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegBltTrttL3BaseLow {
-    pub tr_va_l3_pointer_lower_address: Option<crate::dialect::image::Fill>,
+    pub tr_va_l3_pointer_lower_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.blt_trtt_null`: genxml's BLT_TRTT_NULL.
 #[mlirformat::mlir::op("xe3.reg.blt_trtt_null", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegBltTrttNull {
-    pub null_tile_detection_value: Option<crate::dialect::image::Fill>,
+    pub null_tile_detection_value: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.blt_trtt_va_range`: genxml's BLT_TRTT_VA_RANGE.
 #[mlirformat::mlir::op("xe3.reg.blt_trtt_va_range", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegBltTrttVaRange {
-    pub tr_va_base: Option<crate::dialect::image::Fill>,
+    pub tr_va_base: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.cache_mode_0`: genxml's CACHE_MODE_0.
 #[mlirformat::mlir::op("xe3.reg.cache_mode_0", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCacheMode0 {
-    pub hierarchical_z_raw_stall_optimization_disable: Option<crate::dialect::image::Fill>,
-    pub hierarchical_z_disable: Option<crate::dialect::image::Fill>,
-    pub late_z_alloc_disable: Option<crate::dialect::image::Fill>,
-    pub msaa_fast_clear_enabled: Option<crate::dialect::image::Fill>,
-    pub depth_related_cache_pipelined_flush_disable: Option<crate::dialect::image::Fill>,
-    pub sampler_l2_tlb_prefetch_enable: Option<crate::dialect::image::Fill>,
-    pub rcz_pma_not_promoted_allocation_stall_optimization_disable_due_to_change_in_depth_parameters: Option<crate::dialect::image::Fill>,
-    pub disable_repacking_for_compression: Option<crate::dialect::image::Fill>,
-    pub hierarchical_z_raw_stall_optimization_disable_mask: Option<crate::dialect::image::Fill>,
-    pub hierarchical_z_disable_mask: Option<crate::dialect::image::Fill>,
-    pub late_z_alloc_disable_mask: Option<crate::dialect::image::Fill>,
-    pub msaa_fast_clear_enabled_mask: Option<crate::dialect::image::Fill>,
-    pub depth_related_cache_pipelined_flush_disable_mask: Option<crate::dialect::image::Fill>,
-    pub sampler_l2_tlb_prefetch_enable_mask: Option<crate::dialect::image::Fill>,
-    pub rcz_pma_not_promoted_allocation_stall_optimization_disable_due_to_change_in_depth_parameters_mask: Option<crate::dialect::image::Fill>,
-    pub disable_repacking_for_compression_mask: Option<crate::dialect::image::Fill>,
+    pub hierarchical_z_raw_stall_optimization_disable: Option<crate::dialect::layout::Fill>,
+    pub hierarchical_z_disable: Option<crate::dialect::layout::Fill>,
+    pub late_z_alloc_disable: Option<crate::dialect::layout::Fill>,
+    pub msaa_fast_clear_enabled: Option<crate::dialect::layout::Fill>,
+    pub depth_related_cache_pipelined_flush_disable: Option<crate::dialect::layout::Fill>,
+    pub sampler_l2_tlb_prefetch_enable: Option<crate::dialect::layout::Fill>,
+    pub rcz_pma_not_promoted_allocation_stall_optimization_disable_due_to_change_in_depth_parameters: Option<crate::dialect::layout::Fill>,
+    pub disable_repacking_for_compression: Option<crate::dialect::layout::Fill>,
+    pub hierarchical_z_raw_stall_optimization_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub hierarchical_z_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub late_z_alloc_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub msaa_fast_clear_enabled_mask: Option<crate::dialect::layout::Fill>,
+    pub depth_related_cache_pipelined_flush_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub sampler_l2_tlb_prefetch_enable_mask: Option<crate::dialect::layout::Fill>,
+    pub rcz_pma_not_promoted_allocation_stall_optimization_disable_due_to_change_in_depth_parameters_mask: Option<crate::dialect::layout::Fill>,
+    pub disable_repacking_for_compression_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.cache_mode_1`: genxml's CACHE_MODE_1.
 #[mlirformat::mlir::op("xe3.reg.cache_mode_1", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCacheMode1 {
-    pub partial_resolve_disable_in_vc: Option<crate::dialect::image::Fill>,
-    pub rcz_pma_promoted_2_not_promoted_allocation_stall_optimization_disable: Option<crate::dialect::image::Fill>,
-    pub mcs_cache_disable: Option<crate::dialect::image::Fill>,
-    pub msc_raw_hazard_avoidance_bit: Option<crate::dialect::image::Fill>,
-    pub np_early_z_fails_disable: Option<crate::dialect::image::Fill>,
-    pub blend_optimization_fix_disable: Option<crate::dialect::image::Fill>,
-    pub color_compression_disable: Option<crate::dialect::image::Fill>,
-    pub partial_resolve_disable_in_vc_mask: Option<crate::dialect::image::Fill>,
-    pub rcz_pma_promoted_2_not_promoted_allocation_stall_optimization_disable_mask: Option<crate::dialect::image::Fill>,
-    pub mcs_cache_disable_mask: Option<crate::dialect::image::Fill>,
-    pub msc_raw_hazard_avoidance_bit_mask: Option<crate::dialect::image::Fill>,
-    pub np_early_z_fails_disable_mask: Option<crate::dialect::image::Fill>,
-    pub blend_optimization_fix_disable_mask: Option<crate::dialect::image::Fill>,
-    pub color_compression_disable_mask: Option<crate::dialect::image::Fill>,
+    pub partial_resolve_disable_in_vc: Option<crate::dialect::layout::Fill>,
+    pub rcz_pma_promoted_2_not_promoted_allocation_stall_optimization_disable: Option<crate::dialect::layout::Fill>,
+    pub mcs_cache_disable: Option<crate::dialect::layout::Fill>,
+    pub msc_raw_hazard_avoidance_bit: Option<crate::dialect::layout::Fill>,
+    pub np_early_z_fails_disable: Option<crate::dialect::layout::Fill>,
+    pub blend_optimization_fix_disable: Option<crate::dialect::layout::Fill>,
+    pub color_compression_disable: Option<crate::dialect::layout::Fill>,
+    pub partial_resolve_disable_in_vc_mask: Option<crate::dialect::layout::Fill>,
+    pub rcz_pma_promoted_2_not_promoted_allocation_stall_optimization_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub mcs_cache_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub msc_raw_hazard_avoidance_bit_mask: Option<crate::dialect::layout::Fill>,
+    pub np_early_z_fails_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub blend_optimization_fix_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub color_compression_disable_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.ccs_instdone`: genxml's CCS_INSTDONE.
 #[mlirformat::mlir::op("xe3.reg.ccs_instdone", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCcsInstdone {
-    pub ring_enable: Option<crate::dialect::image::Fill>,
-    pub vfe_done: Option<crate::dialect::image::Fill>,
-    pub tsg_done: Option<crate::dialect::image::Fill>,
-    pub cs_done: Option<crate::dialect::image::Fill>,
+    pub ring_enable: Option<crate::dialect::layout::Fill>,
+    pub vfe_done: Option<crate::dialect::layout::Fill>,
+    pub tsg_done: Option<crate::dialect::layout::Fill>,
+    pub cs_done: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.chicken_raster_1`: genxml's CHICKEN_RASTER_1.
 #[mlirformat::mlir::op("xe3.reg.chicken_raster_1", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegChickenRaster1 {
-    pub aa_line_quality_fix: Option<crate::dialect::image::Fill>,
-    pub aa_line_quality_fix_mask: Option<crate::dialect::image::Fill>,
+    pub aa_line_quality_fix: Option<crate::dialect::layout::Fill>,
+    pub aa_line_quality_fix_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.chicken_raster_2`: genxml's CHICKEN_RASTER_2.
 #[mlirformat::mlir::op("xe3.reg.chicken_raster_2", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegChickenRaster2 {
-    pub disable_any_mctr_response_fix: Option<crate::dialect::image::Fill>,
-    pub disable_any_mctr_response_fix_mask: Option<crate::dialect::image::Fill>,
+    pub disable_any_mctr_response_fix: Option<crate::dialect::layout::Fill>,
+    pub disable_any_mctr_response_fix_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.cl_invocation_count`: genxml's CL_INVOCATION_COUNT.
 #[mlirformat::mlir::op("xe3.reg.cl_invocation_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegClInvocationCount {
-    pub cl_invocation_count_report: Option<crate::dialect::image::Fill>,
+    pub cl_invocation_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.cl_primitives_count`: genxml's CL_PRIMITIVES_COUNT.
 #[mlirformat::mlir::op("xe3.reg.cl_primitives_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegClPrimitivesCount {
-    pub cl_primitives_count_report: Option<crate::dialect::image::Fill>,
+    pub cl_primitives_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.common_slice_chicken1`: genxml's COMMON_SLICE_CHICKEN1.
 #[mlirformat::mlir::op("xe3.reg.common_slice_chicken1", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCommonSliceChicken1 {
-    pub hiz_plane_optimization_disable_bit: Option<crate::dialect::image::Fill>,
-    pub hiz_plane_optimization_disable_bit_mask: Option<crate::dialect::image::Fill>,
+    pub hiz_plane_optimization_disable_bit: Option<crate::dialect::layout::Fill>,
+    pub hiz_plane_optimization_disable_bit_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.common_slice_chicken3`: genxml's COMMON_SLICE_CHICKEN3.
 #[mlirformat::mlir::op("xe3.reg.common_slice_chicken3", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCommonSliceChicken3 {
-    pub ps_thread_panic_dispatch: Option<crate::dialect::image::Fill>,
-    pub state_cache_perf_fix_disabled: Option<crate::dialect::image::Fill>,
-    pub ps_thread_panic_dispatch_mask: Option<crate::dialect::image::Fill>,
-    pub state_cache_perf_fix_disabled_mask: Option<crate::dialect::image::Fill>,
+    pub ps_thread_panic_dispatch: Option<crate::dialect::layout::Fill>,
+    pub state_cache_perf_fix_disabled: Option<crate::dialect::layout::Fill>,
+    pub ps_thread_panic_dispatch_mask: Option<crate::dialect::layout::Fill>,
+    pub state_cache_perf_fix_disabled_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.common_slice_chicken4`: genxml's COMMON_SLICE_CHICKEN4.
 #[mlirformat::mlir::op("xe3.reg.common_slice_chicken4", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCommonSliceChicken4 {
-    pub enable_hardware_filtering_in_wm: Option<crate::dialect::image::Fill>,
-    pub enable_hardware_filtering_in_wm_mask: Option<crate::dialect::image::Fill>,
+    pub enable_hardware_filtering_in_wm: Option<crate::dialect::layout::Fill>,
+    pub enable_hardware_filtering_in_wm_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.comp_ctx0_trtt_cr`: genxml's COMP_CTX0_TRTT_CR.
 #[mlirformat::mlir::op("xe3.reg.comp_ctx0_trtt_cr", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCompCtx0TrttCr {
-    pub tr_tt_enable: Option<crate::dialect::image::Fill>,
+    pub tr_tt_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.comp_ctx0_trtt_inval`: genxml's COMP_CTX0_TRTT_INVAL.
 #[mlirformat::mlir::op("xe3.reg.comp_ctx0_trtt_inval", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCompCtx0TrttInval {
-    pub invalid_tile_detection_value: Option<crate::dialect::image::Fill>,
+    pub invalid_tile_detection_value: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.comp_ctx0_trtt_l3_base_high`: genxml's COMP_CTX0_TRTT_L3_BASE_HIGH.
 #[mlirformat::mlir::op("xe3.reg.comp_ctx0_trtt_l3_base_high", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCompCtx0TrttL3BaseHigh {
-    pub tr_va_l3_pointer_upper_address: Option<crate::dialect::image::Fill>,
+    pub tr_va_l3_pointer_upper_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.comp_ctx0_trtt_l3_base_low`: genxml's COMP_CTX0_TRTT_L3_BASE_LOW.
 #[mlirformat::mlir::op("xe3.reg.comp_ctx0_trtt_l3_base_low", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCompCtx0TrttL3BaseLow {
-    pub tr_va_l3_pointer_lower_address: Option<crate::dialect::image::Fill>,
+    pub tr_va_l3_pointer_lower_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.comp_ctx0_trtt_null`: genxml's COMP_CTX0_TRTT_NULL.
 #[mlirformat::mlir::op("xe3.reg.comp_ctx0_trtt_null", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCompCtx0TrttNull {
-    pub null_tile_detection_value: Option<crate::dialect::image::Fill>,
+    pub null_tile_detection_value: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.comp_ctx0_trtt_va_range`: genxml's COMP_CTX0_TRTT_VA_RANGE.
 #[mlirformat::mlir::op("xe3.reg.comp_ctx0_trtt_va_range", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCompCtx0TrttVaRange {
-    pub tr_va_base: Option<crate::dialect::image::Fill>,
+    pub tr_va_base: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.compcs0_aux_table_base_addr`: genxml's COMPCS0_AUX_TABLE_BASE_ADDR.
 #[mlirformat::mlir::op("xe3.reg.compcs0_aux_table_base_addr", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCompcs0AuxTableBaseAddr {
-    pub address: Option<crate::dialect::image::Fill>,
+    pub address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.compcs0_ccs_aux_inv`: genxml's COMPCS0_CCS_AUX_INV.
 #[mlirformat::mlir::op("xe3.reg.compcs0_ccs_aux_inv", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCompcs0CcsAuxInv {
-    pub aux_inv: Option<crate::dialect::image::Fill>,
+    pub aux_inv: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.cs_chicken1`: genxml's CS_CHICKEN1.
 #[mlirformat::mlir::op("xe3.reg.cs_chicken1", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCsChicken1 {
-    pub media_and_gpgpu_pre_emption_control: Option<crate::dialect::image::Fill>,
-    pub disable_preemption_and_high_priority_pausing_due_to_3dprimitive_command: Option<crate::dialect::image::Fill>,
-    pub media_and_gpgpu_pre_emption_control_mask: Option<crate::dialect::image::Fill>,
-    pub disable_preemption_and_high_priority_pausing_due_to_3dprimitive_command_mask: Option<crate::dialect::image::Fill>,
+    pub media_and_gpgpu_pre_emption_control: Option<crate::dialect::layout::Fill>,
+    pub disable_preemption_and_high_priority_pausing_due_to_3dprimitive_command: Option<crate::dialect::layout::Fill>,
+    pub media_and_gpgpu_pre_emption_control_mask: Option<crate::dialect::layout::Fill>,
+    pub disable_preemption_and_high_priority_pausing_due_to_3dprimitive_command_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.cs_debug_mode2`: genxml's CS_DEBUG_MODE2.
 #[mlirformat::mlir::op("xe3.reg.cs_debug_mode2", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCsDebugMode2 {
-    pub _3d_rendering_instruction_disable: Option<crate::dialect::image::Fill>,
-    pub media_instruction_disable: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_address_offset_disable: Option<crate::dialect::image::Fill>,
-    pub disable_gather_at_set_shader: Option<crate::dialect::image::Fill>,
-    pub _3d_rendering_instruction_disable_mask: Option<crate::dialect::image::Fill>,
-    pub media_instruction_disable_mask: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_address_offset_disable_mask: Option<crate::dialect::image::Fill>,
-    pub disable_gather_at_set_shader_mask: Option<crate::dialect::image::Fill>,
+    pub _3d_rendering_instruction_disable: Option<crate::dialect::layout::Fill>,
+    pub media_instruction_disable: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_address_offset_disable: Option<crate::dialect::layout::Fill>,
+    pub disable_gather_at_set_shader: Option<crate::dialect::layout::Fill>,
+    pub _3d_rendering_instruction_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub media_instruction_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_address_offset_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub disable_gather_at_set_shader_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.cs_invocation_count`: genxml's CS_INVOCATION_COUNT.
 #[mlirformat::mlir::op("xe3.reg.cs_invocation_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegCsInvocationCount {
-    pub cs_invocation_count_report: Option<crate::dialect::image::Fill>,
+    pub cs_invocation_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.ds_invocation_count`: genxml's DS_INVOCATION_COUNT.
 #[mlirformat::mlir::op("xe3.reg.ds_invocation_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegDsInvocationCount {
-    pub ds_invocation_count_report: Option<crate::dialect::image::Fill>,
+    pub ds_invocation_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.ff_mode`: genxml's FF_MODE.
 #[mlirformat::mlir::op("xe3.reg.ff_mode", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegFfMode {
-    pub te_patch_control_bug_fix: Option<crate::dialect::image::Fill>,
-    pub mesh_shader_autostrip_disable: Option<crate::dialect::image::Fill>,
-    pub mesh_shader_partial_autostrip_disable: Option<crate::dialect::image::Fill>,
-    pub te_autostrip_disable: Option<crate::dialect::image::Fill>,
+    pub te_patch_control_bug_fix: Option<crate::dialect::layout::Fill>,
+    pub mesh_shader_autostrip_disable: Option<crate::dialect::layout::Fill>,
+    pub mesh_shader_partial_autostrip_disable: Option<crate::dialect::layout::Fill>,
+    pub te_autostrip_disable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.ff_mode2`: genxml's FF_MODE2.
 #[mlirformat::mlir::op("xe3.reg.ff_mode2", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegFfMode2 {
-    pub vs_timer_value: Option<crate::dialect::image::Fill>,
-    pub hs_timer_value: Option<crate::dialect::image::Fill>,
-    pub tds_timer_value: Option<crate::dialect::image::Fill>,
-    pub gs_timer_value: Option<crate::dialect::image::Fill>,
+    pub vs_timer_value: Option<crate::dialect::layout::Fill>,
+    pub hs_timer_value: Option<crate::dialect::layout::Fill>,
+    pub tds_timer_value: Option<crate::dialect::layout::Fill>,
+    pub gs_timer_value: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gam_done`: genxml's GAM_DONE.
 #[mlirformat::mlir::op("xe3.reg.gam_done", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGamDone {
-    pub gfx_tlb0_done: Option<crate::dialect::image::Fill>,
-    pub gfx_tlb1_done: Option<crate::dialect::image::Fill>,
-    pub comp_tlb0_done: Option<crate::dialect::image::Fill>,
-    pub comp_tlb1_done: Option<crate::dialect::image::Fill>,
-    pub guc_tlb_done: Option<crate::dialect::image::Fill>,
-    pub kcr_tlb_done: Option<crate::dialect::image::Fill>,
-    pub oac_tlb_done: Option<crate::dialect::image::Fill>,
-    pub vdbox0_tlb_done: Option<crate::dialect::image::Fill>,
-    pub vdbox2_tlb_done: Option<crate::dialect::image::Fill>,
-    pub vebox0_tlb_done: Option<crate::dialect::image::Fill>,
-    pub cm_ingress_done: Option<crate::dialect::image::Fill>,
-    pub data_ingress_done: Option<crate::dialect::image::Fill>,
-    pub req_strm_done: Option<crate::dialect::image::Fill>,
-    pub s_tlb_done: Option<crate::dialect::image::Fill>,
-    pub blt_tlb_done: Option<crate::dialect::image::Fill>,
-    pub tlb_hit_arb_comp_done: Option<crate::dialect::image::Fill>,
-    pub tlb_hit_arb_misc_done: Option<crate::dialect::image::Fill>,
-    pub tlb_hit_arb_stg_done: Option<crate::dialect::image::Fill>,
-    pub tlb_hit_gfx_stg_done: Option<crate::dialect::image::Fill>,
-    pub tlb_miss_arb_gfx_done: Option<crate::dialect::image::Fill>,
-    pub tlb_miss_arb_comp_done: Option<crate::dialect::image::Fill>,
-    pub tlb_miss_arb_misc_done: Option<crate::dialect::image::Fill>,
-    pub tlb_miss_arb_stg_done: Option<crate::dialect::image::Fill>,
-    pub tr_tlb_done: Option<crate::dialect::image::Fill>,
-    pub wkrs_done: Option<crate::dialect::image::Fill>,
-    pub ccs_done: Option<crate::dialect::image::Fill>,
-    pub ctrlcomm_done: Option<crate::dialect::image::Fill>,
-    pub flwctrl_done: Option<crate::dialect::image::Fill>,
-    pub drtn_done: Option<crate::dialect::image::Fill>,
-    pub vebox1_tbl_done: Option<crate::dialect::image::Fill>,
-    pub xbl_done: Option<crate::dialect::image::Fill>,
+    pub gfx_tlb0_done: Option<crate::dialect::layout::Fill>,
+    pub gfx_tlb1_done: Option<crate::dialect::layout::Fill>,
+    pub comp_tlb0_done: Option<crate::dialect::layout::Fill>,
+    pub comp_tlb1_done: Option<crate::dialect::layout::Fill>,
+    pub guc_tlb_done: Option<crate::dialect::layout::Fill>,
+    pub kcr_tlb_done: Option<crate::dialect::layout::Fill>,
+    pub oac_tlb_done: Option<crate::dialect::layout::Fill>,
+    pub vdbox0_tlb_done: Option<crate::dialect::layout::Fill>,
+    pub vdbox2_tlb_done: Option<crate::dialect::layout::Fill>,
+    pub vebox0_tlb_done: Option<crate::dialect::layout::Fill>,
+    pub cm_ingress_done: Option<crate::dialect::layout::Fill>,
+    pub data_ingress_done: Option<crate::dialect::layout::Fill>,
+    pub req_strm_done: Option<crate::dialect::layout::Fill>,
+    pub s_tlb_done: Option<crate::dialect::layout::Fill>,
+    pub blt_tlb_done: Option<crate::dialect::layout::Fill>,
+    pub tlb_hit_arb_comp_done: Option<crate::dialect::layout::Fill>,
+    pub tlb_hit_arb_misc_done: Option<crate::dialect::layout::Fill>,
+    pub tlb_hit_arb_stg_done: Option<crate::dialect::layout::Fill>,
+    pub tlb_hit_gfx_stg_done: Option<crate::dialect::layout::Fill>,
+    pub tlb_miss_arb_gfx_done: Option<crate::dialect::layout::Fill>,
+    pub tlb_miss_arb_comp_done: Option<crate::dialect::layout::Fill>,
+    pub tlb_miss_arb_misc_done: Option<crate::dialect::layout::Fill>,
+    pub tlb_miss_arb_stg_done: Option<crate::dialect::layout::Fill>,
+    pub tr_tlb_done: Option<crate::dialect::layout::Fill>,
+    pub wkrs_done: Option<crate::dialect::layout::Fill>,
+    pub ccs_done: Option<crate::dialect::layout::Fill>,
+    pub ctrlcomm_done: Option<crate::dialect::layout::Fill>,
+    pub flwctrl_done: Option<crate::dialect::layout::Fill>,
+    pub drtn_done: Option<crate::dialect::layout::Fill>,
+    pub vebox1_tbl_done: Option<crate::dialect::layout::Fill>,
+    pub xbl_done: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gfx_aux_table_base_addr`: genxml's GFX_AUX_TABLE_BASE_ADDR.
 #[mlirformat::mlir::op("xe3.reg.gfx_aux_table_base_addr", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGfxAuxTableBaseAddr {
-    pub address: Option<crate::dialect::image::Fill>,
+    pub address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gfx_ccs_aux_inv`: genxml's GFX_CCS_AUX_INV.
 #[mlirformat::mlir::op("xe3.reg.gfx_ccs_aux_inv", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGfxCcsAuxInv {
-    pub aux_inv: Option<crate::dialect::image::Fill>,
+    pub aux_inv: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gfx_trtt_cr`: genxml's GFX_TRTT_CR.
 #[mlirformat::mlir::op("xe3.reg.gfx_trtt_cr", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGfxTrttCr {
-    pub tr_tt_enable: Option<crate::dialect::image::Fill>,
+    pub tr_tt_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gfx_trtt_inval`: genxml's GFX_TRTT_INVAL.
 #[mlirformat::mlir::op("xe3.reg.gfx_trtt_inval", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGfxTrttInval {
-    pub invalid_tile_detection_value: Option<crate::dialect::image::Fill>,
+    pub invalid_tile_detection_value: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gfx_trtt_l3_base_high`: genxml's GFX_TRTT_L3_BASE_HIGH.
 #[mlirformat::mlir::op("xe3.reg.gfx_trtt_l3_base_high", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGfxTrttL3BaseHigh {
-    pub tr_va_l3_pointer_upper_address: Option<crate::dialect::image::Fill>,
+    pub tr_va_l3_pointer_upper_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gfx_trtt_l3_base_low`: genxml's GFX_TRTT_L3_BASE_LOW.
 #[mlirformat::mlir::op("xe3.reg.gfx_trtt_l3_base_low", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGfxTrttL3BaseLow {
-    pub tr_va_l3_pointer_lower_address: Option<crate::dialect::image::Fill>,
+    pub tr_va_l3_pointer_lower_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gfx_trtt_null`: genxml's GFX_TRTT_NULL.
 #[mlirformat::mlir::op("xe3.reg.gfx_trtt_null", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGfxTrttNull {
-    pub null_tile_detection_value: Option<crate::dialect::image::Fill>,
+    pub null_tile_detection_value: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gfx_trtt_va_range`: genxml's GFX_TRTT_VA_RANGE.
 #[mlirformat::mlir::op("xe3.reg.gfx_trtt_va_range", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGfxTrttVaRange {
-    pub tr_va_base: Option<crate::dialect::image::Fill>,
+    pub tr_va_base: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gpgpu_dispatchdimx`: genxml's GPGPU_DISPATCHDIMX.
 #[mlirformat::mlir::op("xe3.reg.gpgpu_dispatchdimx", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGpgpuDispatchdimx {
-    pub dispatch_dimension_x: Option<crate::dialect::image::Fill>,
+    pub dispatch_dimension_x: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gpgpu_dispatchdimy`: genxml's GPGPU_DISPATCHDIMY.
 #[mlirformat::mlir::op("xe3.reg.gpgpu_dispatchdimy", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGpgpuDispatchdimy {
-    pub dispatch_dimension_y: Option<crate::dialect::image::Fill>,
+    pub dispatch_dimension_y: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gpgpu_dispatchdimz`: genxml's GPGPU_DISPATCHDIMZ.
 #[mlirformat::mlir::op("xe3.reg.gpgpu_dispatchdimz", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGpgpuDispatchdimz {
-    pub dispatch_dimension_z: Option<crate::dialect::image::Fill>,
+    pub dispatch_dimension_z: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gs_invocation_count`: genxml's GS_INVOCATION_COUNT.
 #[mlirformat::mlir::op("xe3.reg.gs_invocation_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGsInvocationCount {
-    pub gs_invocation_count_report: Option<crate::dialect::image::Fill>,
+    pub gs_invocation_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.gs_primitives_count`: genxml's GS_PRIMITIVES_COUNT.
 #[mlirformat::mlir::op("xe3.reg.gs_primitives_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegGsPrimitivesCount {
-    pub gs_primitives_count_report: Option<crate::dialect::image::Fill>,
+    pub gs_primitives_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.half_slice_chicken7`: genxml's HALF_SLICE_CHICKEN7.
 #[mlirformat::mlir::op("xe3.reg.half_slice_chicken7", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegHalfSliceChicken7 {
-    pub enabled_texel_offset_precision_fix: Option<crate::dialect::image::Fill>,
-    pub enabled_texel_offset_precision_fix_mask: Option<crate::dialect::image::Fill>,
+    pub enabled_texel_offset_precision_fix: Option<crate::dialect::layout::Fill>,
+    pub enabled_texel_offset_precision_fix_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.hiz_chicken`: genxml's HIZ_CHICKEN.
 #[mlirformat::mlir::op("xe3.reg.hiz_chicken", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegHizChicken {
-    pub hz_depth_test_le_ge_optimization_disable: Option<crate::dialect::image::Fill>,
-    pub hz_depth_test_le_ge_optimization_disable_mask: Option<crate::dialect::image::Fill>,
+    pub hz_depth_test_le_ge_optimization_disable: Option<crate::dialect::layout::Fill>,
+    pub hz_depth_test_le_ge_optimization_disable_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.hs_invocation_count`: genxml's HS_INVOCATION_COUNT.
 #[mlirformat::mlir::op("xe3.reg.hs_invocation_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegHsInvocationCount {
-    pub hs_invocation_count_report: Option<crate::dialect::image::Fill>,
+    pub hs_invocation_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.ia_primitives_count`: genxml's IA_PRIMITIVES_COUNT.
 #[mlirformat::mlir::op("xe3.reg.ia_primitives_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegIaPrimitivesCount {
-    pub ia_primitives_count_report: Option<crate::dialect::image::Fill>,
+    pub ia_primitives_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.ia_vertices_count`: genxml's IA_VERTICES_COUNT.
 #[mlirformat::mlir::op("xe3.reg.ia_vertices_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegIaVerticesCount {
-    pub ia_vertices_count_report: Option<crate::dialect::image::Fill>,
+    pub ia_vertices_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.instdone_1`: genxml's INSTDONE_1.
 #[mlirformat::mlir::op("xe3.reg.instdone_1", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegInstdone1 {
-    pub prb0_ring_enable: Option<crate::dialect::image::Fill>,
-    pub vfg_done: Option<crate::dialect::image::Fill>,
-    pub vs_done: Option<crate::dialect::image::Fill>,
-    pub hs_done: Option<crate::dialect::image::Fill>,
-    pub te_done: Option<crate::dialect::image::Fill>,
-    pub ds_done: Option<crate::dialect::image::Fill>,
-    pub gs_done: Option<crate::dialect::image::Fill>,
-    pub sol_done: Option<crate::dialect::image::Fill>,
-    pub cl_done: Option<crate::dialect::image::Fill>,
-    pub sf_done: Option<crate::dialect::image::Fill>,
-    pub tdg1_done: Option<crate::dialect::image::Fill>,
-    pub tdg0_done: Option<crate::dialect::image::Fill>,
-    pub urbm_done: Option<crate::dialect::image::Fill>,
-    pub svg_done: Option<crate::dialect::image::Fill>,
-    pub gafs_done: Option<crate::dialect::image::Fill>,
-    pub vfe_done: Option<crate::dialect::image::Fill>,
-    pub tsg0_done: Option<crate::dialect::image::Fill>,
-    pub gafm_done: Option<crate::dialect::image::Fill>,
-    pub gam_done: Option<crate::dialect::image::Fill>,
-    pub rs_done: Option<crate::dialect::image::Fill>,
-    pub cs_done: Option<crate::dialect::image::Fill>,
-    pub sde_done: Option<crate::dialect::image::Fill>,
-    pub rccfbc_cs_done: Option<crate::dialect::image::Fill>,
-    pub tsg1_done: Option<crate::dialect::image::Fill>,
+    pub prb0_ring_enable: Option<crate::dialect::layout::Fill>,
+    pub vfg_done: Option<crate::dialect::layout::Fill>,
+    pub vs_done: Option<crate::dialect::layout::Fill>,
+    pub hs_done: Option<crate::dialect::layout::Fill>,
+    pub te_done: Option<crate::dialect::layout::Fill>,
+    pub ds_done: Option<crate::dialect::layout::Fill>,
+    pub gs_done: Option<crate::dialect::layout::Fill>,
+    pub sol_done: Option<crate::dialect::layout::Fill>,
+    pub cl_done: Option<crate::dialect::layout::Fill>,
+    pub sf_done: Option<crate::dialect::layout::Fill>,
+    pub tdg1_done: Option<crate::dialect::layout::Fill>,
+    pub tdg0_done: Option<crate::dialect::layout::Fill>,
+    pub urbm_done: Option<crate::dialect::layout::Fill>,
+    pub svg_done: Option<crate::dialect::layout::Fill>,
+    pub gafs_done: Option<crate::dialect::layout::Fill>,
+    pub vfe_done: Option<crate::dialect::layout::Fill>,
+    pub tsg0_done: Option<crate::dialect::layout::Fill>,
+    pub gafm_done: Option<crate::dialect::layout::Fill>,
+    pub gam_done: Option<crate::dialect::layout::Fill>,
+    pub rs_done: Option<crate::dialect::layout::Fill>,
+    pub cs_done: Option<crate::dialect::layout::Fill>,
+    pub sde_done: Option<crate::dialect::layout::Fill>,
+    pub rccfbc_cs_done: Option<crate::dialect::layout::Fill>,
+    pub tsg1_done: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.instdone_geom`: genxml's INSTDONE_GEOM.
 #[mlirformat::mlir::op("xe3.reg.instdone_geom", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegInstdoneGeom {
-    pub vfl_done: Option<crate::dialect::image::Fill>,
-    pub vs_done: Option<crate::dialect::image::Fill>,
-    pub hs_done: Option<crate::dialect::image::Fill>,
-    pub te_done: Option<crate::dialect::image::Fill>,
-    pub ds_done: Option<crate::dialect::image::Fill>,
-    pub gs_done: Option<crate::dialect::image::Fill>,
-    pub sol_done: Option<crate::dialect::image::Fill>,
-    pub cl_done: Option<crate::dialect::image::Fill>,
-    pub sf_done: Option<crate::dialect::image::Fill>,
-    pub tdg1_done: Option<crate::dialect::image::Fill>,
-    pub urbm_done: Option<crate::dialect::image::Fill>,
-    pub svg_done: Option<crate::dialect::image::Fill>,
-    pub tsg0_done: Option<crate::dialect::image::Fill>,
-    pub sde_done: Option<crate::dialect::image::Fill>,
+    pub vfl_done: Option<crate::dialect::layout::Fill>,
+    pub vs_done: Option<crate::dialect::layout::Fill>,
+    pub hs_done: Option<crate::dialect::layout::Fill>,
+    pub te_done: Option<crate::dialect::layout::Fill>,
+    pub ds_done: Option<crate::dialect::layout::Fill>,
+    pub gs_done: Option<crate::dialect::layout::Fill>,
+    pub sol_done: Option<crate::dialect::layout::Fill>,
+    pub cl_done: Option<crate::dialect::layout::Fill>,
+    pub sf_done: Option<crate::dialect::layout::Fill>,
+    pub tdg1_done: Option<crate::dialect::layout::Fill>,
+    pub urbm_done: Option<crate::dialect::layout::Fill>,
+    pub svg_done: Option<crate::dialect::layout::Fill>,
+    pub tsg0_done: Option<crate::dialect::layout::Fill>,
+    pub sde_done: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.l3sqcreg5`: genxml's L3SQCREG5.
 #[mlirformat::mlir::op("xe3.reg.l3sqcreg5", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegL3sqcreg5 {
-    pub l3_cache_partial_write_merge_timer_initial_value: Option<crate::dialect::image::Fill>,
-    pub compressible_partial_write_merge_enable: Option<crate::dialect::image::Fill>,
-    pub coherent_partial_write_merge_enable: Option<crate::dialect::image::Fill>,
-    pub cross_tile_partial_write_merge_enable: Option<crate::dialect::image::Fill>,
+    pub l3_cache_partial_write_merge_timer_initial_value: Option<crate::dialect::layout::Fill>,
+    pub compressible_partial_write_merge_enable: Option<crate::dialect::layout::Fill>,
+    pub coherent_partial_write_merge_enable: Option<crate::dialect::layout::Fill>,
+    pub cross_tile_partial_write_merge_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.mesh_invocation_count`: genxml's MESH_INVOCATION_COUNT.
 #[mlirformat::mlir::op("xe3.reg.mesh_invocation_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegMeshInvocationCount {
-    pub mesh_invocation_counter: Option<crate::dialect::image::Fill>,
+    pub mesh_invocation_counter: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.mesh_primitive_count`: genxml's MESH_PRIMITIVE_COUNT.
 #[mlirformat::mlir::op("xe3.reg.mesh_primitive_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegMeshPrimitiveCount {
-    pub mesh_primitive_counter: Option<crate::dialect::image::Fill>,
+    pub mesh_primitive_counter: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.ps_invocation_count`: genxml's PS_INVOCATION_COUNT.
 #[mlirformat::mlir::op("xe3.reg.ps_invocation_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegPsInvocationCount {
-    pub ps_invocation_count_report: Option<crate::dialect::image::Fill>,
+    pub ps_invocation_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.row_instdone`: genxml's ROW_INSTDONE.
 #[mlirformat::mlir::op("xe3.reg.row_instdone", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegRowInstdone {
-    pub bc_done: Option<crate::dialect::image::Fill>,
-    pub psd_done: Option<crate::dialect::image::Fill>,
-    pub tdp_done: Option<crate::dialect::image::Fill>,
-    pub dapr_done: Option<crate::dialect::image::Fill>,
-    pub cpss_done: Option<crate::dialect::image::Fill>,
-    pub rt_done_render: Option<crate::dialect::image::Fill>,
-    pub tdl_done: Option<crate::dialect::image::Fill>,
-    pub eu00_done_ss1: Option<crate::dialect::image::Fill>,
-    pub eu01_done_ss1: Option<crate::dialect::image::Fill>,
-    pub eu02_done_ss1: Option<crate::dialect::image::Fill>,
-    pub eu03_done_ss1: Option<crate::dialect::image::Fill>,
-    pub ma0_done_ss1: Option<crate::dialect::image::Fill>,
-    pub ic_done: Option<crate::dialect::image::Fill>,
-    pub btd_done_render: Option<crate::dialect::image::Fill>,
-    pub rt_done_compute: Option<crate::dialect::image::Fill>,
-    pub ma0_done_ss0: Option<crate::dialect::image::Fill>,
-    pub eu00_done_ss0: Option<crate::dialect::image::Fill>,
-    pub eu01_done_ss0: Option<crate::dialect::image::Fill>,
-    pub eu02_done_ss0: Option<crate::dialect::image::Fill>,
-    pub eu03_done_ss0: Option<crate::dialect::image::Fill>,
-    pub btd_done_compute: Option<crate::dialect::image::Fill>,
-    pub eu10_done_ss0: Option<crate::dialect::image::Fill>,
-    pub eu11_done_ss0: Option<crate::dialect::image::Fill>,
-    pub eu12_done_ss0: Option<crate::dialect::image::Fill>,
-    pub eu13_done_ss0: Option<crate::dialect::image::Fill>,
-    pub tsl_done: Option<crate::dialect::image::Fill>,
-    pub eu10_done_ss1: Option<crate::dialect::image::Fill>,
-    pub eu11_done_ss1: Option<crate::dialect::image::Fill>,
-    pub eu12_done_ss1: Option<crate::dialect::image::Fill>,
-    pub eu13_done_ss1: Option<crate::dialect::image::Fill>,
+    pub bc_done: Option<crate::dialect::layout::Fill>,
+    pub psd_done: Option<crate::dialect::layout::Fill>,
+    pub tdp_done: Option<crate::dialect::layout::Fill>,
+    pub dapr_done: Option<crate::dialect::layout::Fill>,
+    pub cpss_done: Option<crate::dialect::layout::Fill>,
+    pub rt_done_render: Option<crate::dialect::layout::Fill>,
+    pub tdl_done: Option<crate::dialect::layout::Fill>,
+    pub eu00_done_ss1: Option<crate::dialect::layout::Fill>,
+    pub eu01_done_ss1: Option<crate::dialect::layout::Fill>,
+    pub eu02_done_ss1: Option<crate::dialect::layout::Fill>,
+    pub eu03_done_ss1: Option<crate::dialect::layout::Fill>,
+    pub ma0_done_ss1: Option<crate::dialect::layout::Fill>,
+    pub ic_done: Option<crate::dialect::layout::Fill>,
+    pub btd_done_render: Option<crate::dialect::layout::Fill>,
+    pub rt_done_compute: Option<crate::dialect::layout::Fill>,
+    pub ma0_done_ss0: Option<crate::dialect::layout::Fill>,
+    pub eu00_done_ss0: Option<crate::dialect::layout::Fill>,
+    pub eu01_done_ss0: Option<crate::dialect::layout::Fill>,
+    pub eu02_done_ss0: Option<crate::dialect::layout::Fill>,
+    pub eu03_done_ss0: Option<crate::dialect::layout::Fill>,
+    pub btd_done_compute: Option<crate::dialect::layout::Fill>,
+    pub eu10_done_ss0: Option<crate::dialect::layout::Fill>,
+    pub eu11_done_ss0: Option<crate::dialect::layout::Fill>,
+    pub eu12_done_ss0: Option<crate::dialect::layout::Fill>,
+    pub eu13_done_ss0: Option<crate::dialect::layout::Fill>,
+    pub tsl_done: Option<crate::dialect::layout::Fill>,
+    pub eu10_done_ss1: Option<crate::dialect::layout::Fill>,
+    pub eu11_done_ss1: Option<crate::dialect::layout::Fill>,
+    pub eu12_done_ss1: Option<crate::dialect::layout::Fill>,
+    pub eu13_done_ss1: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.rpstat0`: genxml's RPSTAT0.
 #[mlirformat::mlir::op("xe3.reg.rpstat0", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegRpstat0 {
-    pub previous_gt_frequency: Option<crate::dialect::image::Fill>,
-    pub current_gt_frequency: Option<crate::dialect::image::Fill>,
+    pub previous_gt_frequency: Option<crate::dialect::layout::Fill>,
+    pub current_gt_frequency: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.sampler_instdone`: genxml's SAMPLER_INSTDONE.
 #[mlirformat::mlir::op("xe3.reg.sampler_instdone", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSamplerInstdone {
-    pub si_done: Option<crate::dialect::image::Fill>,
-    pub svsm_adapter_done: Option<crate::dialect::image::Fill>,
-    pub svsm_arb_done: Option<crate::dialect::image::Fill>,
-    pub svsm_done: Option<crate::dialect::image::Fill>,
-    pub pl_done: Option<crate::dialect::image::Fill>,
-    pub dg_done: Option<crate::dialect::image::Fill>,
-    pub ssla_done: Option<crate::dialect::image::Fill>,
-    pub st_arb_done: Option<crate::dialect::image::Fill>,
-    pub st_done: Option<crate::dialect::image::Fill>,
-    pub ft_done: Option<crate::dialect::image::Fill>,
-    pub mt_done: Option<crate::dialect::image::Fill>,
-    pub dm_done: Option<crate::dialect::image::Fill>,
-    pub bdm_done: Option<crate::dialect::image::Fill>,
-    pub sc_done: Option<crate::dialect::image::Fill>,
-    pub fl_done: Option<crate::dialect::image::Fill>,
-    pub so_done: Option<crate::dialect::image::Fill>,
-    pub lsc_l1bank0_idle: Option<crate::dialect::image::Fill>,
-    pub lsc_l1bank1_idle: Option<crate::dialect::image::Fill>,
-    pub lsc_l1bank2_idle: Option<crate::dialect::image::Fill>,
-    pub lsc_l1bank3_idle: Option<crate::dialect::image::Fill>,
-    pub lsc_seq0_idle: Option<crate::dialect::image::Fill>,
-    pub lsc_seq1_idle: Option<crate::dialect::image::Fill>,
-    pub lsc_seq2_idle: Option<crate::dialect::image::Fill>,
-    pub lsc_seq3_idle: Option<crate::dialect::image::Fill>,
-    pub lsc_seq_intf_idle: Option<crate::dialect::image::Fill>,
-    pub lsc_l3_intf_idle: Option<crate::dialect::image::Fill>,
-    pub vmem_soarb0_done: Option<crate::dialect::image::Fill>,
-    pub vmem_soarb1_done: Option<crate::dialect::image::Fill>,
-    pub vmem_l3reqarb0_done: Option<crate::dialect::image::Fill>,
-    pub vmem_l3reqarb1_done: Option<crate::dialect::image::Fill>,
+    pub si_done: Option<crate::dialect::layout::Fill>,
+    pub svsm_adapter_done: Option<crate::dialect::layout::Fill>,
+    pub svsm_arb_done: Option<crate::dialect::layout::Fill>,
+    pub svsm_done: Option<crate::dialect::layout::Fill>,
+    pub pl_done: Option<crate::dialect::layout::Fill>,
+    pub dg_done: Option<crate::dialect::layout::Fill>,
+    pub ssla_done: Option<crate::dialect::layout::Fill>,
+    pub st_arb_done: Option<crate::dialect::layout::Fill>,
+    pub st_done: Option<crate::dialect::layout::Fill>,
+    pub ft_done: Option<crate::dialect::layout::Fill>,
+    pub mt_done: Option<crate::dialect::layout::Fill>,
+    pub dm_done: Option<crate::dialect::layout::Fill>,
+    pub bdm_done: Option<crate::dialect::layout::Fill>,
+    pub sc_done: Option<crate::dialect::layout::Fill>,
+    pub fl_done: Option<crate::dialect::layout::Fill>,
+    pub so_done: Option<crate::dialect::layout::Fill>,
+    pub lsc_l1bank0_idle: Option<crate::dialect::layout::Fill>,
+    pub lsc_l1bank1_idle: Option<crate::dialect::layout::Fill>,
+    pub lsc_l1bank2_idle: Option<crate::dialect::layout::Fill>,
+    pub lsc_l1bank3_idle: Option<crate::dialect::layout::Fill>,
+    pub lsc_seq0_idle: Option<crate::dialect::layout::Fill>,
+    pub lsc_seq1_idle: Option<crate::dialect::layout::Fill>,
+    pub lsc_seq2_idle: Option<crate::dialect::layout::Fill>,
+    pub lsc_seq3_idle: Option<crate::dialect::layout::Fill>,
+    pub lsc_seq_intf_idle: Option<crate::dialect::layout::Fill>,
+    pub lsc_l3_intf_idle: Option<crate::dialect::layout::Fill>,
+    pub vmem_soarb0_done: Option<crate::dialect::layout::Fill>,
+    pub vmem_soarb1_done: Option<crate::dialect::layout::Fill>,
+    pub vmem_l3reqarb0_done: Option<crate::dialect::layout::Fill>,
+    pub vmem_l3reqarb1_done: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.sc_instdone`: genxml's SC_INSTDONE.
 #[mlirformat::mlir::op("xe3.reg.sc_instdone", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegScInstdone {
-    pub svl_done: Option<crate::dialect::image::Fill>,
-    pub wmfe_done: Option<crate::dialect::image::Fill>,
-    pub wmbe_done: Option<crate::dialect::image::Fill>,
-    pub hiz_done: Option<crate::dialect::image::Fill>,
-    pub izfe_done: Option<crate::dialect::image::Fill>,
-    pub sbe_done: Option<crate::dialect::image::Fill>,
-    pub rcc_done: Option<crate::dialect::image::Fill>,
-    pub rcpbe_done: Option<crate::dialect::image::Fill>,
-    pub rcpfe_done: Option<crate::dialect::image::Fill>,
-    pub dapb_done: Option<crate::dialect::image::Fill>,
-    pub daprbe_done: Option<crate::dialect::image::Fill>,
-    pub sarb_done: Option<crate::dialect::image::Fill>,
-    pub dc0_done: Option<crate::dialect::image::Fill>,
-    pub dc1_done: Option<crate::dialect::image::Fill>,
-    pub dc2_done: Option<crate::dialect::image::Fill>,
-    pub dc3_done: Option<crate::dialect::image::Fill>,
-    pub gw0_done: Option<crate::dialect::image::Fill>,
-    pub gw1_done: Option<crate::dialect::image::Fill>,
-    pub gw2_done: Option<crate::dialect::image::Fill>,
-    pub gw3_done: Option<crate::dialect::image::Fill>,
-    pub tdc_done: Option<crate::dialect::image::Fill>,
-    pub sfbe_done: Option<crate::dialect::image::Fill>,
-    pub pss_done: Option<crate::dialect::image::Fill>,
-    pub amfs_done: Option<crate::dialect::image::Fill>,
+    pub svl_done: Option<crate::dialect::layout::Fill>,
+    pub wmfe_done: Option<crate::dialect::layout::Fill>,
+    pub wmbe_done: Option<crate::dialect::layout::Fill>,
+    pub hiz_done: Option<crate::dialect::layout::Fill>,
+    pub izfe_done: Option<crate::dialect::layout::Fill>,
+    pub sbe_done: Option<crate::dialect::layout::Fill>,
+    pub rcc_done: Option<crate::dialect::layout::Fill>,
+    pub rcpbe_done: Option<crate::dialect::layout::Fill>,
+    pub rcpfe_done: Option<crate::dialect::layout::Fill>,
+    pub dapb_done: Option<crate::dialect::layout::Fill>,
+    pub daprbe_done: Option<crate::dialect::layout::Fill>,
+    pub sarb_done: Option<crate::dialect::layout::Fill>,
+    pub dc0_done: Option<crate::dialect::layout::Fill>,
+    pub dc1_done: Option<crate::dialect::layout::Fill>,
+    pub dc2_done: Option<crate::dialect::layout::Fill>,
+    pub dc3_done: Option<crate::dialect::layout::Fill>,
+    pub gw0_done: Option<crate::dialect::layout::Fill>,
+    pub gw1_done: Option<crate::dialect::layout::Fill>,
+    pub gw2_done: Option<crate::dialect::layout::Fill>,
+    pub gw3_done: Option<crate::dialect::layout::Fill>,
+    pub tdc_done: Option<crate::dialect::layout::Fill>,
+    pub sfbe_done: Option<crate::dialect::layout::Fill>,
+    pub pss_done: Option<crate::dialect::layout::Fill>,
+    pub amfs_done: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.sc_instdone_extra`: genxml's SC_INSTDONE_EXTRA.
 #[mlirformat::mlir::op("xe3.reg.sc_instdone_extra", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegScInstdoneExtra {
-    pub rcc1_done: Option<crate::dialect::image::Fill>,
-    pub rcpbe1_done: Option<crate::dialect::image::Fill>,
-    pub rcpfe1_done: Option<crate::dialect::image::Fill>,
-    pub dapb1_done: Option<crate::dialect::image::Fill>,
-    pub daprbe1_done: Option<crate::dialect::image::Fill>,
-    pub dc4_done: Option<crate::dialect::image::Fill>,
-    pub dc5_done: Option<crate::dialect::image::Fill>,
-    pub dc6_done: Option<crate::dialect::image::Fill>,
-    pub dc7_done: Option<crate::dialect::image::Fill>,
-    pub gw4_done: Option<crate::dialect::image::Fill>,
-    pub gw5_done: Option<crate::dialect::image::Fill>,
-    pub gw6_done: Option<crate::dialect::image::Fill>,
-    pub gw7_done: Option<crate::dialect::image::Fill>,
-    pub tdc1_done: Option<crate::dialect::image::Fill>,
-    pub pss_done: Option<crate::dialect::image::Fill>,
+    pub rcc1_done: Option<crate::dialect::layout::Fill>,
+    pub rcpbe1_done: Option<crate::dialect::layout::Fill>,
+    pub rcpfe1_done: Option<crate::dialect::layout::Fill>,
+    pub dapb1_done: Option<crate::dialect::layout::Fill>,
+    pub daprbe1_done: Option<crate::dialect::layout::Fill>,
+    pub dc4_done: Option<crate::dialect::layout::Fill>,
+    pub dc5_done: Option<crate::dialect::layout::Fill>,
+    pub dc6_done: Option<crate::dialect::layout::Fill>,
+    pub dc7_done: Option<crate::dialect::layout::Fill>,
+    pub gw4_done: Option<crate::dialect::layout::Fill>,
+    pub gw5_done: Option<crate::dialect::layout::Fill>,
+    pub gw6_done: Option<crate::dialect::layout::Fill>,
+    pub gw7_done: Option<crate::dialect::layout::Fill>,
+    pub tdc1_done: Option<crate::dialect::layout::Fill>,
+    pub pss_done: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.sc_instdone_extra2`: genxml's SC_INSTDONE_EXTRA2.
 #[mlirformat::mlir::op("xe3.reg.sc_instdone_extra2", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegScInstdoneExtra2 {
-    pub rcc2_done: Option<crate::dialect::image::Fill>,
-    pub rcpbe2_done: Option<crate::dialect::image::Fill>,
-    pub rcpfe2_done: Option<crate::dialect::image::Fill>,
-    pub dapb2_done: Option<crate::dialect::image::Fill>,
-    pub daprbe2_done: Option<crate::dialect::image::Fill>,
+    pub rcc2_done: Option<crate::dialect::layout::Fill>,
+    pub rcpbe2_done: Option<crate::dialect::layout::Fill>,
+    pub rcpfe2_done: Option<crate::dialect::layout::Fill>,
+    pub dapb2_done: Option<crate::dialect::layout::Fill>,
+    pub daprbe2_done: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.slice_common_eco_chicken1`: genxml's SLICE_COMMON_ECO_CHICKEN1.
 #[mlirformat::mlir::op("xe3.reg.slice_common_eco_chicken1", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSliceCommonEcoChicken1 {
-    pub state_cache_redirect_to_cs_section_enable: Option<crate::dialect::image::Fill>,
-    pub state_cache_redirect_to_cs_section_enable_mask: Option<crate::dialect::image::Fill>,
+    pub state_cache_redirect_to_cs_section_enable: Option<crate::dialect::layout::Fill>,
+    pub state_cache_redirect_to_cs_section_enable_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_num_prims_written0`: genxml's SO_NUM_PRIMS_WRITTEN0.
 #[mlirformat::mlir::op("xe3.reg.so_num_prims_written0", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoNumPrimsWritten0 {
-    pub num_prims_written_count: Option<crate::dialect::image::Fill>,
+    pub num_prims_written_count: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_num_prims_written1`: genxml's SO_NUM_PRIMS_WRITTEN1.
 #[mlirformat::mlir::op("xe3.reg.so_num_prims_written1", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoNumPrimsWritten1 {
-    pub num_prims_written_count: Option<crate::dialect::image::Fill>,
+    pub num_prims_written_count: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_num_prims_written2`: genxml's SO_NUM_PRIMS_WRITTEN2.
 #[mlirformat::mlir::op("xe3.reg.so_num_prims_written2", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoNumPrimsWritten2 {
-    pub num_prims_written_count: Option<crate::dialect::image::Fill>,
+    pub num_prims_written_count: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_num_prims_written3`: genxml's SO_NUM_PRIMS_WRITTEN3.
 #[mlirformat::mlir::op("xe3.reg.so_num_prims_written3", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoNumPrimsWritten3 {
-    pub num_prims_written_count: Option<crate::dialect::image::Fill>,
+    pub num_prims_written_count: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_prim_storage_needed0`: genxml's SO_PRIM_STORAGE_NEEDED0.
 #[mlirformat::mlir::op("xe3.reg.so_prim_storage_needed0", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoPrimStorageNeeded0 {
-    pub prim_storage_needed_count: Option<crate::dialect::image::Fill>,
+    pub prim_storage_needed_count: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_prim_storage_needed1`: genxml's SO_PRIM_STORAGE_NEEDED1.
 #[mlirformat::mlir::op("xe3.reg.so_prim_storage_needed1", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoPrimStorageNeeded1 {
-    pub prim_storage_needed_count: Option<crate::dialect::image::Fill>,
+    pub prim_storage_needed_count: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_prim_storage_needed2`: genxml's SO_PRIM_STORAGE_NEEDED2.
 #[mlirformat::mlir::op("xe3.reg.so_prim_storage_needed2", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoPrimStorageNeeded2 {
-    pub prim_storage_needed_count: Option<crate::dialect::image::Fill>,
+    pub prim_storage_needed_count: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_prim_storage_needed3`: genxml's SO_PRIM_STORAGE_NEEDED3.
 #[mlirformat::mlir::op("xe3.reg.so_prim_storage_needed3", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoPrimStorageNeeded3 {
-    pub prim_storage_needed_count: Option<crate::dialect::image::Fill>,
+    pub prim_storage_needed_count: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_write_offset0`: genxml's SO_WRITE_OFFSET0.
 #[mlirformat::mlir::op("xe3.reg.so_write_offset0", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoWriteOffset0 {
-    pub write_offset: Option<crate::dialect::image::Fill>,
+    pub write_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_write_offset1`: genxml's SO_WRITE_OFFSET1.
 #[mlirformat::mlir::op("xe3.reg.so_write_offset1", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoWriteOffset1 {
-    pub write_offset: Option<crate::dialect::image::Fill>,
+    pub write_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_write_offset2`: genxml's SO_WRITE_OFFSET2.
 #[mlirformat::mlir::op("xe3.reg.so_write_offset2", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoWriteOffset2 {
-    pub write_offset: Option<crate::dialect::image::Fill>,
+    pub write_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.so_write_offset3`: genxml's SO_WRITE_OFFSET3.
 #[mlirformat::mlir::op("xe3.reg.so_write_offset3", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegSoWriteOffset3 {
-    pub write_offset: Option<crate::dialect::image::Fill>,
+    pub write_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.task_invocation_count`: genxml's TASK_INVOCATION_COUNT.
 #[mlirformat::mlir::op("xe3.reg.task_invocation_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegTaskInvocationCount {
-    pub task_invocation_counter: Option<crate::dialect::image::Fill>,
+    pub task_invocation_counter: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.vcs_instdone`: genxml's VCS_INSTDONE.
 #[mlirformat::mlir::op("xe3.reg.vcs_instdone", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegVcsInstdone {
-    pub ring_enable: Option<crate::dialect::image::Fill>,
-    pub usb_done: Option<crate::dialect::image::Fill>,
-    pub qrc_done: Option<crate::dialect::image::Fill>,
-    pub sec_done: Option<crate::dialect::image::Fill>,
-    pub mpc_done: Option<crate::dialect::image::Fill>,
-    pub vft_done: Option<crate::dialect::image::Fill>,
-    pub bsp_done: Option<crate::dialect::image::Fill>,
-    pub vlf_done: Option<crate::dialect::image::Fill>,
-    pub vop_done: Option<crate::dialect::image::Fill>,
-    pub vmc_done: Option<crate::dialect::image::Fill>,
-    pub vip_done: Option<crate::dialect::image::Fill>,
-    pub vit_done: Option<crate::dialect::image::Fill>,
-    pub vds_done: Option<crate::dialect::image::Fill>,
-    pub vmx_done: Option<crate::dialect::image::Fill>,
-    pub vcp_done: Option<crate::dialect::image::Fill>,
-    pub vcd_done: Option<crate::dialect::image::Fill>,
-    pub vad_done: Option<crate::dialect::image::Fill>,
-    pub vmd_done: Option<crate::dialect::image::Fill>,
-    pub vis_done: Option<crate::dialect::image::Fill>,
-    pub vac_done: Option<crate::dialect::image::Fill>,
-    pub vam_done: Option<crate::dialect::image::Fill>,
-    pub jpg_done: Option<crate::dialect::image::Fill>,
-    pub vbp_done: Option<crate::dialect::image::Fill>,
-    pub vhr_done: Option<crate::dialect::image::Fill>,
-    pub vci_done: Option<crate::dialect::image::Fill>,
-    pub vin_done: Option<crate::dialect::image::Fill>,
-    pub vpr_done: Option<crate::dialect::image::Fill>,
-    pub vtq_done: Option<crate::dialect::image::Fill>,
-    pub reserved: Option<crate::dialect::image::Fill>,
-    pub vcs_done: Option<crate::dialect::image::Fill>,
-    pub gac_done: Option<crate::dialect::image::Fill>,
+    pub ring_enable: Option<crate::dialect::layout::Fill>,
+    pub usb_done: Option<crate::dialect::layout::Fill>,
+    pub qrc_done: Option<crate::dialect::layout::Fill>,
+    pub sec_done: Option<crate::dialect::layout::Fill>,
+    pub mpc_done: Option<crate::dialect::layout::Fill>,
+    pub vft_done: Option<crate::dialect::layout::Fill>,
+    pub bsp_done: Option<crate::dialect::layout::Fill>,
+    pub vlf_done: Option<crate::dialect::layout::Fill>,
+    pub vop_done: Option<crate::dialect::layout::Fill>,
+    pub vmc_done: Option<crate::dialect::layout::Fill>,
+    pub vip_done: Option<crate::dialect::layout::Fill>,
+    pub vit_done: Option<crate::dialect::layout::Fill>,
+    pub vds_done: Option<crate::dialect::layout::Fill>,
+    pub vmx_done: Option<crate::dialect::layout::Fill>,
+    pub vcp_done: Option<crate::dialect::layout::Fill>,
+    pub vcd_done: Option<crate::dialect::layout::Fill>,
+    pub vad_done: Option<crate::dialect::layout::Fill>,
+    pub vmd_done: Option<crate::dialect::layout::Fill>,
+    pub vis_done: Option<crate::dialect::layout::Fill>,
+    pub vac_done: Option<crate::dialect::layout::Fill>,
+    pub vam_done: Option<crate::dialect::layout::Fill>,
+    pub jpg_done: Option<crate::dialect::layout::Fill>,
+    pub vbp_done: Option<crate::dialect::layout::Fill>,
+    pub vhr_done: Option<crate::dialect::layout::Fill>,
+    pub vci_done: Option<crate::dialect::layout::Fill>,
+    pub vin_done: Option<crate::dialect::layout::Fill>,
+    pub vpr_done: Option<crate::dialect::layout::Fill>,
+    pub vtq_done: Option<crate::dialect::layout::Fill>,
+    pub reserved: Option<crate::dialect::layout::Fill>,
+    pub vcs_done: Option<crate::dialect::layout::Fill>,
+    pub gac_done: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.vfl_scratch_pad`: genxml's VFL_SCRATCH_PAD.
 #[mlirformat::mlir::op("xe3.reg.vfl_scratch_pad", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegVflScratchPad {
-    pub autostrip_disable: Option<crate::dialect::image::Fill>,
-    pub partial_autostrip_disable: Option<crate::dialect::image::Fill>,
-    pub autostrip_disable_mask: Option<crate::dialect::image::Fill>,
-    pub partial_autostrip_disable_mask: Option<crate::dialect::image::Fill>,
+    pub autostrip_disable: Option<crate::dialect::layout::Fill>,
+    pub partial_autostrip_disable: Option<crate::dialect::layout::Fill>,
+    pub autostrip_disable_mask: Option<crate::dialect::layout::Fill>,
+    pub partial_autostrip_disable_mask: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.reg.vs_invocation_count`: genxml's VS_INVOCATION_COUNT.
 #[mlirformat::mlir::op("xe3.reg.vs_invocation_count", format = "attr-dict")]
 #[derive(Default)]
 pub struct RegVsInvocationCount {
-    pub vs_invocation_count_report: Option<crate::dialect::image::Fill>,
+    pub vs_invocation_count_report: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.3dstate_constant_all_data`: genxml's 3DSTATE_CONSTANT_ALL_DATA.
 #[mlirformat::mlir::op("xe3.state.3dstate_constant_all_data", format = "attr-dict")]
 #[derive(Default)]
 pub struct State3dstateConstantAllData {
-    pub constant_buffer_read_length: Option<crate::dialect::image::Fill>,
-    pub pointer_to_constant_buffer: Option<crate::dialect::image::Fill>,
+    pub constant_buffer_read_length: Option<crate::dialect::layout::Fill>,
+    pub pointer_to_constant_buffer: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.3dstate_constant_body`: genxml's 3DSTATE_CONSTANT_BODY.
 #[mlirformat::mlir::op("xe3.state.3dstate_constant_body", format = "attr-dict")]
 #[derive(Default)]
 pub struct State3dstateConstantBody {
-    pub read_length: Option<Vec<crate::dialect::image::Fill>>,
-    pub buffer: Option<Vec<crate::dialect::image::Fill>>,
+    pub read_length: Option<Vec<crate::dialect::layout::Fill>>,
+    pub buffer: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.state.3dstate_so_buffer_index_body`: genxml's 3DSTATE_SO_BUFFER_INDEX_BODY.
 #[mlirformat::mlir::op("xe3.state.3dstate_so_buffer_index_body", format = "attr-dict")]
 #[derive(Default)]
 pub struct State3dstateSoBufferIndexBody {
-    pub stream_output_buffer_offset_address_enable: Option<crate::dialect::image::Fill>,
-    pub stream_offset_write_enable: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub so_buffer_enable: Option<crate::dialect::image::Fill>,
-    pub surface_base_address: Option<crate::dialect::image::Fill>,
-    pub surface_size: Option<crate::dialect::image::Fill>,
-    pub stream_output_buffer_offset_address: Option<crate::dialect::image::Fill>,
-    pub stream_offset: Option<crate::dialect::image::Fill>,
+    pub stream_output_buffer_offset_address_enable: Option<crate::dialect::layout::Fill>,
+    pub stream_offset_write_enable: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub so_buffer_enable: Option<crate::dialect::layout::Fill>,
+    pub surface_base_address: Option<crate::dialect::layout::Fill>,
+    pub surface_size: Option<crate::dialect::layout::Fill>,
+    pub stream_output_buffer_offset_address: Option<crate::dialect::layout::Fill>,
+    pub stream_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.binding_table_edit_entry`: genxml's BINDING_TABLE_EDIT_ENTRY.
 #[mlirformat::mlir::op("xe3.state.binding_table_edit_entry", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateBindingTableEditEntry {
-    pub surface_state_pointer: Option<crate::dialect::image::Fill>,
-    pub binding_table_index: Option<crate::dialect::image::Fill>,
+    pub surface_state_pointer: Option<crate::dialect::layout::Fill>,
+    pub binding_table_index: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.binding_table_state`: genxml's BINDING_TABLE_STATE.
 #[mlirformat::mlir::op("xe3.state.binding_table_state", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateBindingTableState {
-    pub surface_state_pointer: Option<crate::dialect::image::Fill>,
+    pub surface_state_pointer: Option<crate::dialect::layout::Fill>,
 }
 
 /// An element of `xe3.state.blend_state`'s variable group.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateBlendStateElement {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entry: Option<crate::dialect::image::Fields<StateBlendStateEntryFields>>,
+    pub entry: Option<crate::dialect::layout::Fields<StateBlendStateEntryFields>>,
 }
 
 /// `xe3.state.blend_state`: genxml's BLEND_STATE.
 #[mlirformat::mlir::op("xe3.state.blend_state", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateBlendState {
-    pub y_dither_offset: Option<crate::dialect::image::Fill>,
-    pub x_dither_offset: Option<crate::dialect::image::Fill>,
-    pub color_dither_enable: Option<crate::dialect::image::Fill>,
-    pub alpha_test_function: Option<crate::dialect::image::Fill>,
-    pub alpha_test_enable: Option<crate::dialect::image::Fill>,
-    pub alpha_to_coverage_dither_enable: Option<crate::dialect::image::Fill>,
-    pub alpha_to_one_enable: Option<crate::dialect::image::Fill>,
-    pub independent_alpha_blend_enable: Option<crate::dialect::image::Fill>,
-    pub alpha_to_coverage_enable: Option<crate::dialect::image::Fill>,
-    pub elements: Option<Vec<crate::dialect::image::Fields<StateBlendStateElement>>>,
+    pub y_dither_offset: Option<crate::dialect::layout::Fill>,
+    pub x_dither_offset: Option<crate::dialect::layout::Fill>,
+    pub color_dither_enable: Option<crate::dialect::layout::Fill>,
+    pub alpha_test_function: Option<crate::dialect::layout::Fill>,
+    pub alpha_test_enable: Option<crate::dialect::layout::Fill>,
+    pub alpha_to_coverage_dither_enable: Option<crate::dialect::layout::Fill>,
+    pub alpha_to_one_enable: Option<crate::dialect::layout::Fill>,
+    pub independent_alpha_blend_enable: Option<crate::dialect::layout::Fill>,
+    pub alpha_to_coverage_enable: Option<crate::dialect::layout::Fill>,
+    pub elements: Option<Vec<crate::dialect::layout::Fields<StateBlendStateElement>>>,
 }
 
 /// `xe3.state.blend_state_entry`: genxml's BLEND_STATE_ENTRY.
 #[mlirformat::mlir::op("xe3.state.blend_state_entry", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateBlendStateEntry {
-    pub write_disable_blue: Option<crate::dialect::image::Fill>,
-    pub write_disable_green: Option<crate::dialect::image::Fill>,
-    pub write_disable_red: Option<crate::dialect::image::Fill>,
-    pub write_disable_alpha: Option<crate::dialect::image::Fill>,
-    pub alpha_blend_function: Option<crate::dialect::image::Fill>,
-    pub destination_alpha_blend_factor: Option<crate::dialect::image::Fill>,
-    pub source_alpha_blend_factor: Option<crate::dialect::image::Fill>,
-    pub color_blend_function: Option<crate::dialect::image::Fill>,
-    pub destination_blend_factor: Option<crate::dialect::image::Fill>,
-    pub source_blend_factor: Option<crate::dialect::image::Fill>,
-    pub color_buffer_blend_enable: Option<crate::dialect::image::Fill>,
-    pub post_blend_color_clamp_enable: Option<crate::dialect::image::Fill>,
-    pub pre_blend_color_clamp_enable: Option<crate::dialect::image::Fill>,
-    pub color_clamp_range: Option<crate::dialect::image::Fill>,
-    pub pre_blend_source_only_clamp_enable: Option<crate::dialect::image::Fill>,
-    pub simple_float_blend_enable: Option<crate::dialect::image::Fill>,
-    pub logic_op_function: Option<crate::dialect::image::Fill>,
-    pub logic_op_enable: Option<crate::dialect::image::Fill>,
+    pub write_disable_blue: Option<crate::dialect::layout::Fill>,
+    pub write_disable_green: Option<crate::dialect::layout::Fill>,
+    pub write_disable_red: Option<crate::dialect::layout::Fill>,
+    pub write_disable_alpha: Option<crate::dialect::layout::Fill>,
+    pub alpha_blend_function: Option<crate::dialect::layout::Fill>,
+    pub destination_alpha_blend_factor: Option<crate::dialect::layout::Fill>,
+    pub source_alpha_blend_factor: Option<crate::dialect::layout::Fill>,
+    pub color_blend_function: Option<crate::dialect::layout::Fill>,
+    pub destination_blend_factor: Option<crate::dialect::layout::Fill>,
+    pub source_blend_factor: Option<crate::dialect::layout::Fill>,
+    pub color_buffer_blend_enable: Option<crate::dialect::layout::Fill>,
+    pub post_blend_color_clamp_enable: Option<crate::dialect::layout::Fill>,
+    pub pre_blend_color_clamp_enable: Option<crate::dialect::layout::Fill>,
+    pub color_clamp_range: Option<crate::dialect::layout::Fill>,
+    pub pre_blend_source_only_clamp_enable: Option<crate::dialect::layout::Fill>,
+    pub simple_float_blend_enable: Option<crate::dialect::layout::Fill>,
+    pub logic_op_function: Option<crate::dialect::layout::Fill>,
+    pub logic_op_enable: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.cc_viewport`: genxml's CC_VIEWPORT.
 #[mlirformat::mlir::op("xe3.state.cc_viewport", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateCcViewport {
-    pub minimum_depth: Option<crate::dialect::image::Real>,
-    pub maximum_depth: Option<crate::dialect::image::Real>,
+    pub minimum_depth: Option<crate::dialect::layout::Real>,
+    pub maximum_depth: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.state.color_calc_state`: genxml's COLOR_CALC_STATE.
 #[mlirformat::mlir::op("xe3.state.color_calc_state", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateColorCalcState {
-    pub alpha_test_format: Option<crate::dialect::image::Fill>,
-    pub round_disable_function_disable: Option<crate::dialect::image::Fill>,
-    pub alpha_reference_value_as_unorm8: Option<crate::dialect::image::Fill>,
-    pub alpha_reference_value_as_float32: Option<crate::dialect::image::Real>,
-    pub blend_constant_color_red: Option<crate::dialect::image::Real>,
-    pub blend_constant_color_green: Option<crate::dialect::image::Real>,
-    pub blend_constant_color_blue: Option<crate::dialect::image::Real>,
-    pub blend_constant_color_alpha: Option<crate::dialect::image::Real>,
+    pub alpha_test_format: Option<crate::dialect::layout::Fill>,
+    pub round_disable_function_disable: Option<crate::dialect::layout::Fill>,
+    pub alpha_reference_value_as_unorm8: Option<crate::dialect::layout::Fill>,
+    pub alpha_reference_value_as_float32: Option<crate::dialect::layout::Real>,
+    pub blend_constant_color_red: Option<crate::dialect::layout::Real>,
+    pub blend_constant_color_green: Option<crate::dialect::layout::Real>,
+    pub blend_constant_color_blue: Option<crate::dialect::layout::Real>,
+    pub blend_constant_color_alpha: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.state.compute_walker_body`: genxml's COMPUTE_WALKER_BODY.
 #[mlirformat::mlir::op("xe3.state.compute_walker_body", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateComputeWalkerBody {
-    pub indirect_data_length: Option<crate::dialect::image::Fill>,
-    pub l3_prefetch_disable: Option<crate::dialect::image::Fill>,
-    pub partition_dispatch_parameter: Option<crate::dialect::image::Fill>,
-    pub partition_type: Option<crate::dialect::image::Fill>,
-    pub indirect_data_start_address: Option<crate::dialect::image::Fill>,
-    pub compute_dispatch_all_walker_enable: Option<crate::dialect::image::Fill>,
-    pub thread_group_batch_size: Option<crate::dialect::image::Fill>,
-    pub dispatch_walk_order: Option<crate::dialect::image::Fill>,
-    pub message_simd: Option<crate::dialect::image::Fill>,
-    pub tile_layout: Option<crate::dialect::image::Fill>,
-    pub walk_order: Option<crate::dialect::image::Fill>,
-    pub emit_inline_parameter: Option<crate::dialect::image::Fill>,
-    pub emit_local: Option<crate::dialect::image::Fill>,
-    pub generate_local_id: Option<crate::dialect::image::Fill>,
-    pub simd_size: Option<crate::dialect::image::Fill>,
-    pub execution_mask: Option<crate::dialect::image::Fill>,
-    pub local_x_maximum: Option<crate::dialect::image::Fill>,
-    pub local_y_maximum: Option<crate::dialect::image::Fill>,
-    pub local_z_maximum: Option<crate::dialect::image::Fill>,
-    pub thread_group_id_x_dimension: Option<crate::dialect::image::Fill>,
-    pub thread_group_id_y_dimension: Option<crate::dialect::image::Fill>,
-    pub thread_group_id_z_dimension: Option<crate::dialect::image::Fill>,
-    pub thread_group_id_starting_x: Option<crate::dialect::image::Fill>,
-    pub thread_group_id_starting_y: Option<crate::dialect::image::Fill>,
-    pub thread_group_id_starting_z: Option<crate::dialect::image::Fill>,
-    pub partition_id: Option<crate::dialect::image::Fill>,
-    pub partition_size: Option<crate::dialect::image::Fill>,
-    pub preempt_x: Option<crate::dialect::image::Fill>,
-    pub preempt_y: Option<crate::dialect::image::Fill>,
-    pub preempt_z: Option<crate::dialect::image::Fill>,
-    pub walker_id: Option<crate::dialect::image::Fill>,
-    pub over_dispatch_tg_count: Option<crate::dialect::image::Fill>,
-    pub interface_descriptor: Option<crate::dialect::image::Fields<StateInterfaceDescriptorDataFields>>,
-    pub post_sync: Option<crate::dialect::image::Fields<StatePostsyncDataFields>>,
-    pub inline_data: Option<Vec<crate::dialect::image::Fill>>,
+    pub indirect_data_length: Option<crate::dialect::layout::Fill>,
+    pub l3_prefetch_disable: Option<crate::dialect::layout::Fill>,
+    pub partition_dispatch_parameter: Option<crate::dialect::layout::Fill>,
+    pub partition_type: Option<crate::dialect::layout::Fill>,
+    pub indirect_data_start_address: Option<crate::dialect::layout::Fill>,
+    pub compute_dispatch_all_walker_enable: Option<crate::dialect::layout::Fill>,
+    pub thread_group_batch_size: Option<crate::dialect::layout::Fill>,
+    pub dispatch_walk_order: Option<crate::dialect::layout::Fill>,
+    pub message_simd: Option<crate::dialect::layout::Fill>,
+    pub tile_layout: Option<crate::dialect::layout::Fill>,
+    pub walk_order: Option<crate::dialect::layout::Fill>,
+    pub emit_inline_parameter: Option<crate::dialect::layout::Fill>,
+    pub emit_local: Option<crate::dialect::layout::Fill>,
+    pub generate_local_id: Option<crate::dialect::layout::Fill>,
+    pub simd_size: Option<crate::dialect::layout::Fill>,
+    pub execution_mask: Option<crate::dialect::layout::Fill>,
+    pub local_x_maximum: Option<crate::dialect::layout::Fill>,
+    pub local_y_maximum: Option<crate::dialect::layout::Fill>,
+    pub local_z_maximum: Option<crate::dialect::layout::Fill>,
+    pub thread_group_id_x_dimension: Option<crate::dialect::layout::Fill>,
+    pub thread_group_id_y_dimension: Option<crate::dialect::layout::Fill>,
+    pub thread_group_id_z_dimension: Option<crate::dialect::layout::Fill>,
+    pub thread_group_id_starting_x: Option<crate::dialect::layout::Fill>,
+    pub thread_group_id_starting_y: Option<crate::dialect::layout::Fill>,
+    pub thread_group_id_starting_z: Option<crate::dialect::layout::Fill>,
+    pub partition_id: Option<crate::dialect::layout::Fill>,
+    pub partition_size: Option<crate::dialect::layout::Fill>,
+    pub preempt_x: Option<crate::dialect::layout::Fill>,
+    pub preempt_y: Option<crate::dialect::layout::Fill>,
+    pub preempt_z: Option<crate::dialect::layout::Fill>,
+    pub walker_id: Option<crate::dialect::layout::Fill>,
+    pub over_dispatch_tg_count: Option<crate::dialect::layout::Fill>,
+    pub interface_descriptor: Option<crate::dialect::layout::Fields<StateInterfaceDescriptorDataFields>>,
+    pub post_sync: Option<crate::dialect::layout::Fields<StatePostsyncDataFields>>,
+    pub inline_data: Option<Vec<crate::dialect::layout::Fill>>,
 }
 
 /// `xe3.state.filter_coefficient`: genxml's FILTER_COEFFICIENT.
 #[mlirformat::mlir::op("xe3.state.filter_coefficient", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateFilterCoefficient {
-    pub filter_coefficient: Option<crate::dialect::image::Real>,
+    pub filter_coefficient: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.state.gather_constant_entry`: genxml's GATHER_CONSTANT_ENTRY.
 #[mlirformat::mlir::op("xe3.state.gather_constant_entry", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateGatherConstantEntry {
-    pub binding_table_index_offset: Option<crate::dialect::image::Fill>,
-    pub channel_mask: Option<crate::dialect::image::Fill>,
-    pub constant_buffer_offset: Option<crate::dialect::image::Fill>,
+    pub binding_table_index_offset: Option<crate::dialect::layout::Fill>,
+    pub channel_mask: Option<crate::dialect::layout::Fill>,
+    pub constant_buffer_offset: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.hevc_arbitration_priority`: genxml's HEVC_ARBITRATION_PRIORITY.
 #[mlirformat::mlir::op("xe3.state.hevc_arbitration_priority", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateHevcArbitrationPriority {
-    pub priority: Option<crate::dialect::image::Fill>,
+    pub priority: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.image_state_cost`: genxml's IMAGE_STATE_COST.
 #[mlirformat::mlir::op("xe3.state.image_state_cost", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateImageStateCost {
-    pub mv_0_cost: Option<crate::dialect::image::Fill>,
-    pub mv_1_cost: Option<crate::dialect::image::Fill>,
-    pub mv_2_cost: Option<crate::dialect::image::Fill>,
-    pub mv_3_cost: Option<crate::dialect::image::Fill>,
-    pub mv_4_cost: Option<crate::dialect::image::Fill>,
-    pub mv_5_cost: Option<crate::dialect::image::Fill>,
-    pub mv_6_cost: Option<crate::dialect::image::Fill>,
-    pub mv_7_cost: Option<crate::dialect::image::Fill>,
+    pub mv_0_cost: Option<crate::dialect::layout::Fill>,
+    pub mv_1_cost: Option<crate::dialect::layout::Fill>,
+    pub mv_2_cost: Option<crate::dialect::layout::Fill>,
+    pub mv_3_cost: Option<crate::dialect::layout::Fill>,
+    pub mv_4_cost: Option<crate::dialect::layout::Fill>,
+    pub mv_5_cost: Option<crate::dialect::layout::Fill>,
+    pub mv_6_cost: Option<crate::dialect::layout::Fill>,
+    pub mv_7_cost: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.inline_data_description_for_mfd_avc_bsd_object`: genxml's INLINE_DATA_DESCRIPTION_FOR_MFD_AVC_BSD_OBJECT.
 #[mlirformat::mlir::op("xe3.state.inline_data_description_for_mfd_avc_bsd_object", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateInlineDataDescriptionForMfdAvcBsdObject {
-    pub mb_error_concealment_p_slice_weight_prediction_disable: Option<crate::dialect::image::Fill>,
-    pub mb_error_concealment_p_slice_motion_vectors_override_disable: Option<crate::dialect::image::Fill>,
-    pub mb_error_concealment_b_spatial_weight_prediction_disable: Option<crate::dialect::image::Fill>,
-    pub mb_error_concealment_b_spatial_motion_vectors_override_disable: Option<crate::dialect::image::Fill>,
-    pub mb_error_concealment_b_spatial_prediction_mode: Option<crate::dialect::image::Fill>,
-    pub mb_header_error_handling: Option<crate::dialect::image::Fill>,
-    pub entropy_error_handling: Option<crate::dialect::image::Fill>,
-    pub mpr_error_handling: Option<crate::dialect::image::Fill>,
-    pub bsd_premature_complete_error_handling: Option<crate::dialect::image::Fill>,
-    pub concealment_picture_id: Option<crate::dialect::image::Fill>,
-    pub mb_error_concealment_b_temporal_weight_prediction_disable: Option<crate::dialect::image::Fill>,
-    pub mb_error_concealment_b_temporal_motion_vectors_override_enable: Option<crate::dialect::image::Fill>,
-    pub mb_error_concealment_b_temporal_prediction_mode: Option<crate::dialect::image::Fill>,
-    pub intra_predmode_4x4_8x8_luma_error_control: Option<crate::dialect::image::Fill>,
-    pub init_current_mb_number: Option<crate::dialect::image::Fill>,
-    pub concealment_method: Option<crate::dialect::image::Fill>,
-    pub first_mb_bit_offset: Option<crate::dialect::image::Fill>,
-    pub last_slice: Option<crate::dialect::image::Fill>,
-    pub emulation_prevention_byte_present: Option<crate::dialect::image::Fill>,
-    pub fix_prev_mb_skipped: Option<crate::dialect::image::Fill>,
-    pub first_mb_byte_offset_of_slice_data_or_slice_header: Option<crate::dialect::image::Fill>,
-    pub intra_prediction_error_control: Option<crate::dialect::image::Fill>,
-    pub intra_8x8_4x4_prediction_error_concealment_control: Option<crate::dialect::image::Fill>,
-    pub b_slice_temporal_inter_concealment_mode: Option<crate::dialect::image::Fill>,
-    pub b_slice_spatial_inter_concealment_mode: Option<crate::dialect::image::Fill>,
-    pub b_slice_inter_direct_type_concealment_mode: Option<crate::dialect::image::Fill>,
-    pub b_slice_concealment_mode: Option<crate::dialect::image::Fill>,
-    pub p_slice_inter_concealment_mode: Option<crate::dialect::image::Fill>,
-    pub p_slice_concealment_mode: Option<crate::dialect::image::Fill>,
-    pub concealment_reference_picture_field_bit: Option<crate::dialect::image::Fill>,
-    pub i_slice_concealment_mode: Option<crate::dialect::image::Fill>,
+    pub mb_error_concealment_p_slice_weight_prediction_disable: Option<crate::dialect::layout::Fill>,
+    pub mb_error_concealment_p_slice_motion_vectors_override_disable: Option<crate::dialect::layout::Fill>,
+    pub mb_error_concealment_b_spatial_weight_prediction_disable: Option<crate::dialect::layout::Fill>,
+    pub mb_error_concealment_b_spatial_motion_vectors_override_disable: Option<crate::dialect::layout::Fill>,
+    pub mb_error_concealment_b_spatial_prediction_mode: Option<crate::dialect::layout::Fill>,
+    pub mb_header_error_handling: Option<crate::dialect::layout::Fill>,
+    pub entropy_error_handling: Option<crate::dialect::layout::Fill>,
+    pub mpr_error_handling: Option<crate::dialect::layout::Fill>,
+    pub bsd_premature_complete_error_handling: Option<crate::dialect::layout::Fill>,
+    pub concealment_picture_id: Option<crate::dialect::layout::Fill>,
+    pub mb_error_concealment_b_temporal_weight_prediction_disable: Option<crate::dialect::layout::Fill>,
+    pub mb_error_concealment_b_temporal_motion_vectors_override_enable: Option<crate::dialect::layout::Fill>,
+    pub mb_error_concealment_b_temporal_prediction_mode: Option<crate::dialect::layout::Fill>,
+    pub intra_predmode_4x4_8x8_luma_error_control: Option<crate::dialect::layout::Fill>,
+    pub init_current_mb_number: Option<crate::dialect::layout::Fill>,
+    pub concealment_method: Option<crate::dialect::layout::Fill>,
+    pub first_mb_bit_offset: Option<crate::dialect::layout::Fill>,
+    pub last_slice: Option<crate::dialect::layout::Fill>,
+    pub emulation_prevention_byte_present: Option<crate::dialect::layout::Fill>,
+    pub fix_prev_mb_skipped: Option<crate::dialect::layout::Fill>,
+    pub first_mb_byte_offset_of_slice_data_or_slice_header: Option<crate::dialect::layout::Fill>,
+    pub intra_prediction_error_control: Option<crate::dialect::layout::Fill>,
+    pub intra_8x8_4x4_prediction_error_concealment_control: Option<crate::dialect::layout::Fill>,
+    pub b_slice_temporal_inter_concealment_mode: Option<crate::dialect::layout::Fill>,
+    pub b_slice_spatial_inter_concealment_mode: Option<crate::dialect::layout::Fill>,
+    pub b_slice_inter_direct_type_concealment_mode: Option<crate::dialect::layout::Fill>,
+    pub b_slice_concealment_mode: Option<crate::dialect::layout::Fill>,
+    pub p_slice_inter_concealment_mode: Option<crate::dialect::layout::Fill>,
+    pub p_slice_concealment_mode: Option<crate::dialect::layout::Fill>,
+    pub concealment_reference_picture_field_bit: Option<crate::dialect::layout::Fill>,
+    pub i_slice_concealment_mode: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.interface_descriptor_data`: genxml's INTERFACE_DESCRIPTOR_DATA.
 #[mlirformat::mlir::op("xe3.state.interface_descriptor_data", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateInterfaceDescriptorData {
-    pub kernel_start_pointer: Option<crate::dialect::image::Fill>,
-    pub software_exception_enable: Option<crate::dialect::image::Fill>,
-    pub illegal_opcode_exception_enable: Option<crate::dialect::image::Fill>,
-    pub floating_point_mode: Option<crate::dialect::image::Fill>,
-    pub single_program_flow: Option<crate::dialect::image::Fill>,
-    pub denorm_mode: Option<crate::dialect::image::Fill>,
-    pub thread_preemption: Option<crate::dialect::image::Fill>,
-    pub registers_per_thread: Option<crate::dialect::image::Fill>,
-    pub sampler_count: Option<crate::dialect::image::Fill>,
-    pub sampler_state_pointer: Option<crate::dialect::image::Fill>,
-    pub binding_table_entry_count: Option<crate::dialect::image::Fill>,
-    pub binding_table_pointer: Option<crate::dialect::image::Fill>,
-    pub number_of_threads_in_gpgpu_thread_group: Option<crate::dialect::image::Fill>,
-    pub thread_group_forward_progress_guarantee: Option<crate::dialect::image::Fill>,
-    pub shared_local_memory_size: Option<crate::dialect::image::Fill>,
-    pub rounding_mode: Option<crate::dialect::image::Fill>,
-    pub thread_group_dispatch_size: Option<crate::dialect::image::Fill>,
-    pub number_of_barriers: Option<crate::dialect::image::Fill>,
-    pub btd_mode: Option<crate::dialect::image::Fill>,
-    pub preferred_slm_allocation_size: Option<crate::dialect::image::Fill>,
+    pub kernel_start_pointer: Option<crate::dialect::layout::Fill>,
+    pub software_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub illegal_opcode_exception_enable: Option<crate::dialect::layout::Fill>,
+    pub floating_point_mode: Option<crate::dialect::layout::Fill>,
+    pub single_program_flow: Option<crate::dialect::layout::Fill>,
+    pub denorm_mode: Option<crate::dialect::layout::Fill>,
+    pub thread_preemption: Option<crate::dialect::layout::Fill>,
+    pub registers_per_thread: Option<crate::dialect::layout::Fill>,
+    pub sampler_count: Option<crate::dialect::layout::Fill>,
+    pub sampler_state_pointer: Option<crate::dialect::layout::Fill>,
+    pub binding_table_entry_count: Option<crate::dialect::layout::Fill>,
+    pub binding_table_pointer: Option<crate::dialect::layout::Fill>,
+    pub number_of_threads_in_gpgpu_thread_group: Option<crate::dialect::layout::Fill>,
+    pub thread_group_forward_progress_guarantee: Option<crate::dialect::layout::Fill>,
+    pub shared_local_memory_size: Option<crate::dialect::layout::Fill>,
+    pub rounding_mode: Option<crate::dialect::layout::Fill>,
+    pub thread_group_dispatch_size: Option<crate::dialect::layout::Fill>,
+    pub number_of_barriers: Option<crate::dialect::layout::Fill>,
+    pub btd_mode: Option<crate::dialect::layout::Fill>,
+    pub preferred_slm_allocation_size: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.memoryaddressattributes`: genxml's MEMORYADDRESSATTRIBUTES.
 #[mlirformat::mlir::op("xe3.state.memoryaddressattributes", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateMemoryaddressattributes {
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub arbitration_priority_control: Option<crate::dialect::image::Fields<StateHevcArbitrationPriorityFields>>,
-    pub memory_compression_enable: Option<crate::dialect::image::Fill>,
-    pub memory_compression_mode: Option<crate::dialect::image::Fill>,
-    pub row_store_scratch_buffer_cache_select: Option<crate::dialect::image::Fill>,
-    pub tiled_resource_mode: Option<crate::dialect::image::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub arbitration_priority_control: Option<crate::dialect::layout::Fields<StateHevcArbitrationPriorityFields>>,
+    pub memory_compression_enable: Option<crate::dialect::layout::Fill>,
+    pub memory_compression_mode: Option<crate::dialect::layout::Fill>,
+    pub row_store_scratch_buffer_cache_select: Option<crate::dialect::layout::Fill>,
+    pub tiled_resource_mode: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.mi_math_alu_instruction`: genxml's MI_MATH_ALU_INSTRUCTION.
 #[mlirformat::mlir::op("xe3.state.mi_math_alu_instruction", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateMiMathAluInstruction {
-    pub operand_2: Option<crate::dialect::image::Fill>,
-    pub operand_1: Option<crate::dialect::image::Fill>,
-    pub alu_opcode: Option<crate::dialect::image::Fill>,
+    pub operand_2: Option<crate::dialect::layout::Fill>,
+    pub operand_1: Option<crate::dialect::layout::Fill>,
+    pub alu_opcode: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.palette_entry`: genxml's PALETTE_ENTRY.
 #[mlirformat::mlir::op("xe3.state.palette_entry", format = "attr-dict")]
 #[derive(Default)]
 pub struct StatePaletteEntry {
-    pub blue: Option<crate::dialect::image::Fill>,
-    pub green: Option<crate::dialect::image::Fill>,
-    pub red: Option<crate::dialect::image::Fill>,
-    pub alpha: Option<crate::dialect::image::Fill>,
+    pub blue: Option<crate::dialect::layout::Fill>,
+    pub green: Option<crate::dialect::layout::Fill>,
+    pub red: Option<crate::dialect::layout::Fill>,
+    pub alpha: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.postsync_data`: genxml's POSTSYNC_DATA.
 #[mlirformat::mlir::op("xe3.state.postsync_data", format = "attr-dict")]
 #[derive(Default)]
 pub struct StatePostsyncData {
-    pub operation: Option<crate::dialect::image::Fill>,
-    pub hdc_pipeline_flush: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub system_memory_fence_request: Option<crate::dialect::image::Fill>,
-    pub dataport_subslice_cache_flush: Option<crate::dialect::image::Fill>,
-    pub destination_address: Option<crate::dialect::image::Fill>,
-    pub immediate_data: Option<crate::dialect::image::Fill>,
+    pub operation: Option<crate::dialect::layout::Fill>,
+    pub hdc_pipeline_flush: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub system_memory_fence_request: Option<crate::dialect::layout::Fill>,
+    pub dataport_subslice_cache_flush: Option<crate::dialect::layout::Fill>,
+    pub destination_address: Option<crate::dialect::layout::Fill>,
+    pub immediate_data: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.render_surface_state`: genxml's RENDER_SURFACE_STATE.
 #[mlirformat::mlir::op("xe3.state.render_surface_state", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateRenderSurfaceState {
-    pub cube_face_enable_positive_z: Option<crate::dialect::image::Fill>,
-    pub cube_face_enable_negative_z: Option<crate::dialect::image::Fill>,
-    pub cube_face_enable_positive_y: Option<crate::dialect::image::Fill>,
-    pub cube_face_enable_negative_y: Option<crate::dialect::image::Fill>,
-    pub cube_face_enable_positive_x: Option<crate::dialect::image::Fill>,
-    pub cube_face_enable_negative_x: Option<crate::dialect::image::Fill>,
-    pub media_boundary_pixel_mode: Option<crate::dialect::image::Fill>,
-    pub render_cache_read_write_mode: Option<crate::dialect::image::Fill>,
-    pub enable_sampler_route_to_lsc: Option<crate::dialect::image::Fill>,
-    pub vertical_line_stride_offset: Option<crate::dialect::image::Fill>,
-    pub vertical_line_stride: Option<crate::dialect::image::Fill>,
-    pub tile_mode: Option<crate::dialect::image::Fill>,
-    pub surface_horizontal_alignment: Option<crate::dialect::image::Fill>,
-    pub surface_vertical_alignment: Option<crate::dialect::image::Fill>,
-    pub surface_format: Option<crate::dialect::image::Fill>,
-    pub surface_array: Option<crate::dialect::image::Fill>,
-    pub surface_type: Option<crate::dialect::image::Fill>,
-    pub surface_qpitch: Option<crate::dialect::image::Fill>,
-    pub sample_tap_discard_disable: Option<crate::dialect::image::Fill>,
-    pub corner_texel_mode: Option<crate::dialect::image::Fill>,
-    pub base_mip_level: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub width: Option<crate::dialect::image::Fill>,
-    pub height: Option<crate::dialect::image::Fill>,
-    pub depth_stencil_resource: Option<crate::dialect::image::Fill>,
-    pub surface_pitch: Option<crate::dialect::image::Fill>,
-    pub depth: Option<crate::dialect::image::Fill>,
-    pub multisample_position_palette_index: Option<crate::dialect::image::Fill>,
-    pub number_of_multisamples: Option<crate::dialect::image::Fill>,
-    pub multisampled_surface_storage_format: Option<crate::dialect::image::Fill>,
-    pub render_target_view_extent: Option<crate::dialect::image::Fill>,
-    pub minimum_array_element: Option<crate::dialect::image::Fill>,
-    pub render_target_and_sample_unorm_rotation: Option<crate::dialect::image::Fill>,
-    pub mip_count_lod: Option<crate::dialect::image::Fill>,
-    pub surface_min_lod: Option<crate::dialect::image::Fill>,
-    pub mip_tail_start_lod: Option<crate::dialect::image::Fill>,
-    pub l1_cache_control: Option<crate::dialect::image::Fill>,
-    pub ewa_disable_for_cube: Option<crate::dialect::image::Fill>,
-    pub y_offset: Option<crate::dialect::image::Fill>,
-    pub x_offset: Option<crate::dialect::image::Fill>,
-    pub auxiliary_surface_mode: Option<crate::dialect::image::Fill>,
-    pub y_offset_for_u_or_uv_plane: Option<crate::dialect::image::Fill>,
-    pub auxiliary_surface_pitch: Option<crate::dialect::image::Fill>,
-    pub yuv_interpolation_enable: Option<crate::dialect::image::Fill>,
-    pub x_offset_for_u_or_uv_plane: Option<crate::dialect::image::Fill>,
-    pub auxiliary_surface_qpitch: Option<crate::dialect::image::Fill>,
-    pub resource_min_lod: Option<crate::dialect::image::Real>,
-    pub shader_channel_select_alpha: Option<crate::dialect::image::Fill>,
-    pub shader_channel_select_blue: Option<crate::dialect::image::Fill>,
-    pub shader_channel_select_green: Option<crate::dialect::image::Fill>,
-    pub shader_channel_select_red: Option<crate::dialect::image::Fill>,
-    pub surface_base_address: Option<crate::dialect::image::Fill>,
-    pub mip_region_width_in_log2: Option<crate::dialect::image::Fill>,
-    pub append_counter_address: Option<crate::dialect::image::Fill>,
-    pub mip_region_height_in_log2: Option<crate::dialect::image::Fill>,
-    pub procedural_texture: Option<crate::dialect::image::Fill>,
-    pub auxiliary_surface_base_address: Option<crate::dialect::image::Fill>,
-    pub y_offset_for_v_plane: Option<crate::dialect::image::Fill>,
-    pub x_offset_for_v_plane: Option<crate::dialect::image::Fill>,
-    pub compression_format: Option<crate::dialect::image::Fill>,
-    pub mip_region_depth_in_log2: Option<crate::dialect::image::Fill>,
-    pub disallowlowqualityfiltering: Option<crate::dialect::image::Fill>,
+    pub cube_face_enable_positive_z: Option<crate::dialect::layout::Fill>,
+    pub cube_face_enable_negative_z: Option<crate::dialect::layout::Fill>,
+    pub cube_face_enable_positive_y: Option<crate::dialect::layout::Fill>,
+    pub cube_face_enable_negative_y: Option<crate::dialect::layout::Fill>,
+    pub cube_face_enable_positive_x: Option<crate::dialect::layout::Fill>,
+    pub cube_face_enable_negative_x: Option<crate::dialect::layout::Fill>,
+    pub media_boundary_pixel_mode: Option<crate::dialect::layout::Fill>,
+    pub render_cache_read_write_mode: Option<crate::dialect::layout::Fill>,
+    pub enable_sampler_route_to_lsc: Option<crate::dialect::layout::Fill>,
+    pub vertical_line_stride_offset: Option<crate::dialect::layout::Fill>,
+    pub vertical_line_stride: Option<crate::dialect::layout::Fill>,
+    pub tile_mode: Option<crate::dialect::layout::Fill>,
+    pub surface_horizontal_alignment: Option<crate::dialect::layout::Fill>,
+    pub surface_vertical_alignment: Option<crate::dialect::layout::Fill>,
+    pub surface_format: Option<crate::dialect::layout::Fill>,
+    pub surface_array: Option<crate::dialect::layout::Fill>,
+    pub surface_type: Option<crate::dialect::layout::Fill>,
+    pub surface_qpitch: Option<crate::dialect::layout::Fill>,
+    pub sample_tap_discard_disable: Option<crate::dialect::layout::Fill>,
+    pub corner_texel_mode: Option<crate::dialect::layout::Fill>,
+    pub base_mip_level: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub width: Option<crate::dialect::layout::Fill>,
+    pub height: Option<crate::dialect::layout::Fill>,
+    pub depth_stencil_resource: Option<crate::dialect::layout::Fill>,
+    pub surface_pitch: Option<crate::dialect::layout::Fill>,
+    pub depth: Option<crate::dialect::layout::Fill>,
+    pub multisample_position_palette_index: Option<crate::dialect::layout::Fill>,
+    pub number_of_multisamples: Option<crate::dialect::layout::Fill>,
+    pub multisampled_surface_storage_format: Option<crate::dialect::layout::Fill>,
+    pub render_target_view_extent: Option<crate::dialect::layout::Fill>,
+    pub minimum_array_element: Option<crate::dialect::layout::Fill>,
+    pub render_target_and_sample_unorm_rotation: Option<crate::dialect::layout::Fill>,
+    pub mip_count_lod: Option<crate::dialect::layout::Fill>,
+    pub surface_min_lod: Option<crate::dialect::layout::Fill>,
+    pub mip_tail_start_lod: Option<crate::dialect::layout::Fill>,
+    pub l1_cache_control: Option<crate::dialect::layout::Fill>,
+    pub ewa_disable_for_cube: Option<crate::dialect::layout::Fill>,
+    pub y_offset: Option<crate::dialect::layout::Fill>,
+    pub x_offset: Option<crate::dialect::layout::Fill>,
+    pub auxiliary_surface_mode: Option<crate::dialect::layout::Fill>,
+    pub y_offset_for_u_or_uv_plane: Option<crate::dialect::layout::Fill>,
+    pub auxiliary_surface_pitch: Option<crate::dialect::layout::Fill>,
+    pub yuv_interpolation_enable: Option<crate::dialect::layout::Fill>,
+    pub x_offset_for_u_or_uv_plane: Option<crate::dialect::layout::Fill>,
+    pub auxiliary_surface_qpitch: Option<crate::dialect::layout::Fill>,
+    pub resource_min_lod: Option<crate::dialect::layout::Real>,
+    pub shader_channel_select_alpha: Option<crate::dialect::layout::Fill>,
+    pub shader_channel_select_blue: Option<crate::dialect::layout::Fill>,
+    pub shader_channel_select_green: Option<crate::dialect::layout::Fill>,
+    pub shader_channel_select_red: Option<crate::dialect::layout::Fill>,
+    pub surface_base_address: Option<crate::dialect::layout::Fill>,
+    pub mip_region_width_in_log2: Option<crate::dialect::layout::Fill>,
+    pub append_counter_address: Option<crate::dialect::layout::Fill>,
+    pub mip_region_height_in_log2: Option<crate::dialect::layout::Fill>,
+    pub procedural_texture: Option<crate::dialect::layout::Fill>,
+    pub auxiliary_surface_base_address: Option<crate::dialect::layout::Fill>,
+    pub y_offset_for_v_plane: Option<crate::dialect::layout::Fill>,
+    pub x_offset_for_v_plane: Option<crate::dialect::layout::Fill>,
+    pub compression_format: Option<crate::dialect::layout::Fill>,
+    pub mip_region_depth_in_log2: Option<crate::dialect::layout::Fill>,
+    pub disallowlowqualityfiltering: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.resource_barrier_body`: genxml's RESOURCE_BARRIER_BODY.
 #[mlirformat::mlir::op("xe3.state.resource_barrier_body", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateResourceBarrierBody {
-    pub wait_stage: Option<crate::dialect::image::Fill>,
-    pub signal_stage: Option<crate::dialect::image::Fill>,
-    pub barrier_type: Option<crate::dialect::image::Fill>,
-    pub l1_dataport_cache_invalidate: Option<crate::dialect::image::Fill>,
-    pub depth_cache: Option<crate::dialect::image::Fill>,
-    pub color_cache: Option<crate::dialect::image::Fill>,
-    pub l1_dataport_uav_flush: Option<crate::dialect::image::Fill>,
-    pub texture_ro: Option<crate::dialect::image::Fill>,
-    pub state_ro: Option<crate::dialect::image::Fill>,
-    pub vf_ro: Option<crate::dialect::image::Fill>,
-    pub amfs: Option<crate::dialect::image::Fill>,
-    pub constant_cache: Option<crate::dialect::image::Fill>,
-    pub barrier_id_address: Option<crate::dialect::image::Fill>,
+    pub wait_stage: Option<crate::dialect::layout::Fill>,
+    pub signal_stage: Option<crate::dialect::layout::Fill>,
+    pub barrier_type: Option<crate::dialect::layout::Fill>,
+    pub l1_dataport_cache_invalidate: Option<crate::dialect::layout::Fill>,
+    pub depth_cache: Option<crate::dialect::layout::Fill>,
+    pub color_cache: Option<crate::dialect::layout::Fill>,
+    pub l1_dataport_uav_flush: Option<crate::dialect::layout::Fill>,
+    pub texture_ro: Option<crate::dialect::layout::Fill>,
+    pub state_ro: Option<crate::dialect::layout::Fill>,
+    pub vf_ro: Option<crate::dialect::layout::Fill>,
+    pub amfs: Option<crate::dialect::layout::Fill>,
+    pub constant_cache: Option<crate::dialect::layout::Fill>,
+    pub barrier_id_address: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.sampler_border_color_state`: genxml's SAMPLER_BORDER_COLOR_STATE.
 #[mlirformat::mlir::op("xe3.state.sampler_border_color_state", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateSamplerBorderColorState {
-    pub border_color_float_red: Option<crate::dialect::image::Real>,
-    pub border_color_32bit_red: Option<crate::dialect::image::Fill>,
-    pub border_color_float_green: Option<crate::dialect::image::Real>,
-    pub border_color_32bit_green: Option<crate::dialect::image::Fill>,
-    pub border_color_float_blue: Option<crate::dialect::image::Real>,
-    pub border_color_32bit_blue: Option<crate::dialect::image::Fill>,
-    pub border_color_float_alpha: Option<crate::dialect::image::Real>,
-    pub border_color_32bit_alpha: Option<crate::dialect::image::Fill>,
+    pub border_color_float_red: Option<crate::dialect::layout::Real>,
+    pub border_color_32bit_red: Option<crate::dialect::layout::Fill>,
+    pub border_color_float_green: Option<crate::dialect::layout::Real>,
+    pub border_color_32bit_green: Option<crate::dialect::layout::Fill>,
+    pub border_color_float_blue: Option<crate::dialect::layout::Real>,
+    pub border_color_32bit_blue: Option<crate::dialect::layout::Fill>,
+    pub border_color_float_alpha: Option<crate::dialect::layout::Real>,
+    pub border_color_32bit_alpha: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.sampler_indirect_state_border_color`: genxml's SAMPLER_INDIRECT_STATE_BORDER_COLOR.
 #[mlirformat::mlir::op("xe3.state.sampler_indirect_state_border_color", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateSamplerIndirectStateBorderColor {
-    pub border_color_red_as_s31: Option<crate::dialect::image::Fill>,
-    pub border_color_red_as_u32: Option<crate::dialect::image::Fill>,
-    pub border_color_red_as_float: Option<crate::dialect::image::Real>,
-    pub border_color_red_as_u8: Option<crate::dialect::image::Fill>,
-    pub border_color_green_as_u8: Option<crate::dialect::image::Fill>,
-    pub border_color_blue_as_u8: Option<crate::dialect::image::Fill>,
-    pub border_color_alpha_as_u8: Option<crate::dialect::image::Fill>,
-    pub border_color_green_as_s31: Option<crate::dialect::image::Fill>,
-    pub border_color_green_as_u32: Option<crate::dialect::image::Fill>,
-    pub border_color_green_as_float: Option<crate::dialect::image::Real>,
-    pub border_color_blue_as_s31: Option<crate::dialect::image::Fill>,
-    pub border_color_blue_as_u32: Option<crate::dialect::image::Fill>,
-    pub border_color_blue_as_float: Option<crate::dialect::image::Real>,
-    pub border_color_alpha_as_s31: Option<crate::dialect::image::Fill>,
-    pub border_color_alpha_as_u32: Option<crate::dialect::image::Fill>,
-    pub border_color_alpha_as_float: Option<crate::dialect::image::Real>,
+    pub border_color_red_as_s31: Option<crate::dialect::layout::Fill>,
+    pub border_color_red_as_u32: Option<crate::dialect::layout::Fill>,
+    pub border_color_red_as_float: Option<crate::dialect::layout::Real>,
+    pub border_color_red_as_u8: Option<crate::dialect::layout::Fill>,
+    pub border_color_green_as_u8: Option<crate::dialect::layout::Fill>,
+    pub border_color_blue_as_u8: Option<crate::dialect::layout::Fill>,
+    pub border_color_alpha_as_u8: Option<crate::dialect::layout::Fill>,
+    pub border_color_green_as_s31: Option<crate::dialect::layout::Fill>,
+    pub border_color_green_as_u32: Option<crate::dialect::layout::Fill>,
+    pub border_color_green_as_float: Option<crate::dialect::layout::Real>,
+    pub border_color_blue_as_s31: Option<crate::dialect::layout::Fill>,
+    pub border_color_blue_as_u32: Option<crate::dialect::layout::Fill>,
+    pub border_color_blue_as_float: Option<crate::dialect::layout::Real>,
+    pub border_color_alpha_as_s31: Option<crate::dialect::layout::Fill>,
+    pub border_color_alpha_as_u32: Option<crate::dialect::layout::Fill>,
+    pub border_color_alpha_as_float: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.state.sampler_state`: genxml's SAMPLER_STATE.
 #[mlirformat::mlir::op("xe3.state.sampler_state", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateSamplerState {
-    pub anisotropic_algorithm: Option<crate::dialect::image::Fill>,
-    pub texture_lod_bias: Option<crate::dialect::image::Real>,
-    pub min_mode_filter: Option<crate::dialect::image::Fill>,
-    pub mag_mode_filter: Option<crate::dialect::image::Fill>,
-    pub mip_mode_filter: Option<crate::dialect::image::Fill>,
-    pub coarse_lod_quality_mode: Option<crate::dialect::image::Fill>,
-    pub lod_preclamp_mode: Option<crate::dialect::image::Fill>,
-    pub texture_border_color_mode: Option<crate::dialect::image::Fill>,
-    pub cps_lod_compensation_enable: Option<crate::dialect::image::Fill>,
-    pub sampler_disable: Option<crate::dialect::image::Fill>,
-    pub cube_surface_control_mode: Option<crate::dialect::image::Fill>,
-    pub shadow_function: Option<crate::dialect::image::Fill>,
-    pub chromakey_mode: Option<crate::dialect::image::Fill>,
-    pub chromakey_index: Option<crate::dialect::image::Fill>,
-    pub chromakey_enable: Option<crate::dialect::image::Fill>,
-    pub max_lod: Option<crate::dialect::image::Real>,
-    pub min_lod: Option<crate::dialect::image::Real>,
-    pub lod_clamp_magnification_mode: Option<crate::dialect::image::Fill>,
-    pub srgb_decode: Option<crate::dialect::image::Fill>,
-    pub return_filter_weight_for_null_texels: Option<crate::dialect::image::Fill>,
-    pub return_filter_weight_for_border_texels: Option<crate::dialect::image::Fill>,
-    pub force_gather4_behavior: Option<crate::dialect::image::Fill>,
-    pub border_color_pointer: Option<crate::dialect::image::Fill>,
-    pub tcz_address_control_mode: Option<crate::dialect::image::Fill>,
-    pub tcy_address_control_mode: Option<crate::dialect::image::Fill>,
-    pub tcx_address_control_mode: Option<crate::dialect::image::Fill>,
-    pub reduction_type_enable: Option<crate::dialect::image::Fill>,
-    pub non_normalized_coordinate_enable: Option<crate::dialect::image::Fill>,
-    pub trilinear_filter_quality: Option<crate::dialect::image::Fill>,
-    pub r_address_min_filter_rounding_enable: Option<crate::dialect::image::Fill>,
-    pub r_address_mag_filter_rounding_enable: Option<crate::dialect::image::Fill>,
-    pub v_address_min_filter_rounding_enable: Option<crate::dialect::image::Fill>,
-    pub v_address_mag_filter_rounding_enable: Option<crate::dialect::image::Fill>,
-    pub u_address_min_filter_rounding_enable: Option<crate::dialect::image::Fill>,
-    pub u_address_mag_filter_rounding_enable: Option<crate::dialect::image::Fill>,
-    pub maximum_anisotropy: Option<crate::dialect::image::Fill>,
-    pub reduction_type: Option<crate::dialect::image::Fill>,
-    pub allow_low_quality_lod_calculation: Option<crate::dialect::image::Fill>,
-    pub low_quality_filter: Option<crate::dialect::image::Fill>,
+    pub anisotropic_algorithm: Option<crate::dialect::layout::Fill>,
+    pub texture_lod_bias: Option<crate::dialect::layout::Real>,
+    pub min_mode_filter: Option<crate::dialect::layout::Fill>,
+    pub mag_mode_filter: Option<crate::dialect::layout::Fill>,
+    pub mip_mode_filter: Option<crate::dialect::layout::Fill>,
+    pub coarse_lod_quality_mode: Option<crate::dialect::layout::Fill>,
+    pub lod_preclamp_mode: Option<crate::dialect::layout::Fill>,
+    pub texture_border_color_mode: Option<crate::dialect::layout::Fill>,
+    pub cps_lod_compensation_enable: Option<crate::dialect::layout::Fill>,
+    pub sampler_disable: Option<crate::dialect::layout::Fill>,
+    pub cube_surface_control_mode: Option<crate::dialect::layout::Fill>,
+    pub shadow_function: Option<crate::dialect::layout::Fill>,
+    pub chromakey_mode: Option<crate::dialect::layout::Fill>,
+    pub chromakey_index: Option<crate::dialect::layout::Fill>,
+    pub chromakey_enable: Option<crate::dialect::layout::Fill>,
+    pub max_lod: Option<crate::dialect::layout::Real>,
+    pub min_lod: Option<crate::dialect::layout::Real>,
+    pub lod_clamp_magnification_mode: Option<crate::dialect::layout::Fill>,
+    pub srgb_decode: Option<crate::dialect::layout::Fill>,
+    pub return_filter_weight_for_null_texels: Option<crate::dialect::layout::Fill>,
+    pub return_filter_weight_for_border_texels: Option<crate::dialect::layout::Fill>,
+    pub force_gather4_behavior: Option<crate::dialect::layout::Fill>,
+    pub border_color_pointer: Option<crate::dialect::layout::Fill>,
+    pub tcz_address_control_mode: Option<crate::dialect::layout::Fill>,
+    pub tcy_address_control_mode: Option<crate::dialect::layout::Fill>,
+    pub tcx_address_control_mode: Option<crate::dialect::layout::Fill>,
+    pub reduction_type_enable: Option<crate::dialect::layout::Fill>,
+    pub non_normalized_coordinate_enable: Option<crate::dialect::layout::Fill>,
+    pub trilinear_filter_quality: Option<crate::dialect::layout::Fill>,
+    pub r_address_min_filter_rounding_enable: Option<crate::dialect::layout::Fill>,
+    pub r_address_mag_filter_rounding_enable: Option<crate::dialect::layout::Fill>,
+    pub v_address_min_filter_rounding_enable: Option<crate::dialect::layout::Fill>,
+    pub v_address_mag_filter_rounding_enable: Option<crate::dialect::layout::Fill>,
+    pub u_address_min_filter_rounding_enable: Option<crate::dialect::layout::Fill>,
+    pub u_address_mag_filter_rounding_enable: Option<crate::dialect::layout::Fill>,
+    pub maximum_anisotropy: Option<crate::dialect::layout::Fill>,
+    pub reduction_type: Option<crate::dialect::layout::Fill>,
+    pub allow_low_quality_lod_calculation: Option<crate::dialect::layout::Fill>,
+    pub low_quality_filter: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.sampler_state_8x8_avs_coefficients`: genxml's SAMPLER_STATE_8X8_AVS_COEFFICIENTS.
 #[mlirformat::mlir::op("xe3.state.sampler_state_8x8_avs_coefficients", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateSamplerState8x8AvsCoefficients {
-    pub table_0_filter_coefficient: Option<Vec<crate::dialect::image::Real>>,
-    pub table_1_filter_coefficient0: Option<Vec<crate::dialect::image::Real>>,
-    pub table_1_filter_coefficient1: Option<Vec<crate::dialect::image::Real>>,
+    pub table_0_filter_coefficient: Option<Vec<crate::dialect::layout::Real>>,
+    pub table_1_filter_coefficient0: Option<Vec<crate::dialect::layout::Real>>,
+    pub table_1_filter_coefficient1: Option<Vec<crate::dialect::layout::Real>>,
 }
 
 /// `xe3.state.scissor_rect`: genxml's SCISSOR_RECT.
 #[mlirformat::mlir::op("xe3.state.scissor_rect", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateScissorRect {
-    pub scissor_rectangle_x_min: Option<crate::dialect::image::Fill>,
-    pub scissor_rectangle_y_min: Option<crate::dialect::image::Fill>,
-    pub scissor_rectangle_x_max: Option<crate::dialect::image::Fill>,
-    pub scissor_rectangle_y_max: Option<crate::dialect::image::Fill>,
+    pub scissor_rectangle_x_min: Option<crate::dialect::layout::Fill>,
+    pub scissor_rectangle_y_min: Option<crate::dialect::layout::Fill>,
+    pub scissor_rectangle_x_max: Option<crate::dialect::layout::Fill>,
+    pub scissor_rectangle_y_max: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.sf_clip_viewport`: genxml's SF_CLIP_VIEWPORT.
 #[mlirformat::mlir::op("xe3.state.sf_clip_viewport", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateSfClipViewport {
-    pub viewport_matrix_element_m00: Option<crate::dialect::image::Real>,
-    pub viewport_matrix_element_m11: Option<crate::dialect::image::Real>,
-    pub viewport_matrix_element_m22: Option<crate::dialect::image::Real>,
-    pub viewport_matrix_element_m30: Option<crate::dialect::image::Real>,
-    pub viewport_matrix_element_m31: Option<crate::dialect::image::Real>,
-    pub viewport_matrix_element_m32: Option<crate::dialect::image::Real>,
-    pub x_min_clip_guardband: Option<crate::dialect::image::Real>,
-    pub x_max_clip_guardband: Option<crate::dialect::image::Real>,
-    pub y_min_clip_guardband: Option<crate::dialect::image::Real>,
-    pub y_max_clip_guardband: Option<crate::dialect::image::Real>,
-    pub x_min_viewport: Option<crate::dialect::image::Real>,
-    pub x_max_viewport: Option<crate::dialect::image::Real>,
-    pub y_min_viewport: Option<crate::dialect::image::Real>,
-    pub y_max_viewport: Option<crate::dialect::image::Real>,
+    pub viewport_matrix_element_m00: Option<crate::dialect::layout::Real>,
+    pub viewport_matrix_element_m11: Option<crate::dialect::layout::Real>,
+    pub viewport_matrix_element_m22: Option<crate::dialect::layout::Real>,
+    pub viewport_matrix_element_m30: Option<crate::dialect::layout::Real>,
+    pub viewport_matrix_element_m31: Option<crate::dialect::layout::Real>,
+    pub viewport_matrix_element_m32: Option<crate::dialect::layout::Real>,
+    pub x_min_clip_guardband: Option<crate::dialect::layout::Real>,
+    pub x_max_clip_guardband: Option<crate::dialect::layout::Real>,
+    pub y_min_clip_guardband: Option<crate::dialect::layout::Real>,
+    pub y_max_clip_guardband: Option<crate::dialect::layout::Real>,
+    pub x_min_viewport: Option<crate::dialect::layout::Real>,
+    pub x_max_viewport: Option<crate::dialect::layout::Real>,
+    pub y_min_viewport: Option<crate::dialect::layout::Real>,
+    pub y_max_viewport: Option<crate::dialect::layout::Real>,
 }
 
 /// `xe3.state.sf_output_attribute_detail`: genxml's SF_OUTPUT_ATTRIBUTE_DETAIL.
 #[mlirformat::mlir::op("xe3.state.sf_output_attribute_detail", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateSfOutputAttributeDetail {
-    pub source_attribute: Option<crate::dialect::image::Fill>,
-    pub swizzle_select: Option<crate::dialect::image::Fill>,
-    pub constant_source: Option<crate::dialect::image::Fill>,
-    pub swizzle_control_mode: Option<crate::dialect::image::Fill>,
-    pub component_override_x: Option<crate::dialect::image::Fill>,
-    pub component_override_y: Option<crate::dialect::image::Fill>,
-    pub component_override_z: Option<crate::dialect::image::Fill>,
-    pub component_override_w: Option<crate::dialect::image::Fill>,
+    pub source_attribute: Option<crate::dialect::layout::Fill>,
+    pub swizzle_select: Option<crate::dialect::layout::Fill>,
+    pub constant_source: Option<crate::dialect::layout::Fill>,
+    pub swizzle_control_mode: Option<crate::dialect::layout::Fill>,
+    pub component_override_x: Option<crate::dialect::layout::Fill>,
+    pub component_override_y: Option<crate::dialect::layout::Fill>,
+    pub component_override_z: Option<crate::dialect::layout::Fill>,
+    pub component_override_w: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.slice_hash_table`: genxml's SLICE_HASH_TABLE.
 #[mlirformat::mlir::op("xe3.state.slice_hash_table", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateSliceHashTable {
-    pub entry: Option<Vec<Vec<Vec<crate::dialect::image::Fill>>>>,
+    pub entry: Option<Vec<Vec<Vec<crate::dialect::layout::Fill>>>>,
 }
 
 /// `xe3.state.so_decl`: genxml's SO_DECL.
 #[mlirformat::mlir::op("xe3.state.so_decl", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateSoDecl {
-    pub component_mask: Option<crate::dialect::image::Fill>,
-    pub register_index: Option<crate::dialect::image::Fill>,
-    pub hole_flag: Option<crate::dialect::image::Fill>,
-    pub output_buffer_slot: Option<crate::dialect::image::Fill>,
+    pub component_mask: Option<crate::dialect::layout::Fill>,
+    pub register_index: Option<crate::dialect::layout::Fill>,
+    pub hole_flag: Option<crate::dialect::layout::Fill>,
+    pub output_buffer_slot: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.so_decl_entry`: genxml's SO_DECL_ENTRY.
 #[mlirformat::mlir::op("xe3.state.so_decl_entry", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateSoDeclEntry {
-    pub stream_0_decl: Option<crate::dialect::image::Fields<StateSoDeclFields>>,
-    pub stream_1_decl: Option<crate::dialect::image::Fields<StateSoDeclFields>>,
-    pub stream_2_decl: Option<crate::dialect::image::Fields<StateSoDeclFields>>,
-    pub stream_3_decl: Option<crate::dialect::image::Fields<StateSoDeclFields>>,
+    pub stream_0_decl: Option<crate::dialect::layout::Fields<StateSoDeclFields>>,
+    pub stream_1_decl: Option<crate::dialect::layout::Fields<StateSoDeclFields>>,
+    pub stream_2_decl: Option<crate::dialect::layout::Fields<StateSoDeclFields>>,
+    pub stream_3_decl: Option<crate::dialect::layout::Fields<StateSoDeclFields>>,
 }
 
 /// `xe3.state.vertex_buffer_state`: genxml's VERTEX_BUFFER_STATE.
 #[mlirformat::mlir::op("xe3.state.vertex_buffer_state", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateVertexBufferState {
-    pub buffer_pitch: Option<crate::dialect::image::Fill>,
-    pub null_vertex_buffer: Option<crate::dialect::image::Fill>,
-    pub address_modify_enable: Option<crate::dialect::image::Fill>,
-    pub mocs: Option<crate::dialect::image::Fill>,
-    pub l3_bypass_disable: Option<crate::dialect::image::Fill>,
-    pub vertex_buffer_index: Option<crate::dialect::image::Fill>,
-    pub buffer_starting_address: Option<crate::dialect::image::Fill>,
-    pub buffer_size: Option<crate::dialect::image::Fill>,
+    pub buffer_pitch: Option<crate::dialect::layout::Fill>,
+    pub null_vertex_buffer: Option<crate::dialect::layout::Fill>,
+    pub address_modify_enable: Option<crate::dialect::layout::Fill>,
+    pub mocs: Option<crate::dialect::layout::Fill>,
+    pub l3_bypass_disable: Option<crate::dialect::layout::Fill>,
+    pub vertex_buffer_index: Option<crate::dialect::layout::Fill>,
+    pub buffer_starting_address: Option<crate::dialect::layout::Fill>,
+    pub buffer_size: Option<crate::dialect::layout::Fill>,
 }
 
 /// `xe3.state.vertex_element_state`: genxml's VERTEX_ELEMENT_STATE.
 #[mlirformat::mlir::op("xe3.state.vertex_element_state", format = "attr-dict")]
 #[derive(Default)]
 pub struct StateVertexElementState {
-    pub source_element_offset: Option<crate::dialect::image::Fill>,
-    pub edge_flag_enable: Option<crate::dialect::image::Fill>,
-    pub source_element_format: Option<crate::dialect::image::Fill>,
-    pub valid: Option<crate::dialect::image::Fill>,
-    pub vertex_buffer_index: Option<crate::dialect::image::Fill>,
-    pub component_3_control: Option<crate::dialect::image::Fill>,
-    pub component_2_control: Option<crate::dialect::image::Fill>,
-    pub component_1_control: Option<crate::dialect::image::Fill>,
-    pub component_0_control: Option<crate::dialect::image::Fill>,
+    pub source_element_offset: Option<crate::dialect::layout::Fill>,
+    pub edge_flag_enable: Option<crate::dialect::layout::Fill>,
+    pub source_element_format: Option<crate::dialect::layout::Fill>,
+    pub valid: Option<crate::dialect::layout::Fill>,
+    pub vertex_buffer_index: Option<crate::dialect::layout::Fill>,
+    pub component_3_control: Option<crate::dialect::layout::Fill>,
+    pub component_2_control: Option<crate::dialect::layout::Fill>,
+    pub component_1_control: Option<crate::dialect::layout::Fill>,
+    pub component_0_control: Option<crate::dialect::layout::Fill>,
 }
 
 /// The items' typed ops.

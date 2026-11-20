@@ -1,16 +1,13 @@
-//! The GPU dialects detour adds to mlirformat: each GPU's instruction set and command
-//! stream (`rdna2`, `xe3`), what they share (`isa`), and the image a GPU runs (`image`).
-//! Load them into an `MlirOpt` with `opt.load(Xe3Dialect)` and the like.
+//! The GPU dialects detour adds to mlirformat: Xe3's instruction set and command stream (`xe3`, loaded
+//! with `opt.load(Xe3Dialect)`), RDNA2's instruction table (`rdna2`), what they share (`isa`) and the
+//! layout tables records are packed by (`layout`).
 
-mod image;
 mod isa;
+mod layout;
 mod rdna2;
 mod xe3;
 
-pub use image::{
-    Containers as ImageContainers, Data as ImageData, Field as PackField, Fields, Fill, Group as PackGroup, ImageDialect, Item as PackItem, Layouts, MemType as ImageMemType, Memory as ImageMemory, Placed as ImagePlaced, Real, Stream as ImageStream, Ty as PackTy,
-    Words as ImageWords, attribute_of,
-};
+pub use layout::{Field as PackField, Fields, Fill, Group as PackGroup, Item as PackItem, Layouts, Real, Ty as PackTy, attribute_of};
 pub use isa::{IsaInt, OpRows, RegType, ShaderStage};
 pub use rdna2::*;
 pub use xe3::*;

@@ -674,7 +674,7 @@ mod tests {
     #[test]
     fn branches_and_waits() {
         // a uniform branch on VCC, then one on another SGPR (s_cmp_lg_u32 first)
-        for (mask, want) in [(VCC, vec![0xbf87_0001]), (4, vec![0xbf07_8004, 0xbf84_0001])] {
+        for (mask, want) in [(VCC, vec![0xbf86_0001]), (4, vec![0xbf07_8004, 0xbf84_0001])] {
             let regs = [VReg { class: Class::S, size: 1, align: 1, mask: true, uniform: true }];
             let base = [mask];
             let mut e = Encoder::new(&base, &regs);

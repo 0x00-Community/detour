@@ -30,11 +30,6 @@ use crate::ShaderStage;
 
 /// SPI_PS_INPUT_ENA bits
 pub const RDNA2_PERSP_CENTER: u32 = 1 << 1;
-pub const RDNA2_POS_X: u32 = 1 << 8;
-pub const RDNA2_POS_Y: u32 = 1 << 9;
-pub const RDNA2_POS_Z: u32 = 1 << 10;
-pub const RDNA2_POS_W: u32 = 1 << 11;
-pub const RDNA2_FRONT_FACE: u32 = 1 << 12;
 
 /// The first user SGPR of a vertex shader (merged: the system SGPRs come first)
 pub const RDNA2_VS_USER_SGPR: u32 = 8;

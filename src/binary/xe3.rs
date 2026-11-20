@@ -1,17 +1,12 @@
-//! Intel Xe3 machine code and batches: each EU instruction of the `xe3` dialect encoded (its fields
-//! read back as an `Inst`, packed as gentool packs them), a kernel's code, and an image's batch,
-//! state and kernels (`Xe3Image`).
+//! Intel Xe3 machine code: each EU instruction of the `xe3` dialect encoded (its fields read back as
+//! an `Inst`, packed as gentool packs them), and a kernel's code.
 
-use alloc::format;
-use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::ShaderStage;
-use crate::{Arf, Cond, EuFormat as Format, EuOpcode as Opcode, EuOperand as Operand, File, Inst, Sfid, XE3, Xe3Kernel};
-use mlirformat::{Attribute, Error, Op, Operation};
+use crate::{Arf, Cond, EuFormat as Format, EuOpcode as Opcode, EuOperand as Operand, File, Inst, Sfid, Xe3Kernel};
+use mlirformat::{Error, Operation};
 
-use crate::{ImageBytes, Pack, Pool, Write};
-use mlirformat::{Ir, OpId};
+use mlirformat::Ir;
 
 /// The EU encoder
 pub struct Xe3Isa;
@@ -354,107 +349,19 @@ impl Enc {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Xe3Code {
-    pub name: String,
-    pub stage: Option<ShaderStage>,
-    pub bytes: Vec<u8>,
-}
+/// A kernel's machine code
+pub struct Xe3Code;
 
 impl Xe3Code {
-    /// An `xe3.kernel`'s code
-    pub fn of(kernel: &Operation<'_>) -> Result<Xe3Code, Error> {
-        let head = Xe3Kernel::try_from(kernel)?;
+    /// An `xe3.kernel`'s code and the padding it asks for after it
+    pub fn padded(kernel: &Operation<'_>) -> Result<Vec<u8>, Error> {
+        let pad = Xe3Kernel::try_from(kernel)?.pad.unwrap_or(0);
         let ir = Ir::new(kernel)?;
         let mut bytes = Vec::new();
         for op in ir.block_ops(ir.top_block(ir.root)) {
             bytes.extend(Xe3Isa::op(ir[op].name, &ir[op].all_attrs())?);
         }
-        let name = match &head.sym_name {
-            Attribute::SymbolRef(p) => p[0].trim_start_matches('@').into(),
-            a @ Attribute::Str { .. } => a.text()?,
-            other => return Err(Error(format!("{other} is not a symbol"))),
-        };
-        Ok(Xe3Code { name, stage: head.stage, bytes })
-    }
-
-    /// The kernel's code and the padding it asks for after it, as an image holds it
-    pub fn padded(kernel: &Operation<'_>) -> Result<Vec<u8>, Error> {
-        let mut bytes = Xe3Code::of(kernel)?.bytes;
-        let pad = Xe3Kernel::try_from(kernel)?.pad.unwrap_or(0);
         bytes.resize(bytes.len() + pad as usize, 0);
         Ok(bytes)
-    }
-}
-
-/// The `xe3` machine code of a kernel (`xe3.kernel`), or of every kernel in an op, one after the
-/// other; `Xe3Code::of` gives one kernel's code
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Xe3Writer;
-
-impl Xe3Writer {
-    pub const NAME: &'static str = "xe3";
-
-    /// Every `xe3.kernel` in `op` (`op` itself if it is one)
-    pub fn kernels(op: &Operation<'_>) -> Result<Vec<Xe3Code>, Error> {
-        let mut out = Vec::new();
-        Self::collect(op, &mut out)?;
-        Ok(out)
-    }
-
-    fn collect(op: &Operation<'_>, out: &mut Vec<Xe3Code>) -> Result<(), Error> {
-        if op.name == Xe3Kernel::NAME {
-            out.push(Xe3Code::of(op)?);
-            return Ok(());
-        }
-        for o in op.regions.iter().flat_map(|r| &r.blocks).flat_map(|b| &b.ops) {
-            Self::collect(o, out)?;
-        }
-        Ok(())
-    }
-}
-
-impl Write for Xe3Writer {
-    fn name(&self) -> &'static str {
-        Xe3Writer::NAME
-    }
-
-    fn write(&self, op: &Operation<'_>, _pool: &dyn Pool) -> Result<Vec<u8>, Error> {
-        Ok(Xe3Writer::kernels(op)?.into_iter().flat_map(|k| k.bytes).collect())
-    }
-}
-
-/// An Xe3 image: memories from 1 MiB up in 64 KiB pages, a batch of genxml commands, state structs
-/// and padded kernels
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Xe3Image;
-
-impl Xe3Image {
-    /// Prefix of the state structs' ops (`xe3.state.blend_state`), which an image places in memory
-    pub const STATE: &'static str = "xe3.state.";
-
-    fn le(dw: &[u32]) -> Vec<u8> {
-        dw.iter().flat_map(|d| d.to_le_bytes()).collect()
-    }
-}
-
-impl ImageBytes for Xe3Image {
-    const BASE: u64 = 0x10_0000;
-    const PAGE: u64 = 0x1_0000;
-
-    fn stream(&self, ir: &Ir<'_, '_>, stream: OpId) -> Result<Vec<u8>, Error> {
-        let mut dw = Vec::new();
-        for c in ir.block_ops(ir.top_block(stream)) {
-            dw.extend(Pack(XE3).pack(ir[c].name, &ir[c].all_attrs())?);
-        }
-        Ok(Xe3Image::le(&dw))
-    }
-
-    fn item(&self, ir: &Ir<'_, '_>, op: OpId) -> Result<Vec<u8>, Error> {
-        match ir[op].name {
-            n if n == Xe3Kernel::NAME => Xe3Code::padded(ir[op].op),
-            name if name.starts_with(Xe3Image::STATE) => Ok(Xe3Image::le(&Pack(XE3).pack(name, &ir[op].all_attrs())?)),
-            name => Err(Error(format!("{name} cannot be placed in memory"))),
-        }
     }
 }

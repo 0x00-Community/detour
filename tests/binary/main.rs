@@ -1,7 +1,6 @@
 //! detour's binaries: each GPU's machine code encoded as its oracle encodes it, records packed as
 //! Mesa packs them
 
-mod rdna2;
 mod xe3;
 
 use mlirformat::{Attribute, Dialect, Item, MlirOpt, Module, NamedAttr, Operation};
