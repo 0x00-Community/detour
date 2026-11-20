@@ -6,7 +6,7 @@ use mlirpass::{Body, Ctx, GlslDialect, Interfaces, PassManager, Passes};
 /// What `Toolchain::program` writes ahead of the compiled program: this, the detour version, the GPU, each ending in
 /// a newline
 const PROGRAM_MAGIC: &str = "detour program";
-use crate::{DetourPasses, ImageDialect, Kernels, Rdna2Dialect, Rdna2Shader, ShaderStage, Xe3Dialect, Xe3Draw, Xe3Kernel, Xe3Shader};
+use crate::{DetourPasses, ImageDialect, Kernels, Rdna2Dialect, Rdna2Graphics, Rdna2Shader, ShaderStage, Xe3Dialect, Xe3Draw, Xe3Kernel, Xe3Shader};
 
 /// The instruction set a program is compiled for: a GPU detour draws on
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -72,8 +72,9 @@ impl Toolchain<'_> {
         }
     }
 
-    fn compile_rdna2(&self, _body: Body<'_>) -> Result<Compiled, Error> {
-        Err(Error("RDNA2 shaders: not yet".into()))
+    fn compile_rdna2(&self, mut body: Body<'_>) -> Result<Compiled, Error> {
+        let (vs, fs) = Rdna2Graphics::compile(&mut body, &self.passes).map_err(|e| Error(format!("{e}\n{}", self.show(&body))))?;
+        Ok(Compiled::new(Shaders::Rdna2 { vs, fs }))
     }
 
     fn compile_xe3(&self, mut body: Body<'_>) -> Result<Compiled, Error> {
