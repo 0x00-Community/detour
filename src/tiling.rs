@@ -89,10 +89,10 @@ impl Tiling {
         let across = (self.pitch(row_bytes) / Self::TILE4_WIDTH) as usize;
         let tiles = across * (self.rows(height) / Self::TILE4_ROWS) as usize;
         let mut tile = Tile([0; Self::TILE4_BYTES]);
-        for (i, from) in tiled.chunks_exact(Self::TILE4_BYTES).take(tiles).enumerate() {
+        for (i, from) in tiled.as_chunks::<{ Self::TILE4_BYTES }>().0.iter().take(tiles).enumerate() {
             let (x0, y0) = ((i % across) as u32 * Self::TILE4_WIDTH, (i / across) as u32 * Self::TILE4_ROWS);
             stream(from, &mut tile.0);
-            for (r, run) in tile.0.chunks_exact(RUN as usize).enumerate() {
+            for (r, run) in tile.0.as_chunks::<{ RUN as usize }>().0.iter().enumerate() {
                 let (x, y) = (x0 + RUNS[r].0, y0 + RUNS[r].1);
                 if x >= row_bytes || y >= height {
                     continue;

@@ -151,8 +151,10 @@ fn target(device: &Device<'_>, size: [u32; 2], tiling: Tiling) -> Result<Surface
 /// `got` against `want`, each byte within `tolerance`
 fn compare(got: &[u8], want: &[u8], width: u32, tolerance: u8) -> Result<(), String> {
     let wrong: Vec<String> = got
-        .chunks_exact(4)
-        .zip(want.chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(want.as_chunks::<4>().0)
         .enumerate()
         .filter(|(_, (g, w))| g.iter().zip(*w).any(|(a, b)| a.abs_diff(*b) > tolerance))
         .map(|(i, (g, w))| format!("({}, {}) {g:?} not {w:?}", i as u32 % width, i as u32 / width))

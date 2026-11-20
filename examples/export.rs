@@ -113,7 +113,7 @@ fn run(xe: &Xe, program: &Compiled, tiling: Tiling, card: Option<&std::path::Pat
     let other = Device::new(xe);
     let imported = other.import(&target(tiling), e.fd.as_fd(), e.offset, e.pitch).map_err(|e| e.0)?;
     let pixels = other.read(imported, (W * H * 4) as usize).map_err(|e| e.0)?;
-    let wrong = pixels.chunks_exact(4).filter(|p| *p != COLOR).count();
+    let wrong = pixels.as_chunks::<4>().0.iter().filter(|p| **p != COLOR).count();
     if wrong > 0 {
         return Err(format!("{wrong} pixels read through the import are not the color drawn"));
     }

@@ -115,7 +115,7 @@ impl Run<'_, '_> {
 type Case<'a> = (&'static str, Result<Vec<u8>, String>, &'a [u8]);
 
 fn same(got: &[u8], want: &[u8]) -> Result<(), String> {
-    let wrong = got.chunks_exact(4).zip(want.chunks_exact(4)).filter(|(a, b)| a != b).count();
+    let wrong = got.as_chunks::<4>().0.iter().zip(want.as_chunks::<4>().0).filter(|(a, b)| a != b).count();
     if wrong == 0 { Ok(()) } else { Err(format!("{wrong} pixels differ from the plain draw")) }
 }
 
