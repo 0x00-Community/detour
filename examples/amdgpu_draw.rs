@@ -6,7 +6,7 @@
 
 use std::time::{Duration, Instant};
 
-use detour::{Amdgpu, AmdgpuIb, Bo, Caching, Engine, Fence, Gpu, MemType, Queue, Vm};
+use detour::{Amdgpu, AmdgpuIb, Bo, Caching, MemType};
 
 /// PM4 type-3 packet header: opcode, then `n` dwords of body
 const fn pkt3(op: u32, n: u32) -> u32 {
@@ -315,14 +315,14 @@ fn main() {
     b[IB as usize..][..4 * ib.len()].copy_from_slice(&words(&ib));
 
     let vm = amd.vm().unwrap();
-    let queue = amd.queue(&vm, Engine::Render).unwrap();
+    let queue = amd.queue(&vm).unwrap();
     vm.bind(&bo, 0, base, SIZE, MemType::Streaming, &[]).unwrap();
     let done = amd.fence(false).unwrap();
     let t = Instant::now();
-    queue.submit(&AmdgpuIb { addr: ib_addr, dwords: ib.len() as u32 }, &[], &[&done]).unwrap();
+    queue.submit(AmdgpuIb { addr: ib_addr, dwords: ib.len() as u32 }, &[], &[&done]).unwrap();
     assert!(done.wait(Duration::from_secs(5)).unwrap(), "the draw did not finish");
     let took = t.elapsed();
-    println!("{} dwords drawn in {:.3} ms; fault: {:?}", ib.len(), took.as_secs_f64() * 1e3, queue.fault(&done).unwrap());
+    println!("{} dwords drawn in {:.3} ms; fault: {:?}", ib.len(), took.as_secs_f64() * 1e3, queue.fault().unwrap());
     let px = &bo.bytes().unwrap()[TARGET as usize..][..SIDE * SIDE * 4];
     let at = |x: usize, y: usize| &px[4 * (y * SIDE + x)..][..4];
     let lit = px.chunks(4).filter(|p| p.iter().any(|&c| c != 0)).count();

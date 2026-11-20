@@ -1,7 +1,6 @@
 //! detour: a user-mode driver for Intel Xe3 and AMD RDNA2 integrated graphics over mlirpass: the kernel interface, shaders to
 //! machine code, and draws (`Device::draw`). Its GPU dialects are mlirformat plugins (`dialect`), its lowerings mlirpass plugins
-//! (`pass`), and the machine code it writes (`binary`). The kernel
-//! interface and the devices are Linux's; the compiler builds anywhere.
+//! (`pass`), and the machine code it writes (`binary`). Linux only.
 
 extern crate alloc;
 
@@ -9,7 +8,6 @@ mod binary;
 mod dialect;
 mod kmd;
 mod pass;
-#[cfg(target_os = "linux")]
 mod render;
 mod shader;
 mod tiling;
@@ -18,7 +16,6 @@ pub use binary::*;
 pub use dialect::*;
 pub use kmd::*;
 pub use pass::*;
-#[cfg(target_os = "linux")]
 pub use render::*;
 pub use shader::*;
 pub use tiling::*;

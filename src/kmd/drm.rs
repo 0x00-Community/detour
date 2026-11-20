@@ -13,7 +13,7 @@ use rustix::ioctl::{Ioctl, IoctlOutput, Opcode, opcode};
 use rustix::mm::{MapFlags, ProtFlags};
 use rustix::time::ClockId;
 
-use super::{Fence, Result};
+use super::Result;
 
 pub const DRM_IOCTL_BASE: u8 = b'd';
 pub const DRM_COMMAND_BASE: u8 = 0x40;
@@ -274,8 +274,8 @@ impl Syncobj<'_> {
     }
 }
 
-impl Fence for Syncobj<'_> {
-    fn wait(&self, timeout: Duration) -> Result<bool> {
+impl Syncobj<'_> {
+    pub fn wait(&self, timeout: Duration) -> Result<bool> {
         let now = rustix::time::clock_gettime(ClockId::Monotonic);
         let deadline = (now.tv_sec * 1_000_000_000 + now.tv_nsec).saturating_add(timeout.as_nanos() as i64);
         let handles = [self.handle];
@@ -293,7 +293,7 @@ impl Fence for Syncobj<'_> {
         }
     }
 
-    fn export(&self) -> Result<OwnedFd> {
+    pub fn export(&self) -> Result<OwnedFd> {
         let mut h = drm_syncobj_handle { handle: self.handle, flags: DRM_SYNCOBJ_HANDLE_TO_FD_FLAGS_EXPORT_SYNC_FILE, fd: -1, ..Default::default() };
         unsafe { self.node.ioctl(DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD, &mut h) }?;
         Ok(unsafe { OwnedFd::from_raw_fd(h.fd) })

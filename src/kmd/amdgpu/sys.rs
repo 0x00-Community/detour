@@ -23,8 +23,6 @@ pub const AMDGPU_VM_MTYPE_DEFAULT: u32 = 0;
 pub const AMDGPU_VM_MTYPE_UC: u32 = 4 << 5;
 
 pub const AMDGPU_HW_IP_GFX: u32 = 0;
-pub const AMDGPU_HW_IP_COMPUTE: u32 = 1;
-pub const AMDGPU_HW_IP_DMA: u32 = 2;
 
 pub const AMDGPU_CHUNK_ID_IB: u32 = 0x01;
 pub const AMDGPU_CHUNK_ID_SYNCOBJ_IN: u32 = 0x04;

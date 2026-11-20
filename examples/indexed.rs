@@ -5,10 +5,7 @@
 //!
 //!   cargo run --release --example indexed
 
-use detour::{Isa, 
-    ColorFormat, ColorTarget, Compiled, Device, Draw, Gpu, IndexBuffer, IndexFormat, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement,
-    VertexFormat, Xe,
-};
+use detour::{Isa, ColorFormat, ColorTarget, Compiled, Device, Draw, IndexBuffer, IndexFormat, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
 use mlirpass::{GlslReader, GlslStage};
 
 const SHADERS: [&str; 2] = [

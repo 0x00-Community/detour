@@ -5,7 +5,7 @@ use std::io;
 use std::os::fd::{BorrowedFd, OwnedFd};
 use std::path::Path;
 
-use crate::{BoDesc, Caching, DeviceInfo, Engine, Gpu, Map, MemType, Node, Result, Syncobj};
+use crate::{BoDesc, Caching, DeviceInfo, Map, MemType, Node, Result, Syncobj};
 
 pub use sys::drm_xe_engine_class_instance as EngineInstance;
 
@@ -146,13 +146,9 @@ impl XeInfo {
         self.mem_regions.iter().find(|r| !r.vram).map_or(1, |r| 1 << r.instance)
     }
 
-    pub fn engine(&self, engine: Engine) -> Option<EngineInstance> {
-        let class = match engine {
-            Engine::Render => sys::DRM_XE_ENGINE_CLASS_RENDER,
-            Engine::Compute => sys::DRM_XE_ENGINE_CLASS_COMPUTE,
-            Engine::Copy => sys::DRM_XE_ENGINE_CLASS_COPY,
-        };
-        self.engines.iter().copied().find(|e| e.engine_class == class)
+    /// The render engine
+    pub fn render(&self) -> Option<EngineInstance> {
+        self.engines.iter().copied().find(|e| e.engine_class == sys::DRM_XE_ENGINE_CLASS_RENDER)
     }
 }
 
@@ -211,27 +207,21 @@ impl TryFrom<Node> for Xe {
     }
 }
 
-impl Gpu for Xe {
-    type Info = XeInfo;
-    type Bo<'d> = XeBo<'d>;
-    type Vm<'d> = XeVm<'d>;
-    type Queue<'d> = XeQueue<'d>;
-    type Fence<'d> = Syncobj<'d>;
-    type Cmd = u64;
+impl Xe {
 
-    fn open_first() -> Result<Xe> {
+    pub fn open_first() -> Result<Xe> {
         Xe::try_from(Node::open_driver("xe")?)
     }
 
-    fn info(&self) -> DeviceInfo {
+    pub fn info(&self) -> DeviceInfo {
         self.info.common
     }
 
-    fn driver_info(&self) -> &XeInfo {
+    pub fn driver_info(&self) -> &XeInfo {
         &self.info
     }
 
-    fn bo(&self, desc: BoDesc) -> Result<XeBo<'_>> {
+    pub fn bo(&self, desc: BoDesc) -> Result<XeBo<'_>> {
         let size = desc.size.next_multiple_of(self.info.common.min_alignment);
         let mut c = sys::drm_xe_gem_create {
             size,
@@ -247,19 +237,19 @@ impl Gpu for Xe {
         Ok(XeBo { xe: self, handle: c.handle, size, map: None })
     }
 
-    fn import(&self, fd: BorrowedFd<'_>) -> Result<XeBo<'_>> {
+    pub fn import(&self, fd: BorrowedFd<'_>) -> Result<XeBo<'_>> {
         let (handle, size) = self.node.import(fd)?;
         Ok(XeBo { xe: self, handle, size, map: None })
     }
 
-    fn vm(&self) -> Result<XeVm<'_>> {
+    pub fn vm(&self) -> Result<XeVm<'_>> {
         let mut c = sys::drm_xe_vm_create::default();
         self.node.xe(sys::DRM_IOCTL_XE_VM_CREATE, &mut c)?;
         Ok(XeVm { xe: self, id: c.vm_id })
     }
 
-    fn queue<'d>(&'d self, vm: &XeVm<'d>, engine: Engine) -> Result<XeQueue<'d>> {
-        let instance = self.info.engine(engine).ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no {engine:?} engine")))?;
+    pub fn queue<'d>(&'d self, vm: &XeVm<'d>) -> Result<XeQueue<'d>> {
+        let instance = self.info.render().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no render engine"))?;
         let mut c = sys::drm_xe_exec_queue_create {
             width: 1,
             num_placements: 1,
@@ -271,7 +261,7 @@ impl Gpu for Xe {
         Ok(XeQueue { xe: self, id: c.exec_queue_id })
     }
 
-    fn fence(&self, signaled: bool) -> Result<Syncobj<'_>> {
+    pub fn fence(&self, signaled: bool) -> Result<Syncobj<'_>> {
         self.node.syncobj(signaled)
     }
 }
@@ -361,8 +351,8 @@ impl XeVm<'_> {
     }
 }
 
-impl<'d> crate::Vm<'d, Xe> for XeVm<'d> {
-    fn bind(&self, bo: &XeBo<'d>, offset: u64, addr: u64, range: u64, mem: MemType, done: &[&Syncobj<'d>]) -> Result<()> {
+impl<'d> XeVm<'d> {
+    pub fn bind(&self, bo: &XeBo<'d>, offset: u64, addr: u64, range: u64, mem: MemType, done: &[&Syncobj<'d>]) -> Result<()> {
         let op = sys::drm_xe_vm_bind_op {
             obj: bo.handle,
             pat_index: Pat::from(mem).0,
@@ -375,7 +365,7 @@ impl<'d> crate::Vm<'d, Xe> for XeVm<'d> {
         self.bind_op(op, done)
     }
 
-    fn unbind(&self, addr: u64, range: u64, done: &[&Syncobj<'d>]) -> Result<()> {
+    pub fn unbind(&self, addr: u64, range: u64, done: &[&Syncobj<'d>]) -> Result<()> {
         self.bind_op(sys::drm_xe_vm_bind_op { range, addr, op: sys::DRM_XE_VM_BIND_OP_UNMAP, ..Default::default() }, done)
     }
 }
@@ -392,21 +382,21 @@ pub struct XeQueue<'d> {
     id: u32,
 }
 
-impl<'d> crate::Queue<'d, Xe> for XeQueue<'d> {
-    fn submit(&self, batch: &u64, wait: &[&Syncobj<'d>], signal: &[&Syncobj<'d>]) -> Result<()> {
+impl<'d> XeQueue<'d> {
+    pub fn submit(&self, batch: u64, wait: &[&Syncobj<'d>], signal: &[&Syncobj<'d>]) -> Result<()> {
         let Syncs(syncs) = (wait, signal).into();
         let mut e = sys::drm_xe_exec {
             exec_queue_id: self.id,
             num_syncs: syncs.len() as u32,
             syncs: syncs.as_ptr() as u64,
-            address: *batch,
+            address: batch,
             num_batch_buffer: 1,
             ..Default::default()
         };
         self.xe.node.xe(sys::DRM_IOCTL_XE_EXEC, &mut e)
     }
 
-    fn fault(&self, _done: &Syncobj<'d>) -> Result<Option<u64>> {
+    pub fn fault(&self) -> Result<Option<u64>> {
         let mut p = sys::drm_xe_exec_queue_get_property {
             exec_queue_id: self.id,
             property: sys::DRM_XE_EXEC_QUEUE_GET_PROPERTY_BAN,

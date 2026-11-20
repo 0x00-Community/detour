@@ -7,10 +7,7 @@
 
 use std::time::Instant;
 
-use detour::{
-    Blend, BlendEquation, BlendFactor, Card, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, Filter, IndexBuffer, IndexFormat, Isa, RDNA2_PERSP_CENTER, Rdna2Shader,
-    Sampled, ShaderStage, Shaders, Surface, TargetLoad, Tiling, VertexBuffer, VertexElement, VertexFormat, Wrap,
-};
+use detour::{Blend, BlendEquation, BlendFactor, Card, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, Filter, IndexBuffer, IndexFormat, Isa, RDNA2_PERSP_CENTER, Rdna2Shader, Sampled, ShaderStage, Shaders, Surface, TargetLoad, Tiling, VertexBuffer, VertexElement, VertexFormat, Wrap};
 
 /// s_code_end, padding a shader for the instruction prefetch
 const CODE_END: u32 = 0xbf9f_0000;
