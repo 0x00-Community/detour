@@ -367,8 +367,6 @@ impl Xe3Device {
     pub const NULL_TABLE_AT: u64 = SURFACE_ALIGN as u64;
     /// Bytes the pool's static part takes: what a device writes in it goes after
     pub const POOL_STATIC: u64 = Xe3Device::NULL_TABLE_AT + 4 * Xe3Device::NULL_TABLE as u64;
-    /// The pool's alignment
-    pub const POOL_ALIGN: u64 = POOL as u64;
 
     /// The binding table pool's static part, the pool at `pool`: the null surface, then a binding table of it
     pub fn pool(pool: u64) -> Result<Vec<u8>, Error> {
@@ -440,8 +438,6 @@ pub struct Xe3Draw {
 impl Xe3Draw {
     /// SPIR-V vertex and fragment shaders (spirv.module ops at the top of the module) to Xe3 kernels
     pub const SHADERS: &'static str = "builtin.module(xevm-attach-target{chip=ptl}, convert-spirv-entry-points, gpu-inline-calls, convert-spirv-cf-to-cf, sroa, mem2reg, gpu-local-arrays, mem2reg, lift-cf-to-scf, canonicalize, cse, convert-gpu-to-xe3, xe3-regalloc, xe3-control, xe3-swsb, xe3-branches, xe3-pad)";
-    /// A surface state's alignment, and a binding table's
-    pub const SURFACE_ALIGN: u64 = SURFACE_ALIGN as u64;
     /// A scissor rectangle's alignment: 64 bytes. genxml's pointer keeps bits 5 and up, but on Xe3 (Panther Lake) a
     /// rectangle 32 bytes past a 64-byte boundary is not the one the draw uses
     pub const SCISSOR_ALIGN: u64 = 64;

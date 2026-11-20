@@ -47,10 +47,6 @@ impl Interpolate {
         3 + imask as u8
     }
 
-    pub const fn coverage(varyings: bool) -> u8 {
-        if varyings { 3 } else { 1 }
-    }
-
     pub fn plane(setup: u8, k: usize, p: usize) -> String {
         let reg = setup as usize + k / 5;
         let byte = (k % 5) * 12 + 4 * p;

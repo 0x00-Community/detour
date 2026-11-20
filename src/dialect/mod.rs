@@ -8,6 +8,6 @@ mod rdna2;
 mod xe3;
 
 pub use layout::{Field as PackField, Fields, Fill, Group as PackGroup, Item as PackItem, Layouts, Real, Ty as PackTy, attribute_of};
-pub use isa::{IsaInt, OpRows, RegType, ShaderStage};
+pub use isa::{OpRows, RegType, ShaderStage};
 pub use rdna2::*;
 pub use xe3::*;

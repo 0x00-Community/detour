@@ -121,17 +121,6 @@ struct drm_syncobj_array {
     pad: u32,
 }
 
-#[repr(C)]
-#[derive(Default)]
-struct sync_file_info {
-    name: [u8; 32],
-    status: i32,
-    flags: u32,
-    num_fences: u32,
-    pad: u32,
-    sync_fence_info: u64,
-}
-
 const DRM_SYNCOBJ_CREATE_SIGNALED: u32 = 1 << 0;
 const DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL: u32 = 1 << 0;
 const DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT: u32 = 1 << 1;
@@ -150,7 +139,6 @@ const DRM_IOCTL_SYNCOBJ_HANDLE_TO_FD: Opcode = opcode::read_write::<drm_syncobj_
 const DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE: Opcode = opcode::read_write::<drm_syncobj_handle>(DRM_IOCTL_BASE, 0xc2);
 const DRM_IOCTL_SYNCOBJ_WAIT: Opcode = opcode::read_write::<drm_syncobj_wait>(DRM_IOCTL_BASE, 0xc3);
 const DRM_IOCTL_SYNCOBJ_SIGNAL: Opcode = opcode::read_write::<drm_syncobj_array>(DRM_IOCTL_BASE, 0xc5);
-const SYNC_IOC_FILE_INFO: Opcode = opcode::read_write::<sync_file_info>(b'>', 4);
 
 pub struct Node {
     fd: OwnedFd,
@@ -283,13 +271,6 @@ impl Syncobj<'_> {
         let mut h = drm_syncobj_handle { handle: self.handle, flags: DRM_SYNCOBJ_FD_TO_HANDLE_FLAGS_IMPORT_SYNC_FILE, fd: sync_file.as_raw_fd(), ..Default::default() };
         unsafe { self.node.ioctl(DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, &mut h) }
     }
-
-    pub fn status(&self) -> Result<i32> {
-        let file = self.export()?;
-        let mut info = sync_file_info::default();
-        unsafe { call(file.as_fd(), SYNC_IOC_FILE_INFO, &mut info) }?;
-        Ok(info.status)
-    }
 }
 
 impl Fence for Syncobj<'_> {
@@ -333,11 +314,9 @@ mod tests {
     fn sizes_match_the_kernel() {
         assert_eq!(size_of::<drm_version>(), 64);
         assert_eq!(size_of::<drm_syncobj_wait>(), 40);
-        assert_eq!(size_of::<sync_file_info>(), 56);
         assert_eq!(DRM_IOCTL_VERSION, 0xc040_6400);
         assert_eq!(DRM_IOCTL_SYNCOBJ_WAIT, 0xc028_64c3);
         assert_eq!(DRM_IOCTL_SYNCOBJ_SIGNAL, 0xc010_64c5);
         assert_eq!(DRM_IOCTL_SYNCOBJ_FD_TO_HANDLE, 0xc018_64c2);
-        assert_eq!(SYNC_IOC_FILE_INFO, 0xc038_3e04);
     }
 }
