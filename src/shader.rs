@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use mlirformat::{Error, MlirOpt, Op};
-use mlirpass::{Body, Ctx, GlslDialect, Interfaces, OpId, PassManager, Passes, Shift, SpirvBinary};
+use mlirpass::{Body, Ctx, GlslDialect, Interfaces, PassManager, Passes};
 
 /// What `Toolchain::program` writes ahead of the compiled program: this, the detour version, the GPU, each ending in
 /// a newline
@@ -60,17 +60,6 @@ impl Toolchain<'_> {
 
     pub fn show(&self, body: &Body<'_>) -> String {
         body.show(&self.opt, false, |_| true)
-    }
-
-    /// A SPIR-V module (its bytes, as an application hands them) read into `body`, at the end of its top block
-    pub fn read_spirv(&self, body: &mut Body<'_>, bytes: &[u8]) -> Result<OpId, Error> {
-        let sub = SpirvBinary::default().read(body.ctx, bytes)?;
-        let m = sub.first_op(sub.top_block(sub.root)).ok_or_else(|| Error::from("an empty SPIR-V module"))?;
-        let moved = m.shift(&body.absorb(sub));
-        body.detach(moved);
-        let top = body.top_block(body.root);
-        body.insert(moved, top, None);
-        Ok(moved)
     }
 
     /// The SPIR-V shaders at the top of `body` compiled by mlirpass for the device's GPU, to machine code
