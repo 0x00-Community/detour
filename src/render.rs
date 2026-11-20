@@ -1,89 +1,29 @@
-use std::cell::{RefCell, RefMut};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::mem::discriminant;
+//! Draws on a GPU: a card (an Xe or amdgpu render node) and the device that keeps surfaces and draws on it, the same
+//! calls on either (`Device`)
+
+mod amd;
+mod target;
+mod xe3;
+
+use std::io;
 use std::os::fd::{BorrowedFd, OwnedFd};
-use std::rc::Rc;
+use std::path::Path;
 use std::time::Duration;
 
 use mlirformat::Error;
 
-use crate::{
-    Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Syncobj, TargetLoad, Template, Tiling, Vm, Shaders, Xe, Xe3Device, Xe3Draw, Xe3DrawCommands, Xe3Shader, XeBo, XeQueue,
-    XeVm,
-};
+use crate::{Amd, ColorTarget, Compiled, Draw, Fence, Isa, Node, Syncobj, Xe};
+pub(crate) use target::SurfaceMem;
 
 /// How long a submission may take before the GPU is called hung
 const TIMEOUT: Duration = Duration::from_secs(5);
-/// Draw shapes kept resident
-const RESIDENT: usize = 64;
-/// The arena the programs' code and the shapes' states and batches go in: chunks from `ARENA_ADDR`, `ARENA_SPAN`
-/// apart, all below 4 GiB (states are pointed at with 32 bits), each `ARENA_CHUNK` bytes or what one piece takes
-const ARENA_ADDR: u64 = 1 << 24;
-const ARENA_SPAN: u64 = 1 << 24;
-const ARENA_CHUNK: usize = 1 << 20;
-const ARENA_ALIGN: usize = 64;
-/// The binding table pool all shapes share (its static part first), below 4 GiB on its alignment
-const POOL_ADDR: u64 = 0xe000_0000;
-const POOL_SIZE: usize = 1 << 20;
-/// The context's system memory fence
-const FENCE_ADDR: u64 = 0xef00_0000;
-const FENCE_SIZE: u64 = 4096;
-/// What the device writes between draws below 4 GiB (scissor rectangles, viewports), and its size
-const DYNAMIC_ADDR: u64 = 0xf000_0000;
-const DYNAMIC_SIZE: usize = 1 << 20;
-/// Where the first-level batches go, and their ring's size
-const CALLS_ADDR: u64 = 1 << 32;
-const CALLS_SIZE: u64 = 1 << 20;
-/// Mapped past a ring's end: the command streamer prefetches beyond the batch end it reads (a GPU fault at batch +
-/// 0x1000 otherwise), the VF beyond a buffer's
-const GUARD: u64 = 1 << 16;
-/// MI_BATCH_BUFFER_START of a second-level batch in the PPGTT (its address in the next two dwords), MI_BATCH_BUFFER_END
-const MI_BATCH_BUFFER_START_2ND: u32 = 49 << 23 | 1 << 22 | 1 << 8 | 1;
-const MI_BATCH_BUFFER_END: u32 = 10 << 23;
-const CALL_BYTES: usize = 12;
-/// A first-level batch's start: the CS reads it from a 64-byte boundary
-const BATCH_ALIGN: usize = 64;
-/// The uniforms' ring, vertex buffer i's (`VERTEX_ADDR + i * VERTEX_SPAN`), a ring's least size and where each
-/// draw's bytes start in it
-const UNIFORM_ADDR: u64 = 1 << 35;
-/// The indices' ring
-const INDEX_ADDR: u64 = 1 << 34;
-const VERTEX_ADDR: u64 = 1 << 36;
-const VERTEX_SPAN: u64 = 1 << 32;
-const RING_MIN: usize = 1 << 20;
-const RING_ALIGN: usize = 64;
-/// Bytes a ring compares with the last it was given (more: written again, not compared nor kept)
-const RING_HELD: usize = 64 << 10;
-/// Where surface slot i is mapped (`SURFACE_ADDR + i * SURFACE_SPAN`): a surface takes at most a span
-const SURFACE_ADDR: u64 = 1 << 40;
-const SURFACE_SPAN: u64 = 1 << 30;
-/// States the device writes: on 64 bytes
-const STATE_ALIGN: usize = 64;
 
-fn io(e: std::io::Error) -> Error {
+fn io(e: io::Error) -> Error {
     Error(e.to_string())
 }
 
 fn wait(f: &Syncobj<'_>, what: &str) -> Result<(), Error> {
     if f.wait(TIMEOUT).map_err(io)? { Ok(()) } else { Err(Error(format!("{what} did not finish: the GPU hung"))) }
-}
-
-/// `bo` mapped at `addr` in `vm` from its byte `offset`, the mapping in place before returning
-fn bind<'x>(xe: &'x Xe, vm: &XeVm<'x>, bo: &XeBo<'x>, offset: u64, addr: u64, range: u64, mem: MemType) -> Result<(), Error> {
-    let done = xe.fence(false).map_err(io)?;
-    vm.bind(bo, offset, addr, range, mem, &[&done]).map_err(io)?;
-    wait(&done, &format!("binding {addr:#x}"))
-}
-
-/// `words` written into `bo` from byte `at`
-fn put(bo: &mut XeBo<'_>, at: usize, words: &[u32]) -> Result<(), Error> {
-    let memory = bo.bytes().map_err(io)?;
-    let room = memory.get_mut(at..at + 4 * words.len()).ok_or_else(|| Error(format!("{} dwords past a memory's end at {at}", words.len())))?;
-    for (d, w) in room.as_chunks_mut::<4>().0.iter_mut().zip(words) {
-        d.copy_from_slice(&w.to_le_bytes());
-    }
-    Ok(())
 }
 
 /// DRM's format modifiers for a surface's tiling: linear, and Intel's Tile4 (fourcc_mod_code(INTEL, 9))
@@ -106,1083 +46,210 @@ pub struct Exported {
 
 /// A color target the device keeps: its pixels stay on the GPU between draws
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Surface(usize);
+pub struct Surface(pub(crate) usize);
 
-/// A command a draw writes: a template and, for each of its holes, which of the values given fills it
-struct Command {
-    template: Template,
-    slots: Vec<usize>,
+/// A GPU detour draws on: an Intel Xe3 (`xe`) or an AMD RDNA2 (`amdgpu`) render node
+#[expect(clippy::large_enum_variant, reason = "a card or two in a process")]
+pub enum Card {
+    Xe(Xe),
+    Amd(Amd),
 }
 
-impl Command {
-    /// `t`, its holes named as `names` says (each name's value's index)
-    fn new(t: &Template, names: &[String]) -> Result<Command, Error> {
-        let slot = |h: &str| names.iter().position(|n| n == h).ok_or_else(|| Error(format!("a hole @{h} the device does not fill")));
-        Ok(Command { template: t.clone(), slots: t.holes.iter().map(|h| slot(&h.name)).collect::<Result<_, _>>()? })
+impl Card {
+    /// The first render node in /dev/dri whose driver detour draws with
+    pub fn open_first() -> io::Result<Card> {
+        Card::try_from(Node::open_any(&["xe", "amdgpu"])?)
     }
 
-    fn bytes(&self) -> usize {
-        4 * self.template.dw.len()
+    /// Render node `path`, by its driver
+    pub fn open(path: &Path) -> io::Result<Card> {
+        Card::try_from(Node::open(path)?)
     }
 
-    /// Its dwords, the holes filled from `values`, after `out`'s
-    fn emit(&self, out: &mut Vec<u32>, values: &[u64]) {
-        self.template.emit_indexed(out, |i| values[self.slots[i]]);
-    }
-}
-
-fn names(n: &[&str]) -> Vec<String> {
-    n.iter().map(|s| s.to_string()).collect()
-}
-
-/// Bytes the GPU reads, written into a ring from its start once what read them before finished, each draw's after
-/// the last's (the same bytes again: where they are)
-struct Ring<'x> {
-    bo: Option<XeBo<'x>>,
-    addr: u64,
-    /// the bytes the ring holds (its memory past them mapped too: `GUARD`)
-    size: usize,
-    at: usize,
-    /// where the batch being recorded started writing, and the room the next start wants: twice what a batch
-    /// that did not fit asked for, so a frame's draws fit and it starts over at most once a frame
-    mark: usize,
-    want: usize,
-    /// where writing stops: `size`, or below a batch maybe still running after the ring started over at a frame's
-    /// end (`State::submit`)
-    limit: usize,
-    /// where the last bytes written start, and them (`RING_HELD` at most)
-    last: Option<(usize, Vec<u8>)>,
-}
-
-impl<'x> Ring<'x> {
-    fn new(addr: u64) -> Ring<'x> {
-        Ring { bo: None, addr, size: 0, at: 0, mark: 0, want: 0, limit: 0, last: None }
-    }
-
-    /// The batch being recorded did not fit, `len` more bytes asked for: the next start makes room for twice it
-    fn outgrown(&mut self, len: usize) {
-        self.want = self.want.max(2 * (self.at - self.mark.min(self.at) + len + RING_ALIGN));
-    }
-
-    fn held(&self, bytes: &[u8]) -> Option<usize> {
-        self.last.as_ref().filter(|(_, b)| b == bytes).map(|(at, _)| *at)
-    }
-
-    /// Where the ring is after `lens` more bytes from `at` (each on `RING_ALIGN`)
-    fn after(at: usize, lens: impl Iterator<Item = usize>) -> usize {
-        lens.fold(at, |at, n| if n == 0 { at } else { at.next_multiple_of(RING_ALIGN) + n })
-    }
-
-    /// Whether `bytes` are in place already, or fit after the last
-    fn fits(&self, bytes: &[u8]) -> bool {
-        self.held(bytes).is_some() || Ring::after(self.at, [bytes.len()].into_iter()) <= self.limit
-    }
-
-    /// The ring from its start, with room for `len` bytes and what it wants (nothing reading it)
-    fn restart(&mut self, xe: &'x Xe, vm: &XeVm<'x>, len: usize) -> Result<(), Error> {
-        let len = len.max(self.want);
-        (self.at, self.mark, self.want, self.last) = (0, 0, 0, None);
-        self.limit = self.size;
-        if len <= self.size {
-            return Ok(());
+    pub fn path(&self) -> &Path {
+        match self {
+            Card::Xe(xe) => xe.path(),
+            Card::Amd(amd) => amd.path(),
         }
-        let size = len.next_power_of_two().max(RING_MIN);
-        let bytes = size as u64 + GUARD;
-        if let Some(old) = self.bo.take() {
-            vm.unbind(self.addr, old.size(), &[]).map_err(io)?;
-        }
-        let bo = xe.bo((bytes, Caching::WriteCombined).into()).map_err(io)?;
-        bind(xe, vm, &bo, 0, self.addr, bytes, MemType::Streaming)?;
-        (self.bo, self.size, self.limit) = (Some(bo), size, size);
-        Ok(())
     }
 
-    /// `bytes` in the ring (they fit): their address
-    fn put(&mut self, bytes: &[u8]) -> Result<u64, Error> {
-        if bytes.is_empty() {
-            return Ok(self.addr);
+    /// The instruction set its programs are compiled for (`Toolchain::new`)
+    pub fn isa(&self) -> Isa {
+        match self {
+            Card::Xe(_) => Isa::Xe3,
+            Card::Amd(_) => Isa::Rdna2,
         }
-        if let Some(at) = self.held(bytes) {
-            return Ok(self.addr + at as u64);
-        }
-        let at = self.at.next_multiple_of(RING_ALIGN);
-        let bo = self.bo.as_mut().ok_or_else(|| Error("a ring with no memory".into()))?;
-        bo.bytes().map_err(io)?[at..at + bytes.len()].copy_from_slice(bytes);
-        self.at = at + bytes.len();
-        match &mut self.last {
-            _ if bytes.len() > RING_HELD => self.last = None,
-            Some((held, b)) => {
-                *held = at;
-                b.clear();
-                b.extend_from_slice(bytes);
-            }
-            None => self.last = Some((at, bytes.to_vec())),
-        }
-        Ok(self.addr + at as u64)
     }
 }
 
-/// What a draw writes, from its image (`Xe3DrawCommands`)
-struct Commands {
-    primitive: Command,
-    index_buffer: Command,
-    vertex_buffers: Command,
-    scissor_rect: Command,
-    scissor_pointer: Command,
-    target_surface: Command,
-    uniform_surface: Command,
-    texture_surface: Command,
-    binding_table: Command,
-    barrier: Command,
-    table_vs: Command,
-    table_ps: Command,
-    viewport_cc: Command,
-    viewport_sf_clip: Command,
-}
+impl TryFrom<Node> for Card {
+    type Error = io::Error;
 
-impl Commands {
-    /// The bytes a draw's commands take at most
-    fn bytes(&self) -> usize {
-        [&self.index_buffer, &self.vertex_buffers, &self.scissor_pointer, &self.table_vs, &self.table_ps, &self.viewport_cc, &self.viewport_sf_clip, &self.primitive, &self.barrier].iter().map(|c| c.bytes()).sum()
+    fn try_from(node: Node) -> io::Result<Card> {
+        match node.driver()?.as_str() {
+            "xe" => Xe::try_from(node).map(Card::Xe),
+            "amdgpu" => Amd::try_from(node).map(Card::Amd),
+            d => Err(io::Error::new(io::ErrorKind::Unsupported, format!("{}: driver {d}, not xe or amdgpu", node.path().display()))),
+        }
     }
 }
 
-/// Memory for the programs' code and the shapes: chunks mapped once, pieces taken and given back
-struct Arena<'x> {
-    chunks: Vec<(XeBo<'x>, u64, usize)>,
-    /// pieces given back: address and bytes
-    free: Vec<(u64, usize)>,
-    /// where the last chunk's untaken bytes start
-    at: usize,
+/// A card a device draws on, borrowed: a `Card`, an `Xe` or an `Amd`
+#[derive(Clone, Copy)]
+pub enum CardRef<'x> {
+    Xe(&'x Xe),
+    Amd(&'x Amd),
 }
 
-impl<'x> Arena<'x> {
-    /// A piece of `len` bytes (made a multiple of `ARENA_ALIGN`): its address and bytes
-    fn take(&mut self, xe: &'x Xe, vm: &XeVm<'x>, len: usize) -> Result<(u64, usize), Error> {
-        let len = len.next_multiple_of(ARENA_ALIGN);
-        if let Some(f) = self.free.iter().position(|(_, n)| *n >= len) {
-            let (addr, n) = self.free.swap_remove(f);
-            if n > len {
-                self.free.push((addr + len as u64, n - len));
-            }
-            return Ok((addr, len));
-        }
-        if self.chunks.last().is_none_or(|(_, _, size)| self.at + len > *size) {
-            let size = len.max(ARENA_CHUNK);
-            let addr = ARENA_ADDR + self.chunks.len() as u64 * ARENA_SPAN;
-            if size as u64 + GUARD > ARENA_SPAN || addr + ARENA_SPAN > POOL_ADDR {
-                return Err(Error(format!("no room for {len} bytes of shapes and programs")));
-            }
-            let bo = xe.bo((size as u64 + GUARD, Caching::WriteCombined).into()).map_err(io)?;
-            bind(xe, vm, &bo, 0, addr, size as u64 + GUARD, MemType::Streaming)?;
-            self.chunks.push((bo, addr, size));
-            self.at = 0;
-        }
-        let (_, base, _) = self.chunks.last().unwrap();
-        let addr = base + self.at as u64;
-        self.at += len;
-        Ok((addr, len))
-    }
-
-    /// `bytes` written at `addr`, in a piece taken
-    fn write(&mut self, addr: u64, bytes: &[u8]) -> Result<(), Error> {
-        let chunk = self.chunks.iter_mut().find(|(_, base, size)| (*base..*base + *size as u64).contains(&addr));
-        let (bo, base, _) = chunk.ok_or_else(|| Error(format!("{addr:#x}: not in the arena")))?;
-        let at = (addr - *base) as usize;
-        bo.bytes().map_err(io)?[at..at + bytes.len()].copy_from_slice(bytes);
-        Ok(())
-    }
-
-    /// A piece holding `bytes`: its address
-    fn put(&mut self, xe: &'x Xe, vm: &XeVm<'x>, bytes: &[u8]) -> Result<u64, Error> {
-        let (addr, _) = self.take(xe, vm, bytes.len())?;
-        self.write(addr, bytes)?;
-        Ok(addr)
+impl<'x> From<&'x Xe> for CardRef<'x> {
+    fn from(xe: &'x Xe) -> Self {
+        CardRef::Xe(xe)
     }
 }
 
-/// One draw shape resident: its states and batches in the arena
-struct Shape {
-    key: u64,
-    /// when it was last drawn (the device's clock)
-    used: u64,
-    /// its piece of the arena
-    piece: (u64, usize),
-    /// its second-level batches: the draw's state, the flush
-    state: u64,
-    flush: u64,
-    commands: Commands,
-    /// the uniform blocks' bindings, in the draw's order
-    bindings: Vec<u32>,
-    /// the sampled textures' bindings, in the draw's order
-    textures: Vec<u32>,
-}
-
-impl Shape {
-    fn new(key: u64, piece: (u64, usize), state: u64, flush: u64, c: &Xe3DrawCommands, d: &Draw<'_>) -> Result<Shape, Error> {
-        let vb: Vec<String> = (0..d.buffers.len()).flat_map(|i| [Xe3Draw::vertex_buffer(i), format!("{}_size", Xe3Draw::vertex_buffer(i))]).collect();
-        let bindings: Vec<u32> = d.uniforms.iter().map(|(b, _)| *b).collect();
-        let textures: Vec<u32> = d.textures.iter().map(|t| t.binding).collect();
-        let table: Vec<String> = ["rt", "null"]
-            .into_iter()
-            .map(String::from)
-            .chain(bindings.iter().map(|b| Xe3Draw::uniform_buffer(*b)))
-            .chain(textures.iter().map(|b| Xe3Draw::texture_binding(*b)))
-            .collect();
-        let commands = Commands {
-            primitive: Command::new(&c.primitive, &names(&["count", "first", "instances"]))?,
-            index_buffer: Command::new(&c.index_buffer, &names(&["ib", "ib_size"]))?,
-            vertex_buffers: Command::new(&c.vertex_buffers, &vb)?,
-            scissor_rect: Command::new(&c.scissor_rect, &names(&["x0", "y0", "x1", "y1"]))?,
-            scissor_pointer: Command::new(&c.scissor_pointer, &names(&["scissor"]))?,
-            target_surface: Command::new(&c.target_surface, &names(&["target", "pitch", "width", "height"]))?,
-            uniform_surface: Command::new(&c.uniform_surface, &names(&["ubo", "ubo_w", "ubo_h", "ubo_d"]))?,
-            texture_surface: Command::new(&c.texture_surface, &names(&["tex", "tex_format", "tex_tile", "tex_w", "tex_h", "tex_pitch"]))?,
-            binding_table: Command::new(&c.binding_table, &table)?,
-            barrier: Command::new(&c.barrier, &[])?,
-            table_vs: Command::new(&c.table_pointers_vs, &names(&["bt"]))?,
-            table_ps: Command::new(&c.table_pointers_ps, &names(&["bt"]))?,
-            viewport_cc: Command::new(&c.viewport_cc, &names(&["cc"]))?,
-            viewport_sf_clip: Command::new(&c.viewport_sf_clip, &names(&["sf_clip"]))?,
-        };
-        Ok(Shape { key, used: 0, piece, state, flush, commands, bindings, textures })
-    }
-
-    /// The bytes a draw's binding table and its surface states take in the pool at most
-    fn table_bytes(&self) -> usize {
-        STATE_ALIGN * (1 + self.bindings.len() + self.textures.len()) + self.commands.binding_table.bytes().next_multiple_of(STATE_ALIGN)
+impl<'x> From<&'x Amd> for CardRef<'x> {
+    fn from(amd: &'x Amd) -> Self {
+        CardRef::Amd(amd)
     }
 }
 
-/// What a draw's key holds: everything of it its image depends on (a hash: one per draw, no allocation)
-fn key(program: u64, d: &Draw<'_>) -> u64 {
-    let mut h = DefaultHasher::new();
-    program.hash(&mut h);
-    for b in &d.buffers {
-        b.stride.hash(&mut h);
-    }
-    for e in &d.elements {
-        (e.buffer, discriminant(&e.format), e.offset).hash(&mut h);
-    }
-    for (binding, _) in &d.uniforms {
-        binding.hash(&mut h);
-    }
-    for t in &d.textures {
-        (t.binding, t.filter, t.wrap).hash(&mut h);
-    }
-    discriminant(&d.primitive).hash(&mut h);
-    d.indices.map(|i| i.format).hash(&mut h);
-    (discriminant(&d.cull), d.front_ccw, d.color_mask, d.blend.is_some()).hash(&mut h);
-    if let Some(b) = &d.blend {
-        (b.src.map(|f| f as u8), b.dst.map(|f| f as u8), b.equation.map(|e| e as u8), b.color.map(f32::to_bits)).hash(&mut h);
-    }
-    (discriminant(&d.target.format), d.target.tiling).hash(&mut h);
-    h.finish()
-}
-
-/// A surface's memory and what last wrote it: the device's own, or a dma-buf imported
-struct Target<'x> {
-    bo: XeBo<'x>,
-    slot: usize,
-    addr: u64,
-    /// where its pixels start in `bo`, the bytes mapped from there
-    offset: usize,
-    range: u64,
-    width: u32,
-    height: u32,
-    format: ColorFormat,
-    tiling: Tiling,
-    /// a row's bytes in memory
-    pitch: u32,
-    fence: Option<Rc<Syncobj<'x>>>,
-}
-
-impl<'x> Target<'x> {
-    fn row(&self) -> u32 {
-        self.width * self.format.bytes()
-    }
-
-    fn len(&self) -> usize {
-        self.pitch as usize * self.tiling.rows(self.height) as usize
-    }
-
-    /// Whether a draw describing its target as `t` draws into it
-    fn holds(&self, t: &ColorTarget<'_>) -> bool {
-        (t.width, t.height, t.format, t.tiling) == (self.width, self.height, self.format, self.tiling)
-    }
-
-    /// Its memory as laid out (nothing writing it)
-    fn memory(&mut self) -> Result<&mut [u8], Error> {
-        let (at, n) = (self.offset, self.len());
-        self.bo.bytes().map_err(io)?.get_mut(at..at + n).ok_or_else(|| Error("a surface past its memory's end".into()))
-    }
-
-    /// Whether the CPU reads and writes it as its tiling lays rows out
-    fn natural(&self) -> Result<(), Error> {
-        match self.tiling == Tiling::Linear || self.pitch == self.tiling.pitch(self.row()) {
-            true => Ok(()),
-            false => Err(Error(format!("a {:?} surface with rows {} bytes apart: not read or written by the CPU", self.tiling, self.pitch))),
+impl<'x> From<&'x Card> for CardRef<'x> {
+    fn from(card: &'x Card) -> Self {
+        match card {
+            Card::Xe(xe) => CardRef::Xe(xe),
+            Card::Amd(amd) => CardRef::Amd(amd),
         }
-    }
-
-    /// Its pixels in rows (nothing writing it)
-    fn pixels(&mut self) -> Result<Vec<u8>, Error> {
-        self.natural()?;
-        let (row, height, pitch, tiling) = (self.row() as usize, self.height, self.pitch as usize, self.tiling);
-        let mut out = vec![0; row * height as usize];
-        let memory = self.memory()?;
-        match tiling {
-            Tiling::Linear => out.chunks_exact_mut(row).zip(memory.chunks(pitch)).for_each(|(o, m)| o.copy_from_slice(&m[..row])),
-            _ => tiling.untile(memory, row as u32, height, &mut out),
-        }
-        Ok(out)
-    }
-
-    /// `pixels` (rows of `rect`'s width) written into rectangle `rect` of it (nothing using it)
-    fn write_rect(&mut self, rect: [u32; 4], pixels: &[u8]) -> Result<(), Error> {
-        let [x, y, w, h] = rect;
-        if x.checked_add(w).is_none_or(|r| r > self.width) || y.checked_add(h).is_none_or(|b| b > self.height) {
-            return Err(Error(format!("a {w}x{h} rectangle at {x}, {y} of a {}x{} surface", self.width, self.height)));
-        }
-        let bpp = self.format.bytes();
-        let row = (w * bpp) as usize;
-        if pixels.len() < row * h as usize {
-            return Err(Error(format!("{} bytes for a {w}x{h} rectangle of {bpp}-byte texels", pixels.len())));
-        }
-        let (pitch, tiling) = (self.pitch, self.tiling);
-        let memory = self.memory()?;
-        for (r, src) in pixels.chunks_exact(row).take(h as usize).enumerate() {
-            let yy = y + r as u32;
-            let mut done = 0;
-            while done < row {
-                let bx = x * bpp + done as u32;
-                let run = (Tiling::RUN - bx % Tiling::RUN) as usize;
-                let n = run.min(row - done);
-                let at = tiling.byte(bx, yy, pitch);
-                memory[at..at + n].copy_from_slice(&src[done..done + n]);
-                done += n;
-            }
-        }
-        Ok(())
-    }
-
-    /// `pixels` (rows) written into it (nothing using it)
-    fn write(&mut self, pixels: &[u8]) -> Result<(), Error> {
-        self.natural()?;
-        let (row, height, pitch, tiling) = (self.row() as usize, self.height, self.pitch as usize, self.tiling);
-        let pixels = pixels.get(..row * height as usize).ok_or_else(|| Error("fewer pixels than the target holds".into()))?;
-        let memory = self.memory()?;
-        match tiling {
-            Tiling::Linear => memory.chunks_mut(pitch).zip(pixels.chunks_exact(row)).for_each(|(m, p)| m[..row].copy_from_slice(p)),
-            _ => tiling.tile(pixels, row as u32, height, memory),
-        }
-        Ok(())
     }
 }
 
-/// What the batch being recorded has set since its last shape's state: its vertex buffers, binding table (the
-/// surface, the uniforms' addresses and the textures), viewport and scissor
-struct Current {
-    shape: u64,
-    flush: u64,
-    vertices: Vec<u64>,
-    indices: Option<[u64; 2]>,
-    table: Option<(usize, Vec<u64>, Vec<usize>)>,
-    viewport: Option<u64>,
-    scissor: Option<[u32; 4]>,
-}
-
-/// The device's address space and what is in it
-struct State<'x> {
-    xe: &'x Xe,
-    vm: XeVm<'x>,
-    queue: XeQueue<'x>,
-    calls: XeBo<'x>,
-    /// where the next dword goes in `calls`, and where the batch being recorded starts
-    at: usize,
-    start: Option<usize>,
-    dynamic: XeBo<'x>,
-    dynamic_at: usize,
-    vertices: Vec<Ring<'x>>,
-    uniforms: Ring<'x>,
-    indices: Ring<'x>,
-    /// each binding's uniform bytes last written into the ring, and where
-    held: Vec<(u32, u64, Vec<u8>)>,
-    shapes: Vec<Shape>,
-    clock: u64,
-    /// the programs' code and the shapes' states and batches
-    arena: Arena<'x>,
-    /// each program's code in the arena: its id, the vertex and the fragment shader's addresses
-    programs: Vec<(u64, u64, u64)>,
-    /// the binding table pool, and where the device writes next in it
-    pool: XeBo<'x>,
-    pool_at: usize,
-    _fence: XeBo<'x>,
-    surfaces: Vec<Option<Target<'x>>>,
-    /// what the next submission waits for, the last submission, the surfaces the batch being recorded draws into and
-    /// samples
-    waits: Vec<Syncobj<'x>>,
-    last: Option<Rc<Syncobj<'x>>>,
-    written: Vec<usize>,
-    sampled: Vec<usize>,
-    /// the surfaces drawn into and sampled since the batch's last barrier: sampling one of the first, or drawing
-    /// into one of the second, records a barrier first
-    drawn_since: Vec<usize>,
-    sampled_since: Vec<usize>,
-    current: Option<Current>,
-    /// the viewports written into the dynamic memory since it started over: each one's key, CC and SF_CLIP state
-    viewports: Vec<(u64, u64, u64)>,
-    words: Vec<u32>,
-    lowered: usize,
-}
-
-impl<'x> State<'x> {
-    fn new(xe: &'x Xe) -> Result<State<'x>, Error> {
-        let vm = xe.vm().map_err(io)?;
-        let queue = xe.queue(&vm, Engine::Render).map_err(io)?;
-        let calls = xe.bo((CALLS_SIZE + GUARD, Caching::WriteCombined).into()).map_err(io)?;
-        bind(xe, &vm, &calls, 0, CALLS_ADDR, CALLS_SIZE + GUARD, MemType::Streaming)?;
-        let dynamic = xe.bo((DYNAMIC_SIZE as u64, Caching::WriteCombined).into()).map_err(io)?;
-        bind(xe, &vm, &dynamic, 0, DYNAMIC_ADDR, DYNAMIC_SIZE as u64, MemType::Streaming)?;
-        let mut pool = xe.bo((POOL_SIZE as u64, Caching::WriteCombined).into()).map_err(io)?;
-        let fixed = Xe3Device::pool(POOL_ADDR)?;
-        pool.bytes().map_err(io)?[..fixed.len()].copy_from_slice(&fixed);
-        bind(xe, &vm, &pool, 0, POOL_ADDR, POOL_SIZE as u64, MemType::Streaming)?;
-        let fence = xe.bo((FENCE_SIZE, Caching::WriteCombined).into()).map_err(io)?;
-        bind(xe, &vm, &fence, 0, FENCE_ADDR, FENCE_SIZE, MemType::Streaming)?;
-        let mut arena = Arena { chunks: Vec::new(), free: Vec::new(), at: 0 };
-        let context = arena.put(xe, &vm, &Xe3Device::context(FENCE_ADDR)?)?;
-        Native::fence();
-        let done = xe.fence(false).map_err(io)?;
-        queue.submit(&context, &[], &[&done]).map_err(io)?;
-        Ok(State {
-            xe,
-            vm,
-            queue,
-            calls,
-            at: 0,
-            start: None,
-            dynamic,
-            dynamic_at: 0,
-            vertices: Vec::new(),
-            uniforms: Ring::new(UNIFORM_ADDR),
-            indices: Ring::new(INDEX_ADDR),
-            held: Vec::new(),
-            shapes: Vec::new(),
-            clock: 0,
-            arena,
-            programs: Vec::new(),
-            pool,
-            pool_at: Xe3Device::POOL_STATIC as usize,
-            _fence: fence,
-            surfaces: Vec::new(),
-            waits: Vec::new(),
-            last: Some(Rc::new(done)),
-            written: Vec::new(),
-            sampled: Vec::new(),
-            drawn_since: Vec::new(),
-            sampled_since: Vec::new(),
-            current: None,
-            viewports: Vec::new(),
-            words: Vec::new(),
-            lowered: 0,
-        })
-    }
-
-    fn target(&mut self, s: Surface) -> Result<&mut Target<'x>, Error> {
-        self.surfaces.get_mut(s.0).and_then(Option::as_mut).ok_or_else(|| Error(format!("no surface {s:?}")))
-    }
-
-    /// A surface slot no surface takes
-    fn surface_slot(&self) -> usize {
-        let taken: Vec<usize> = self.surfaces.iter().flatten().map(|t| t.slot).collect();
-        (0..).find(|i| !taken.contains(i)).unwrap_or(0)
-    }
-
-    /// `bo` a surface for targets like `t`, its pixels from byte `offset`, rows `pitch` bytes apart, mapped as the
-    /// first of `mems` the GPU takes
-    fn adopt(&mut self, t: &ColorTarget<'_>, bo: XeBo<'x>, offset: u64, pitch: u32, mems: &[MemType]) -> Result<Surface, Error> {
-        let align = self.xe.info().min_alignment.max(4096);
-        if !offset.is_multiple_of(align) {
-            return Err(Error(format!("a surface at byte {offset} of its memory: not on {align}")));
-        }
-        let rows = t.tiling.rows(t.height) as u64;
-        let need = u64::from(pitch) * rows;
-        if pitch < t.row() || offset + need > bo.size() {
-            return Err(Error(format!("a {}x{} surface, rows of {pitch} bytes from {offset}, in {} bytes", t.width, t.height, bo.size())));
-        }
-        if t.tiling == Tiling::Tile4 && !(pitch.is_multiple_of(Tiling::TILE4_WIDTH)) || !pitch.is_multiple_of(4) {
-            return Err(Error(format!("rows of {pitch} bytes for {:?}", t.tiling)));
-        }
-        let range = need.next_multiple_of(align).min(bo.size() - offset);
-        if range > SURFACE_SPAN {
-            return Err(Error(format!("a surface of {range} bytes: more than {SURFACE_SPAN}")));
-        }
-        let slot = self.surface_slot();
-        let addr = SURFACE_ADDR + slot as u64 * SURFACE_SPAN;
-        let mut tried = Vec::new();
-        for mem in mems {
-            match bind(self.xe, &self.vm, &bo, offset, addr, range, *mem) {
-                Ok(()) => break,
-                Err(e) => tried.push(format!("as {mem:?}: {}", e.0)),
-            }
-        }
-        if tried.len() == mems.len() {
-            return Err(Error(format!("a surface's memory not mapped: {}", tried.join("; "))));
-        }
-        let target = Target { bo, slot, addr, offset: offset as usize, range, width: t.width, height: t.height, format: t.format, tiling: t.tiling, pitch, fence: None };
-        self.surfaces.push(Some(target));
-        Ok(Surface(self.surfaces.len() - 1))
-    }
-
-    /// The batch recorded ended (the flush, MI_BATCH_BUFFER_END) and submitted, after what it waits for
-    fn submit(&mut self) -> Result<(), Error> {
-        let Some(start) = self.start.take() else { return Ok(()) };
-        let flush = self.current.take().map_or(0, |c| c.flush);
-        self.words.extend([MI_BATCH_BUFFER_START_2ND, flush as u32, (flush >> 32) as u32, MI_BATCH_BUFFER_END]);
-        self.write()?;
-        self.at = self.at.next_multiple_of(BATCH_ALIGN);
-        Native::fence();
-        let done = Rc::new(self.xe.fence(false).map_err(io)?);
-        let waits: Vec<&Syncobj<'x>> = self.waits.iter().collect();
-        self.queue.submit(&(CALLS_ADDR + start as u64), &waits, &[&done]).map_err(io)?;
-        self.waits.clear();
-        self.drawn_since.clear();
-        self.sampled_since.clear();
-        let used: Vec<usize> = self.written.drain(..).chain(self.sampled.drain(..)).collect();
-        for s in used {
-            if let Some(Some(t)) = self.surfaces.get_mut(s) {
-                t.fence = Some(done.clone());
-            }
-        }
-        let previous = self.last.replace(done);
-        self.wrap(previous)
-    }
-
-    /// After a batch went to the GPU, the vertex and uniform rings: when one has less room left than the batch took,
-    /// each starts over below where the batch began (what the batches before it read, done once the last of them
-    /// is), so the next frame's draws need not wait; a ring that started over so lets its writes past that again
-    /// once the batch before this one is done
-    fn wrap(&mut self, previous: Option<Rc<Syncobj<'x>>>) -> Result<(), Error> {
-        let rings = || self.vertices.iter().chain([&self.uniforms, &self.indices]);
-        let limited = rings().any(|r| r.limit < r.size);
-        let short = rings().any(|r| r.at - r.mark > r.limit.max(r.at) - r.at);
-        if (limited || short)
-            && let Some(p) = &previous
-        {
-            wait(p, "a draw")?;
-        }
-        for r in self.vertices.iter_mut().chain([&mut self.uniforms, &mut self.indices]) {
-            r.limit = r.size;
-            if short {
-                (r.limit, r.at, r.last) = (r.mark, 0, None);
-            }
-            r.mark = r.at;
-        }
-        if short {
-            self.held.clear();
-        }
-        Ok(())
-    }
-
-    /// Everything recorded submitted and done
-    fn settle(&mut self) -> Result<(), Error> {
-        self.submit()?;
-        if let Some(f) = self.last.take() {
-            wait(&f, "a draw")?;
-        }
-        Ok(())
-    }
-
-    /// The draws into surface `s`, and those sampling it, submitted and done
-    fn idle(&mut self, s: Surface) -> Result<(), Error> {
-        if self.written.contains(&s.0) || self.sampled.contains(&s.0) {
-            self.submit()?;
-        }
-        if let Some(f) = &self.target(s)?.fence {
-            wait(f, "a draw")?;
-        }
-        Ok(())
-    }
-
-    /// What `s` holds before a draw, as `load` says: nothing to do when it keeps what it has; otherwise its draws so
-    /// far done, then its memory written
-    fn load(&mut self, s: Surface, load: &TargetLoad<'_>) -> Result<(), Error> {
-        let clears = match load {
-            TargetLoad::Keep([]) => return Ok(()),
-            TargetLoad::Keep(c) | TargetLoad::Fill(_, c) | TargetLoad::Pixels(_, c) => c,
-        };
-        self.idle(s)?;
-        let t = self.target(s)?;
-        match load {
-            TargetLoad::Fill(texel, _) => {
-                let memory = t.memory()?;
-                match texel.iter().all(|b| *b == texel[0]) {
-                    true => memory.fill(texel[0]),
-                    false => memory.chunks_exact_mut(texel.len()).for_each(|p| p.copy_from_slice(texel)),
-                }
-            }
-            TargetLoad::Pixels(p, _) => t.write(p)?,
-            TargetLoad::Keep(_) => {}
-        }
-        let (pitch, tiling) = (t.pitch, t.tiling);
-        let memory = t.memory()?;
-        clears.iter().for_each(|c| c.apply_pitched(memory, pitch, tiling));
-        Ok(())
-    }
-
-    /// Program `p`'s Xe3 shaders
-    fn xe3(p: &Compiled) -> Result<(&Xe3Shader, &Xe3Shader), Error> {
-        match &p.shaders {
-            Shaders::Xe3 { vs, fs } => Ok((vs, fs)),
-            _ => Err(Error(format!("a program compiled for {:?}, drawn on Xe3", p.isa()))),
-        }
-    }
-
-    /// Program `p`'s code in the arena: its vertex and fragment shader's addresses
-    fn program(&mut self, p: &Compiled) -> Result<(u64, u64), Error> {
-        if let Some(&(_, vs, fs)) = self.programs.iter().find(|(id, _, _)| *id == p.id) {
-            return Ok((vs, fs));
-        }
-        let (vs, fs) = Self::xe3(p)?;
-        let vs = self.arena.put(self.xe, &self.vm, &vs.code)?;
-        let fs = self.arena.put(self.xe, &self.vm, &fs.code)?;
-        self.programs.push((p.id, vs, fs));
-        Ok((vs, fs))
-    }
-
-    /// The resident shape of `program` and `d`: packed into the arena when it is not (the least recently drawn one
-    /// put away when they are `RESIDENT`)
-    fn shape(&mut self, program: &Compiled, d: &Draw<'_>) -> Result<usize, Error> {
-        let k = key(program.id, d);
-        self.clock += 1;
-        if let Some(i) = self.shapes.iter().position(|s| s.key == k) {
-            self.shapes[i].used = self.clock;
-            return Ok(i);
-        }
-        if self.shapes.len() == RESIDENT {
-            self.settle()?;
-            let oldest = (0..self.shapes.len()).min_by_key(|&i| self.shapes[i].used).unwrap_or(0);
-            let gone = self.shapes.swap_remove(oldest);
-            self.arena.free.push(gone.piece);
-        }
-        let (vs, fs) = self.program(program)?;
-        let shape = Xe3Draw::shape(d, Self::xe3(program)?.0, Self::xe3(program)?.1)?;
-        let outer = |h: &str| match h {
-            "vs" => Some(vs),
-            "fs" => Some(fs),
-            "surfaces" => Some(POOL_ADDR),
-            "surfaces::bt" | "surfaces::bt_null" => Some(Xe3Device::NULL_TABLE_AT),
-            _ => None,
-        };
-        let piece = self.arena.take(self.xe, &self.vm, shape.bytes())?;
-        let (bytes, state, flush) = shape.lay(piece.0, outer)?;
-        self.arena.write(piece.0, &bytes)?;
-        self.lowered += 1;
-        let mut shape = Shape::new(k, piece, piece.0 + state as u64, piece.0 + flush as u64, &shape.commands, d)?;
-        shape.used = self.clock;
-        self.shapes.push(shape);
-        Ok(self.shapes.len() - 1)
-    }
-
-    /// Whether draw `d` of shape `i` fits in what the batch being recorded has room for
-    fn fits(&self, i: usize, d: &Draw<'_>) -> bool {
-        let sh = &self.shapes[i];
-        let calls = self.at + 2 * CALL_BYTES + sh.commands.bytes() + 4 <= CALLS_SIZE as usize;
-        let dynamic = self.dynamic_at.next_multiple_of(STATE_ALIGN) + 3 * STATE_ALIGN <= DYNAMIC_SIZE;
-        let pool = self.pool_at.next_multiple_of(STATE_ALIGN) + sh.table_bytes() <= POOL_SIZE;
-        let vertices = d.buffers.iter().enumerate().all(|(i, b)| self.vertices.get(i).is_some_and(|r| r.fits(b.bytes)) || b.bytes.is_empty());
-        let fresh = d.uniforms.iter().filter(|(b, bytes)| !self.held.iter().any(|(h, _, held)| h == b && held == bytes)).map(|(_, bytes)| bytes.len());
-        let uniforms = Ring::after(self.uniforms.at, fresh) <= self.uniforms.size;
-        let indices = d.indices.is_none_or(|i| self.indices.fits(i.bytes));
-        calls && dynamic && pool && vertices && uniforms && indices
-    }
-
-    /// Draw `d` did not fit in the batch being recorded: each ring wants room for twice the batch with it
-    fn outgrown(&mut self, d: &Draw<'_>) {
-        for (r, b) in self.vertices.iter_mut().zip(&d.buffers) {
-            r.outgrown(b.bytes.len());
-        }
-        let uniforms = Ring::after(0, d.uniforms.iter().map(|(_, b)| b.len()));
-        self.uniforms.outgrown(uniforms);
-        if let Some(i) = d.indices {
-            self.indices.outgrown(i.bytes.len());
-        }
-    }
-
-    /// Every ring from its start, with room for draw `d` (nothing running)
-    fn restart(&mut self, d: &Draw<'_>) -> Result<(), Error> {
-        (self.at, self.dynamic_at) = (0, 0);
-        self.held.clear();
-        self.viewports.clear();
-        self.pool_at = Xe3Device::POOL_STATIC as usize;
-        while self.vertices.len() < d.buffers.len() {
-            self.vertices.push(Ring::new(VERTEX_ADDR + self.vertices.len() as u64 * VERTEX_SPAN));
-        }
-        for (i, r) in self.vertices.iter_mut().enumerate() {
-            r.restart(self.xe, &self.vm, d.buffers.get(i).map_or(0, |b| b.bytes.len()))?;
-        }
-        let uniforms = Ring::after(0, d.uniforms.iter().map(|(_, b)| b.len()));
-        self.uniforms.restart(self.xe, &self.vm, uniforms)?;
-        self.indices.restart(self.xe, &self.vm, d.indices.map_or(0, |i| i.bytes.len()))
-    }
-
-    /// `words` written at the batch's end
-    fn write(&mut self) -> Result<(), Error> {
-        put(&mut self.calls, self.at, &self.words)?;
-        self.at += 4 * self.words.len();
-        self.words.clear();
-        Ok(())
-    }
-
-    /// `words` written into the dynamic memory on `align`: their address
-    fn dynamic(&mut self, words: &[u32]) -> Result<u64, Error> {
-        let at = self.dynamic_at.next_multiple_of(STATE_ALIGN);
-        put(&mut self.dynamic, at, words)?;
-        self.dynamic_at = at + 4 * words.len();
-        Ok(DYNAMIC_ADDR + at as u64)
-    }
-
-    /// Uniform block `binding`'s bytes in the ring: their address
-    fn uniform(&mut self, binding: u32, bytes: &[u8]) -> Result<u64, Error> {
-        if let Some((_, addr, _)) = self.held.iter().find(|(b, _, held)| *b == binding && held == bytes) {
-            return Ok(*addr);
-        }
-        let addr = self.uniforms.put(bytes)?;
-        self.held.retain(|(b, _, _)| *b != binding);
-        self.held.push((binding, addr, bytes.to_vec()));
-        Ok(addr)
-    }
-
-    /// Draw `d` of shape `i` into `s` recorded (it fits): its shape's state when the batch has another's, then its
-    /// viewport, binding table, vertex buffers and scissor where the batch does not have them, and its primitive
-    fn record(&mut self, i: usize, d: &Draw<'_>, s: Surface) -> Result<(), Error> {
-        if self.start.is_none() {
-            self.start = Some(self.at);
-        }
-        let (key, state, flush) = (self.shapes[i].key, self.shapes[i].state, self.shapes[i].flush);
-        if self.current.as_ref().is_none_or(|c| c.shape != key) {
-            self.words.extend([MI_BATCH_BUFFER_START_2ND, state as u32, (state >> 32) as u32]);
-            self.write()?;
-            self.current = Some(Current { shape: key, flush, vertices: Vec::new(), indices: None, table: None, viewport: None, scissor: None });
-        }
-        let mut h = DefaultHasher::new();
-        (d.viewport.map(f32::to_bits), d.depth_range.map(f32::to_bits), d.target.width, d.target.height).hash(&mut h);
-        let viewport = h.finish();
-        if self.current.as_ref().is_some_and(|c| c.viewport != Some(viewport)) {
-            let (cc, sf_clip) = match self.viewports.iter().find(|v| v.0 == viewport) {
-                Some(&(_, cc, sf_clip)) => (cc, sf_clip),
-                None => {
-                    let [cc, sf_clip] = Xe3Draw::viewports(d)?;
-                    let (cc, sf_clip) = (self.dynamic(&cc)?, self.dynamic(&sf_clip)?);
-                    self.viewports.push((viewport, cc, sf_clip));
-                    (cc, sf_clip)
-                }
-            };
-            let c = &self.shapes[i].commands;
-            c.viewport_cc.emit(&mut self.words, &[cc]);
-            c.viewport_sf_clip.emit(&mut self.words, &[sf_clip]);
-            self.write()?;
-            self.current.as_mut().unwrap().viewport = Some(viewport);
-        }
-        let textures: Vec<usize> = d.textures.iter().map(|t| t.surface.0).collect();
-        if textures.iter().any(|t| self.drawn_since.contains(t)) || self.sampled_since.contains(&s.0) {
-            self.shapes[i].commands.barrier.emit(&mut self.words, &[]);
-            self.write()?;
-            self.drawn_since.clear();
-            self.sampled_since.clear();
-        }
-        let mut uniforms = Vec::with_capacity(d.uniforms.len());
-        for (binding, bytes) in &d.uniforms {
-            uniforms.push(self.uniform(*binding, bytes)?);
-        }
-        if self.current.as_ref().is_some_and(|c| c.table.as_ref().is_none_or(|(t, u, x)| *t != s.0 || *u != uniforms || *x != textures)) {
-            let lens: Vec<usize> = d.uniforms.iter().map(|(_, b)| b.len()).collect();
-            self.table(i, s, &uniforms, &lens, &textures)?;
-            self.current.as_mut().unwrap().table = Some((s.0, uniforms, textures.clone()));
-        }
-        let mut values = Vec::with_capacity(2 * d.buffers.len());
-        for (r, b) in self.vertices.iter_mut().zip(&d.buffers) {
-            values.extend([r.put(b.bytes)?, b.bytes.len() as u64]);
-        }
-        if !values.is_empty() && self.current.as_ref().is_some_and(|c| c.vertices != values) {
-            self.shapes[i].commands.vertex_buffers.emit(&mut self.words, &values);
-            self.write()?;
-            self.current.as_mut().unwrap().vertices = values;
-        }
-        if let Some(ib) = d.indices {
-            let indices = [self.indices.put(ib.bytes)?, ib.bytes.len() as u64];
-            if self.current.as_ref().is_some_and(|c| c.indices != Some(indices)) {
-                self.shapes[i].commands.index_buffer.emit(&mut self.words, &indices);
-                self.write()?;
-                self.current.as_mut().unwrap().indices = Some(indices);
-            }
-        }
-        let rect = Xe3Draw::scissor(d);
-        if self.current.as_ref().is_some_and(|c| c.scissor != Some(rect)) {
-            let mut words = Vec::new();
-            self.shapes[i].commands.scissor_rect.emit(&mut words, &rect.map(u64::from));
-            let at = self.dynamic(&words)?;
-            self.shapes[i].commands.scissor_pointer.emit(&mut self.words, &[at]);
-            self.write()?;
-            self.current.as_mut().unwrap().scissor = Some(rect);
-        }
-        self.shapes[i].commands.primitive.emit(&mut self.words, &[d.count, d.first, d.instances].map(u64::from));
-        self.write()?;
-        if !self.written.contains(&s.0) {
-            self.written.push(s.0);
-        }
-        if !self.drawn_since.contains(&s.0) {
-            self.drawn_since.push(s.0);
-        }
-        for t in textures {
-            if !self.sampled.contains(&t) {
-                self.sampled.push(t);
-            }
-            if !self.sampled_since.contains(&t) {
-                self.sampled_since.push(t);
-            }
-        }
-        Ok(())
-    }
-
-    /// A binding table of `s`, `uniforms` (the blocks' addresses, `lens` their bytes) and `textures` (surfaces)
-    /// written into shape `i`'s pool, and the pointers to it recorded
-    fn table(&mut self, i: usize, s: Surface, uniforms: &[u64], lens: &[usize], textures: &[usize]) -> Result<(), Error> {
-        let t = self.target(s)?;
-        let rt = [t.addr, u64::from(t.pitch) - 1, u64::from(t.width) - 1, u64::from(t.height) - 1];
-        let mut sampled = Vec::with_capacity(textures.len());
-        for &x in textures {
-            let t = self.target(Surface(x))?;
-            let [format, tile] = Xe3Draw::texture(t.format, t.tiling);
-            sampled.push([t.addr, u64::from(format), u64::from(tile), u64::from(t.width) - 1, u64::from(t.height) - 1, u64::from(t.pitch) - 1]);
-        }
-        let sh = &self.shapes[i];
-        let pool = &mut self.pool;
-        let mut at = self.pool_at.next_multiple_of(STATE_ALIGN);
-        let mut words = Vec::new();
-        sh.commands.target_surface.emit(&mut words, &rt);
-        put(pool, at, &words)?;
-        let mut table = vec![POOL_ADDR + at as u64, POOL_ADDR];
-        at += STATE_ALIGN;
-        for (addr, len) in uniforms.iter().zip(lens) {
-            words.clear();
-            let [w, h, dd] = Xe3Draw::buffer_size(*len as u32);
-            sh.commands.uniform_surface.emit(&mut words, &[*addr, u64::from(w), u64::from(h), u64::from(dd)]);
-            put(pool, at, &words)?;
-            table.push(POOL_ADDR + at as u64);
-            at += STATE_ALIGN;
-        }
-        for values in &sampled {
-            words.clear();
-            sh.commands.texture_surface.emit(&mut words, values);
-            put(pool, at, &words)?;
-            table.push(POOL_ADDR + at as u64);
-            at += STATE_ALIGN;
-        }
-        words.clear();
-        sh.commands.binding_table.emit(&mut words, &table);
-        put(pool, at, &words)?;
-        let bt = at as u64;
-        self.pool_at = at + 4 * words.len();
-        sh.commands.table_vs.emit(&mut self.words, &[bt]);
-        sh.commands.table_ps.emit(&mut self.words, &[bt]);
-        self.write()
-    }
+#[expect(clippy::large_enum_variant, reason = "a device or two in a process")]
+enum Backend<'x> {
+    Xe(xe3::XeDevice<'x>),
+    Amd(amd::AmdDevice<'x>),
 }
 
 /// The GPU detour submits to, and what it keeps there in one address space: its surfaces (its own or dma-bufs
-/// imported), each program and draw shape's image (its context set up once), rings of the draws' vertices and
-/// uniforms. A draw records a call of its shape's state when the batch has another shape's, then the commands its
-/// target, uniforms, vertices, viewport, scissor and counts need; nothing waits for the GPU. The batch goes to the
-/// GPU, one submission, when a surface it draws into is read, loaded with other pixels, finished, flushed or
-/// fenced, or when a ring is full
+/// imported), each program's code, rings of the draws' vertices, indices and uniforms. A draw is recorded, nothing
+/// waits for the GPU; the draws go to the GPU, one submission, when a surface they draw into is read, loaded with
+/// other pixels, finished, flushed or fenced, or when a ring is full. The same calls on Xe3 and RDNA2
 pub struct Device<'x> {
-    pub xe: &'x Xe,
-    state: RefCell<Option<State<'x>>>,
+    backend: Backend<'x>,
+}
+
+/// `$e` on the device's backend, as `$d`
+macro_rules! on {
+    ($self:ident, $d:ident => $e:expr) => {
+        match &$self.backend {
+            Backend::Xe($d) => $e,
+            Backend::Amd($d) => $e,
+        }
+    };
 }
 
 impl<'x> Device<'x> {
-    pub fn new(xe: &'x Xe) -> Device<'x> {
-        Device { xe, state: RefCell::new(None) }
+    pub fn new(card: impl Into<CardRef<'x>>) -> Device<'x> {
+        let backend = match card.into() {
+            CardRef::Xe(xe) => Backend::Xe(xe3::XeDevice::new(xe)),
+            CardRef::Amd(amd) => Backend::Amd(amd::AmdDevice::new(amd)),
+        };
+        Device { backend }
     }
 
-    /// Its state, set up on first use
-    fn state(&self) -> Result<RefMut<'_, State<'x>>, Error> {
-        let mut st = self.state.borrow_mut();
-        if st.is_none() {
-            *st = Some(State::new(self.xe)?);
+    /// The card it draws on
+    pub fn card(&self) -> CardRef<'x> {
+        match &self.backend {
+            Backend::Xe(d) => CardRef::Xe(d.xe),
+            Backend::Amd(d) => CardRef::Amd(d.amd),
         }
-        Ok(RefMut::map(st, |s| s.as_mut().unwrap()))
+    }
+
+    /// The instruction set the programs it draws are compiled for
+    pub fn isa(&self) -> Isa {
+        match self.backend {
+            Backend::Xe(_) => Isa::Xe3,
+            Backend::Amd(_) => Isa::Rdna2,
+        }
     }
 
     /// A new surface for target `t` (its size, format and layout): zero, then loaded as `t.load` says (a texture's
     /// texels: `TargetLoad::Pixels`)
     pub fn surface(&self, t: &ColorTarget<'_>) -> Result<Surface, Error> {
-        let mut st = self.state()?;
-        let size = (t.size() as u64).next_multiple_of(self.xe.info().min_alignment.max(4096));
-        let bo = self.xe.bo((size, Caching::WriteCombined).into()).map_err(io)?;
-        let s = st.adopt(t, bo, 0, t.pitch(), &[MemType::Streaming])?;
-        st.load(s, &t.load)?;
-        Ok(s)
+        on!(self, d => d.surface(t))
     }
 
     /// A new surface for target `t` the display engine can scan out (a compositor's output, flipped to KMS): like
     /// `surface`, its memory write-combined and marked for scanout; `export` gives it to KMS
     pub fn scanout(&self, t: &ColorTarget<'_>) -> Result<Surface, Error> {
-        let mut st = self.state()?;
-        let size = (t.size() as u64).next_multiple_of(self.xe.info().min_alignment.max(4096));
-        let bo = self.xe.bo(BoDesc { size, caching: Caching::WriteCombined, scanout: true }).map_err(io)?;
-        let s = st.adopt(t, bo, 0, t.pitch(), &[MemType::Streaming])?;
-        st.load(s, &t.load)?;
-        Ok(s)
+        on!(self, d => d.scanout(t))
     }
 
     /// Surface `s` as a dma-buf for another process or device (a compositor, KMS): its fd and how its pixels lie
     /// in it. Its draws are not waited for: `fence` says when they are done
     pub fn export(&self, s: Surface) -> Result<Exported, Error> {
-        let mut st = self.state()?;
-        let t = st.target(s)?;
-        let modifier = match t.tiling {
-            Tiling::Linear => DRM_FORMAT_MOD_LINEAR,
-            Tiling::Tile4 => I915_FORMAT_MOD_4_TILED,
-        };
-        let fourcc = match t.format {
-            ColorFormat::Rgba8Unorm => DRM_FORMAT_ABGR8888,
-            ColorFormat::R8Unorm => DRM_FORMAT_R8,
-            ColorFormat::Rgba32Float => return Err(Error("an Rgba32Float surface: no DRM format to export it as".into())),
-        };
-        let fd = t.bo.export().map_err(io)?;
-        Ok(Exported { fd, offset: t.offset as u64, pitch: t.pitch, modifier, fourcc })
+        on!(self, d => d.export(s))
     }
 
     /// A surface drawn straight into dma-buf `fd` (a GBM buffer, a udmabuf...): targets like `t` (its size, format:
-    /// `Rgba8Unorm` is DRM's ABGR8888; tiling: `Linear`, or `Tile4` for I915_FORMAT_MOD_4_TILED), from byte `offset`
-    /// (on a page), rows `stride` bytes apart. What it held stays until a draw writes it; `fence` says when the
-    /// draws into it are done
+    /// `Rgba8Unorm` is DRM's ABGR8888; tiling: `Linear`, or on Xe3 `Tile4` for I915_FORMAT_MOD_4_TILED), from byte
+    /// `offset` (on a page), rows `stride` bytes apart (on RDNA2 a multiple of 256). What it held stays until a draw
+    /// writes it; `fence` says when the draws into it are done
     pub fn import(&self, t: &ColorTarget<'_>, fd: BorrowedFd<'_>, offset: u64, stride: u32) -> Result<Surface, Error> {
-        let mut st = self.state()?;
-        let bo = self.xe.import(fd).map_err(|e| Error(format!("a dma-buf not imported: {e}")))?;
-        st.adopt(t, bo, offset, stride, &[MemType::Streaming, MemType::Coherent])
+        on!(self, d => d.import(t, fd, offset, stride))
     }
 
     /// Surface `s` gone, once the draws into it are done; using it again is an error
     pub fn free(&self, s: Surface) -> Result<(), Error> {
-        let mut st = self.state()?;
-        st.idle(s)?;
-        let t = st.surfaces.get_mut(s.0).and_then(Option::take).ok_or_else(|| Error(format!("no surface {s:?}")))?;
-        for c in st.current.iter_mut() {
-            c.table = c.table.take().filter(|(t, _, x)| *t != s.0 && !x.contains(&s.0));
-        }
-        st.vm.unbind(t.addr, t.range, &[]).map_err(io)
+        on!(self, d => d.free(s))
     }
 
     /// `pixels` (rows of `rect`'s width, tightly packed) written into rectangle `rect` (x, y, width, height) of
     /// surface `s`, once the draws into it and those sampling it are done: a texture's part updated (a glyph
     /// atlas's)
     pub fn write(&self, s: Surface, rect: [u32; 4], pixels: &[u8]) -> Result<(), Error> {
-        let mut st = self.state()?;
-        st.idle(s)?;
-        st.target(s)?.write_rect(rect, pixels)
+        on!(self, d => d.write(s, rect, pixels))
     }
 
-    /// How many draw shapes were lowered into images so far (each costs a compile; a draw of a resident one does not)
+    /// How many draw shapes (Xe3) or programs (RDNA2) were made ready to draw so far: each costs a compile or an
+    /// upload; a draw of a resident one does not
     pub fn lowered(&self) -> usize {
-        self.state.borrow().as_ref().map_or(0, |s| s.lowered)
+        on!(self, d => d.lowered())
     }
 
     /// The first `len` bytes of surface `s`'s pixels (rows), once the draws into it are done
     pub fn read(&self, s: Surface, len: usize) -> Result<Vec<u8>, Error> {
-        let mut st = self.state()?;
-        st.idle(s)?;
-        let mut pixels = st.target(s)?.pixels()?;
-        if len > pixels.len() {
-            return Err(Error(format!("{len} bytes of a surface of {}", pixels.len())));
-        }
-        pixels.truncate(len);
-        Ok(pixels)
+        on!(self, d => d.read(s, len))
     }
 
     /// Surface `s`'s memory as it is laid out, once the draws into it are done
     pub fn raw(&self, s: Surface) -> Result<Vec<u8>, Error> {
-        let mut st = self.state()?;
-        st.idle(s)?;
-        Ok(st.target(s)?.memory()?.to_vec())
+        on!(self, d => d.raw(s))
     }
 
     /// The draws recorded (into `s` and every other surface) submitted, not waited for
     pub fn flush(&self, s: Surface) -> Result<(), Error> {
-        let mut st = self.state()?;
-        st.target(s)?;
-        st.submit()
+        on!(self, d => d.flush(s))
     }
 
     /// The draws into surface `s` submitted and done (glFinish)
     pub fn finish(&self, s: Surface) -> Result<(), Error> {
-        self.state()?.idle(s)
+        on!(self, d => d.finish(s))
     }
 
     /// The draws recorded submitted (when some draw into `s`): a sync_file signalled once the draws into `s` are
     /// done, None when nothing ever drew into it
     pub fn fence(&self, s: Surface) -> Result<Option<OwnedFd>, Error> {
-        let mut st = self.state()?;
-        if st.written.contains(&s.0) {
-            st.submit()?;
-        }
-        st.target(s)?.fence.as_ref().map(|f| f.export().map_err(io)).transpose()
+        on!(self, d => d.fence(s))
     }
 
     /// The next submission waits for sync_file `fd` (a compositor done reading a surface, say)
     pub fn after(&self, fd: BorrowedFd<'_>) -> Result<(), Error> {
-        let mut st = self.state()?;
-        let f = self.xe.fence(false).map_err(io)?;
-        f.import(fd).map_err(io)?;
-        st.waits.push(f);
-        Ok(())
+        on!(self, d => d.after(fd))
     }
 
-    /// One draw into surface `s` (`d.target` its size, format and tiling), recorded: the first of its program and
-    /// shape lowers it with the program's kernels into an image and makes it resident; the surface is loaded as
-    /// `d.target.load` says. The draws go to the GPU together (`Device`)
+    /// One draw into surface `s` (`d.target` its size, format and tiling), recorded with `program` (compiled for
+    /// the device's instruction set); the surface is loaded as `d.target.load` says. The draws go to the GPU
+    /// together (`Device`)
     pub fn draw(&self, program: &Compiled, d: &Draw<'_>, s: Surface) -> Result<(), Error> {
-        let mut st = self.state()?;
-        let t = st.target(s)?;
-        if !t.holds(&d.target) {
-            return Err(Error(format!(
-                "a draw into a {}x{} {:?} {:?} target, surface {s:?} is {}x{} {:?} {:?}",
-                d.target.width, d.target.height, d.target.format, d.target.tiling, t.width, t.height, t.format, t.tiling
-            )));
-        }
-        if let Some(ib) = d.indices {
-            let size = match ib.format {
-                IndexFormat::U16 => 2,
-                IndexFormat::U32 => 4,
-            };
-            if !ib.bytes.len().is_multiple_of(size) || (d.first as usize + d.count as usize) * size > ib.bytes.len() {
-                return Err(Error(format!("indices {}..{} of {} bytes of {:?} indices", d.first, d.first + d.count, ib.bytes.len(), ib.format)));
-            }
-        }
-        for x in &d.textures {
-            if x.surface == s {
-                return Err(Error(format!("a draw into surface {s:?} sampling it")));
-            }
-            st.target(x.surface)?;
-        }
-        let i = st.shape(program, d)?;
-        st.load(s, &d.target.load)?;
-        if !st.fits(i, d) {
-            st.outgrown(d);
-            st.settle()?;
-            st.restart(d)?;
-        }
-        st.record(i, d, s)
-    }
-}
-
-impl Drop for Device<'_> {
-    fn drop(&mut self) {
-        if let Some(st) = self.state.get_mut() {
-            let _ = st.settle();
-        }
+        on!(self, x => x.draw(program, d, s))
     }
 }

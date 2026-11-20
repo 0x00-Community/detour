@@ -3,6 +3,7 @@
 mod build;
 mod convert;
 mod dispatch;
+mod draw;
 mod emit;
 mod lower;
 mod pass_layout;
@@ -16,6 +17,7 @@ mod shader;
 pub use build::*;
 pub use convert::*;
 pub use dispatch::*;
+pub use draw::*;
 pub use emit::*;
 pub use lower::*;
 pub use pass_layout::*;

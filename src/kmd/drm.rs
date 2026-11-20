@@ -158,12 +158,17 @@ pub struct Node {
 }
 
 impl Node {
-    fn open(path: &Path) -> Result<Node> {
+    pub fn open(path: &Path) -> Result<Node> {
         let file = OpenOptions::new().read(true).write(true).open(path)?;
         Ok(Node { fd: file.into(), path: path.to_owned() })
     }
 
     pub fn open_driver(driver: &str) -> Result<Node> {
+        Node::open_any(&[driver])
+    }
+
+    /// The first render node in /dev/dri whose driver is one of `drivers`
+    pub fn open_any(drivers: &[&str]) -> Result<Node> {
         let mut nodes: Vec<PathBuf> = std::fs::read_dir("/dev/dri")?
             .filter_map(|e| e.ok().map(|e| e.path()))
             .filter(|p| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("renderD")))
@@ -172,8 +177,8 @@ impl Node {
         nodes
             .iter()
             .filter_map(|p| Node::open(p).ok())
-            .find(|n| n.driver().is_ok_and(|d| d == driver))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no {driver} render node in /dev/dri")))
+            .find(|n| n.driver().is_ok_and(|d| drivers.contains(&d.as_str())))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no {} render node in /dev/dri", drivers.join(" or "))))
     }
 
     pub fn open_checked(path: &Path, driver: &str) -> Result<Node> {
