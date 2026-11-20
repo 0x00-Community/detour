@@ -12,6 +12,7 @@ mod pass;
 mod render;
 mod shader;
 mod tiling;
+mod vk;
 
 pub use binary::*;
 pub use dialect::*;
@@ -21,6 +22,7 @@ pub use pass::*;
 pub use render::*;
 pub use shader::*;
 pub use tiling::*;
+pub use vk::*;
 
 // The passes came from mlirpass and name its items as `crate::…`, as its #[pass] / #[patterns] /
 // rewrites! expansions do: mlirpass's names, at the root (detour's own items take precedence)

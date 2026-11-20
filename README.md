@@ -22,14 +22,17 @@
 
 ## ⚡ What is detour
 
-detour is **our own GPU userspace driver**, made for a few GPUs and nothing else: no graphics API to emulate, just
-draws (`Device::draw`) whose shaders it compiles to the GPU's machine code, whose command streams it builds and submits
-**through the kernel driver's ioctls**. No Mesa, no libdrm underneath. Anything else is left to a general backend
+detour is **our own GPU userspace driver**, made for a few GPUs and nothing else: its own draws (`Device::draw`), and
+Vulkan on top of them (`src/vk`, begun). It compiles the shaders to the GPU's machine code and builds the command streams
+itself, submitting them **through the kernel driver's ioctls**. No Mesa, no libdrm underneath. Anything else is left to a general backend
 (wgpu).
 
 - 🧩 **Draws** (`src/render.rs`, `src/shader.rs`): SPIR-V shaders (GLSL through [mlirpass](https://github.com/Jabberwocky238/mlirpass))
   compiled to Xe3 or RDNA2, ahead of time or in place; targets, vertex buffers, uniforms, sampled textures (any surface,
   so render to texture too), blending, scissors, dma-bufs.
+- 🌋 **Vulkan** (`src/vk`, begun): a device's objects by handle (memory, buffers, images, render passes,
+  framebuffers, shader modules, descriptor sets, pipelines, command buffers, fences), create infos as Rust structures;
+  command buffers run at `vkQueueSubmit` as draws, the applications' SPIR-V compiled by the toolchain.
 - 🔵 **Intel Xe3**: the xe3 dialect (EU instructions, genxml commands and states), SPIR-V and GPU kernels lowered to
   Xe3 machine code, register allocation, scoreboard, a draw's image.
 - 🔴 **AMD RDNA2** (gfx1036): SPIR-V shaders compiled straight to GFX10 machine code (wave32, NGG passthrough; its
@@ -52,6 +55,7 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | 🔢 | Indexed draws and byte colors (`examples/indexed`): 3000 overlapping quads as four vertices and six u16 / u32 indices each, colors as `Unorm8x4`, from a middle index, indexed and plain draws taking turns | **5 / 5** cases **byte for byte** as the plain draw |
 | 🖼️ | Textures (`examples/texture`): a quad sampling a surface against a CPU reference: nearest and linear, magnified and minified, clamp / repeat / mirrored repeat, RGBA8 and R8, linear and Tile4; drawn into then sampled, and sampled then drawn over, in one batch; a part written (`Device::write`) | **15 / 15** cases, nearest **byte for byte**, linear within 2 of the f32 reference |
 | 🔣 | Encodings (`tests/binary`, `src/pass/rdna2`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc |
+| 🌋 | Vulkan (`examples/compare_vulkan`): each case's GLSL made SPIR-V for Vulkan, the same calls on detour and on the local ANV (`support/vkrun.c`) | **5 / 10** byte for byte; the other 5 are Mesa's NIR rewriting the math (a division by a constant as a multiply by its reciprocal, say) |
 | 🪜 | Lowerings (`tests/pass`) | Xe3 kernels as acgpu compiled them, GLSL reaching Xe3 |
 
 ## 🎮 GPUs
@@ -72,8 +76,9 @@ rasterizer and no hand-off to the system's drivers.
 | `src/pass` | mlirpass plugins: `convert-gpu-to-xe3`, register allocation, control flow, SWSB, `Xe3Draw`; RDNA2's shader compiler (`Rdna2Graphics`) and draw state |
 | `src/binary` | Xe3 machine code, records packed by layout tables |
 | `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + detour's passes) and the device a draw runs on |
+| `src/vk` | Vulkan on detour's draws |
 | `src/kmd` | the kernel interface: DRM, the `Gpu` trait, the `xe` driver (`src/kmd/xe`) and the `amdgpu` driver (`src/kmd/amdgpu`) |
-| `examples/` | `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `texture` (sampled textures vs a CPU reference), `indexed` (indexed draws), `export` (dma-bufs and scanout), `program` (programs compiled ahead of time), `shapes` and `frame` (draws in a frame, timed), `programs` (acdes's programs drawn), `xe_info`, `amdgpu_info`, `amdgpu_draw`, `amdgpu_device` |
+| `examples/` | `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `texture` (sampled textures vs a CPU reference), `indexed` (indexed draws), `export` (dma-bufs and scanout), `program` (programs compiled ahead of time), `shapes` and `frame` (draws in a frame, timed), `programs` (acdes's programs drawn), `compare_vulkan` and `bench_vulkan` (Vulkan vs ANV; `support/vkrun.c`), `xe_info`, `amdgpu_info`, `amdgpu_draw`, `amdgpu_device` |
 | `tests/binary`, `tests/pass` | encodings, and lowerings |
 | `scripts/` | the xe3 dialect's generator (`xe3gen`) and the Mesa data it reads (`data/intel`), the RDNA2 opcode table (`rdna2_opcodes.py`, `data/amd`), and the oracles each test's expected bytes come from (`*_oracle.*`) |
 
@@ -92,6 +97,10 @@ GLREF=./glref cargo run --release --example correct
 
 # 🏁 a frame of draws, timed
 cargo run --release --example frame
+# 🌋 Vulkan vs the local ANV, byte for byte, then timed
+cc -O2 -o vkrun examples/support/vkrun.c -lvulkan
+cargo run --release --example compare_vulkan -- ./vkrun
+cargo run --release --example bench_vulkan -- ./vkrun
 ```
 
 ## 📜 License
