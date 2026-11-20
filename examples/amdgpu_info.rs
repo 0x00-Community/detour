@@ -2,11 +2,11 @@
 //! the GPU's address space; an indirect buffer on the GFX ring writing words into it (PM4 WRITE_DATA), its syncobj
 //! waited for; the words read back; the buffer exported as a dma-buf and imported again.
 //!
-//!   cargo run --release --example amd_info
+//!   cargo run --release --example amdgpu_info
 
 use std::time::{Duration, Instant};
 
-use detour::{Amd, AmdIb, Bo, Caching, Engine, Fence, Gpu, MemType, Queue, Vm};
+use detour::{Amdgpu, AmdgpuIb, Bo, Caching, Engine, Fence, Gpu, MemType, Queue, Vm};
 
 /// PM4 type-3 packet header: opcode, then `n` dwords of body
 const fn pkt3(op: u32, n: u32) -> u32 {
@@ -19,7 +19,7 @@ const DST_MEM: u32 = 5 << 8 | 1 << 20;
 const NOP: u32 = 0xffff_1000;
 
 fn main() {
-    let amd = Amd::open_first().expect("an amdgpu render node");
+    let amd = Amdgpu::open_first().expect("an amdgpu render node");
     let i = amd.driver_info();
     println!(
         "{}: device {:#06x} rev {:#x}, family {}, {} CUs, VA {:#x}..{:#x} (high {:#x}..{:#x}), alignment {:#x}",
@@ -52,7 +52,7 @@ fn main() {
     vm.bind(&cmd, 0, ib_addr, 4096, MemType::Streaming, &[]).unwrap();
     let done = amd.fence(false).unwrap();
     let t = Instant::now();
-    queue.submit(&AmdIb { addr: ib_addr, dwords: ib.len() as u32 }, &[], &[&done]).unwrap();
+    queue.submit(&AmdgpuIb { addr: ib_addr, dwords: ib.len() as u32 }, &[], &[&done]).unwrap();
     assert!(done.wait(Duration::from_secs(5)).unwrap(), "the IB did not finish");
     let took = t.elapsed();
     let got: Vec<u32> = data.bytes().unwrap()[..64].as_chunks::<4>().0.iter().map(|c| u32::from_le_bytes(*c)).collect();

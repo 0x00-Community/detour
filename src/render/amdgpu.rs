@@ -11,11 +11,11 @@ use mlirformat::Error;
 
 use super::{DRM_FORMAT_ABGR8888, DRM_FORMAT_MOD_LINEAR, DRM_FORMAT_R8, Exported, Surface, io, wait};
 use crate::{
-    Amd, AmdBo, AmdIb, AmdQueue, AmdVm, Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Rdna2Draw, Rdna2Surface,
+    Amdgpu, AmdgpuBo, AmdgpuIb, AmdgpuQueue, AmdgpuVm, Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Rdna2Draw, Rdna2Surface,
     Rdna2Packet, Rdna2Write, Rdna2Shader, Rdna2Shadow, Shaders, Syncobj, TargetLoad, Tiling, Vm,
 };
 
-type SurfaceMem<'a> = super::SurfaceMem<'a, AmdBo<'a>>;
+type SurfaceMem<'a> = super::SurfaceMem<'a, AmdgpuBo<'a>>;
 
 /// Where the programs' code goes: chunks `CODE_SPAN` apart from `CODE_ADDR`, each `CODE_CHUNK` bytes or what one
 /// program takes; each shader on 256 bytes
@@ -47,14 +47,14 @@ const BATCH_DWORDS: usize = 1 << 18;
 
 /// The code of the programs drawn: chunks mapped once, pieces taken (never given back: a program stays)
 struct Code<'a> {
-    chunks: Vec<(AmdBo<'a>, u64, usize)>,
+    chunks: Vec<(AmdgpuBo<'a>, u64, usize)>,
     /// where the last chunk's untaken bytes start
     at: usize,
 }
 
 impl<'a> Code<'a> {
     /// `code` placed: its address (on `CODE_ALIGN`)
-    fn put(&mut self, amd: &'a Amd, vm: &AmdVm<'a>, code: &[u8]) -> Result<u64, Error> {
+    fn put(&mut self, amd: &'a Amdgpu, vm: &AmdgpuVm<'a>, code: &[u8]) -> Result<u64, Error> {
         let len = code.len().next_multiple_of(CODE_ALIGN) + CODE_ALIGN;
         if self.chunks.last().is_none_or(|(_, _, size)| self.at + len > *size) {
             let size = len.max(CODE_CHUNK);
@@ -83,7 +83,7 @@ impl<'a> Code<'a> {
 struct Ring<'a> {
     addr: u64,
     mem: MemType,
-    bo: Option<AmdBo<'a>>,
+    bo: Option<AmdgpuBo<'a>>,
     size: usize,
     head: u64,
     /// where the batch being recorded started
@@ -139,7 +139,7 @@ impl<'a> Ring<'a> {
     }
 
     /// Room for a batch of `len` bytes (nothing running): the ring from its start, larger when it was too small
-    fn restart(&mut self, amd: &'a Amd, vm: &AmdVm<'a>, len: usize) -> Result<(), Error> {
+    fn restart(&mut self, amd: &'a Amdgpu, vm: &AmdgpuVm<'a>, len: usize) -> Result<(), Error> {
         self.inflight.clear();
         (self.head, self.start) = (0, 0);
         if 2 * len <= self.size {
@@ -158,9 +158,9 @@ impl<'a> Ring<'a> {
 
 /// The device's address space and what is in it
 struct State<'a> {
-    amd: &'a Amd,
-    vm: AmdVm<'a>,
-    queue: AmdQueue<'a>,
+    amd: &'a Amdgpu,
+    vm: AmdgpuVm<'a>,
+    queue: AmdgpuQueue<'a>,
     code: Code<'a>,
     /// each program's code: its id, the vertex and the fragment shader's addresses
     programs: Vec<(u64, u64, u64)>,
@@ -182,7 +182,7 @@ struct State<'a> {
 }
 
 impl<'a> State<'a> {
-    fn new(amd: &'a Amd) -> Result<State<'a>, Error> {
+    fn new(amd: &'a Amdgpu) -> Result<State<'a>, Error> {
         let vm = amd.vm().map_err(io)?;
         let queue = amd.queue(&vm, Engine::Render).map_err(io)?;
         let (mut ring, mut cmds) = (Ring::new(RING_ADDR, MemType::Streaming), Ring::new(CMDS_ADDR, MemType::Scanout));
@@ -214,7 +214,7 @@ impl<'a> State<'a> {
     }
 
     /// `bo` a surface for targets like `t`, its pixels from byte `offset`, rows `pitch` bytes apart
-    fn adopt(&mut self, t: &ColorTarget<'_>, bo: AmdBo<'a>, offset: u64, pitch: u32) -> Result<Surface, Error> {
+    fn adopt(&mut self, t: &ColorTarget<'_>, bo: AmdgpuBo<'a>, offset: u64, pitch: u32) -> Result<Surface, Error> {
         if t.tiling != Tiling::Linear {
             return Err(Error(format!("a {:?} surface: RDNA2 draws linear ones", t.tiling)));
         }
@@ -263,7 +263,7 @@ impl<'a> State<'a> {
         Native::fence();
         let done = Rc::new(self.amd.fence(false).map_err(io)?);
         let waits: Vec<&Syncobj<'a>> = self.waits.iter().collect();
-        self.queue.submit(&AmdIb { addr, dwords: self.ib.len() as u32 }, &waits, &[&done]).map_err(io)?;
+        self.queue.submit(&AmdgpuIb { addr, dwords: self.ib.len() as u32 }, &waits, &[&done]).map_err(io)?;
         self.waits.clear();
         self.ib.clear();
         self.index_type = None;
@@ -429,14 +429,14 @@ impl<'a> State<'a> {
 }
 
 /// The device on an amdgpu card (`Device`'s): its state set up on first use
-pub struct AmdDevice<'a> {
-    pub amd: &'a Amd,
+pub struct AmdgpuDevice<'a> {
+    pub amd: &'a Amdgpu,
     state: RefCell<Option<State<'a>>>,
 }
 
-impl<'a> AmdDevice<'a> {
-    pub fn new(amd: &'a Amd) -> AmdDevice<'a> {
-        AmdDevice { amd, state: RefCell::new(None) }
+impl<'a> AmdgpuDevice<'a> {
+    pub fn new(amd: &'a Amdgpu) -> AmdgpuDevice<'a> {
+        AmdgpuDevice { amd, state: RefCell::new(None) }
     }
 
     fn state(&self) -> Result<RefMut<'_, State<'a>>, Error> {
@@ -592,7 +592,7 @@ impl<'a> AmdDevice<'a> {
     }
 }
 
-impl Drop for AmdDevice<'_> {
+impl Drop for AmdgpuDevice<'_> {
     fn drop(&mut self) {
         if let Some(st) = self.state.get_mut() {
             let _ = st.settle();
