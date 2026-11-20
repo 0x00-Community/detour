@@ -22,13 +22,17 @@
 
 ## ⚡ detour 是什么
 
-detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做: 不模拟任何图形 API, 只提供绘制 (`Device::draw`).
+detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做: 自己的绘制 (`Device::draw`), 上面一层 Vulkan
+(`src/vk`, 起步中).
 着色器到机器码的编译、命令流都由 detour 自己负责, **经内核 GPU 驱动的 ioctl 直接提交**. 下面没有 Mesa, 没有 libdrm.
 其余的交给通用后端 (wgpu).
 
 - 🧩 **绘制** (`src/render.rs`、`src/shader.rs`): SPIR-V 着色器 (GLSL 经 [mlirpass](https://github.com/Jabberwocky238/mlirpass))
   编成 Xe3 或 RDNA2 机器码, 可预编译也可现编; 目标、顶点缓冲、uniform、采样纹理 (任何 surface, 所以也能渲染到纹理)、
   混合、scissor、dma-buf.
+- 🌋 **Vulkan** (`src/vk`, 起步中): 设备对象按句柄管理 (memory、buffer、image、render pass、framebuffer、
+  shader module、descriptor set、pipeline、command buffer、fence), create info 是 Rust 结构体;
+  command buffer 在 `vkQueueSubmit` 时变成绘制执行, 应用的 SPIR-V 由工具链编译.
 - 🔵 **Intel Xe3**: xe3 方言 (EU 指令、genxml 命令和状态)、SPIR-V 和 GPU kernel 下降到 Xe3 机器码、寄存器分配、
   记分板、一次绘制的镜像.
 - 🔴 **AMD RDNA2** (gfx1036): SPIR-V 着色器直接编成 GFX10 机器码 (wave32、NGG passthrough; 自己的指令选择、寄存器分配
@@ -48,6 +52,7 @@ detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做
 | 🔢 | 索引绘制和字节颜色 (`examples/indexed`): 3000 个重叠的四边形, 每个 4 个顶点加 6 个 u16 / u32 索引, 颜色用 `Unorm8x4`, 从中间的索引开始, 索引和非索引绘制交替 | **5 / 5** 例和非索引绘制**逐字节一致** |
 | 🖼️ | 纹理 (`examples/texture`): 四边形采样一个 surface, 对照 CPU 参考: nearest 和 linear、放大和缩小、clamp / repeat / mirrored repeat、RGBA8 和 R8、linear 和 Tile4; 同一批里先画进再采样、先采样再覆盖; 局部写入 (`Device::write`) | **15 / 15** 例, nearest **逐字节一致**, linear 与 f32 参考差 2 以内 |
 | 🔣 | 编码 (`tests/binary`、`src/pass/rdna2`) | Xe3 EU 对 gentool、genxml 对 Mesa, RDNA2 对 llvm-mc |
+| 🌋 | Vulkan (`examples/compare_vulkan`): 每个用例的 GLSL 编成 Vulkan 的 SPIR-V, 同一串调用分别跑 detour 和本机 ANV (`support/vkrun.c`) | **5 / 10** 逐字节一致; 其余 5 个是 Mesa 的 NIR 改写了数学 (比如除以常数改成乘倒数) |
 | 🪜 | 下降 (`tests/pass`) | Xe3 kernel 对 acgpu、GLSL 到 Xe3 |
 
 ## 🎮 支持的 GPU
@@ -67,8 +72,9 @@ detour 只驱动 x86_64 Linux 上的这两种核显. 没有任何回退: 没有 
 | `src/pass` | mlirpass 插件: `convert-gpu-to-xe3`、寄存器分配、控制流、SWSB、`Xe3Draw`; RDNA2 着色器编译器 (`Rdna2Graphics`) 和绘制状态 |
 | `src/binary` | Xe3 机器码、按布局表打包记录 |
 | `src/shader.rs`、`src/render.rs` | 工具链 (mlirpass + detour 的 pass) 和执行绘制的设备 |
+| `src/vk` | 叠在 detour 绘制上的 Vulkan |
 | `src/kmd` | 内核接口: DRM、`Gpu` trait、`xe` 驱动 (`src/kmd/xe`)、`amdgpu` 驱动 (`src/kmd/amdgpu`) |
-| `examples/` | `correct` (正确性对 CPU 参考和 Mesa; `support/glref.c`)、`texture` (采样纹理对 CPU 参考)、`indexed` (索引绘制)、`export` (dma-buf 和扫描输出)、`program` (预编译的程序)、`shapes` 和 `frame` (一帧里的绘制, 计时)、`programs` (画 acdes 的程序)、`xe_info`、`amdgpu_info`、`amdgpu_draw`、`amdgpu_device` |
+| `examples/` | `correct` (正确性对 CPU 参考和 Mesa; `support/glref.c`)、`texture` (采样纹理对 CPU 参考)、`indexed` (索引绘制)、`export` (dma-buf 和扫描输出)、`program` (预编译的程序)、`shapes` 和 `frame` (一帧里的绘制, 计时)、`programs` (画 acdes 的程序)、`compare_vulkan` 和 `bench_vulkan` (Vulkan 对 ANV; `support/vkrun.c`)、`xe_info`、`amdgpu_info`、`amdgpu_draw`、`amdgpu_device` |
 | `tests/binary`、`tests/pass` | 编码、下降 |
 | `scripts/` | xe3 方言生成器 (`xe3gen`) 和它读的 Mesa 数据 (`data/intel`)、RDNA2 opcode 表 (`rdna2_opcodes.py`、`data/amd`), 以及各测试期望值的来源 (`*_oracle.*`) |
 
@@ -87,6 +93,10 @@ GLREF=./glref cargo run --release --example correct
 
 # 🏁 一帧里的绘制, 计时
 cargo run --release --example frame
+# 🌋 Vulkan 对本机 ANV, 先逐字节对拍再计时
+cc -O2 -o vkrun examples/support/vkrun.c -lvulkan
+cargo run --release --example compare_vulkan -- ./vkrun
+cargo run --release --example bench_vulkan -- ./vkrun
 ```
 
 ## 📜 许可证
