@@ -105,12 +105,17 @@ impl<'a> Ring<'a> {
 
     /// `bytes` placed: their address
     fn put(&mut self, bytes: &[u8]) -> Result<u64, Error> {
+        self.put_with(bytes.len(), |to| to.copy_from_slice(bytes))
+    }
+
+    /// `len` bytes placed, `fill` writing them: their address
+    fn put_with(&mut self, len: usize, fill: impl FnOnce(&mut [u8])) -> Result<u64, Error> {
         let size = self.size as u64;
         let mut at = self.head.next_multiple_of(RING_ALIGN as u64);
-        if at % size + bytes.len() as u64 > size {
+        if at % size + len as u64 > size {
             at = at.next_multiple_of(size);
         }
-        let end = at + bytes.len() as u64;
+        let end = at + len as u64;
         // the batches that read what was here
         let mut last = None;
         while self.inflight.front().is_some_and(|(start, _)| *start + size < end) {
@@ -121,7 +126,7 @@ impl<'a> Ring<'a> {
         }
         let place = (at % size) as usize;
         let bo = self.bo.as_mut().ok_or_else(|| Error("a ring with no memory".into()))?;
-        bo.bytes().map_err(io)?[place..place + bytes.len()].copy_from_slice(bytes);
+        fill(&mut bo.bytes().map_err(io)?[place..place + len]);
         self.head = end;
         Ok(self.addr + place as u64)
     }
@@ -258,8 +263,8 @@ impl<'a> State<'a> {
             return Ok(());
         }
         Rdna2Packet::pad(&mut self.ib);
-        let bytes: Vec<u8> = self.ib.iter().flat_map(|w| w.to_le_bytes()).collect();
-        let addr = self.cmds.put(&bytes)?;
+        let ib = &self.ib;
+        let addr = self.cmds.put_with(4 * ib.len(), |to| to.as_chunks_mut::<4>().0.iter_mut().zip(ib).for_each(|(to, w)| *to = w.to_le_bytes()))?;
         Native::fence();
         let done = Rc::new(self.amd.fence(false).map_err(io)?);
         let waits: Vec<&Syncobj<'a>> = self.waits.iter().collect();

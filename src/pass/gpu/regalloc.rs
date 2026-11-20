@@ -63,10 +63,6 @@ impl Sequence {
 }
 
 impl LinearScan {
-    pub fn run(&self, target: &impl RegTarget, body: &Body<'_>, block: BlockId) -> Result<BTreeMap<ValueId, u32>, Error> {
-        self.run_with(target, body, block, &[])
-    }
-
     pub fn run_with(&self, target: &impl RegTarget, body: &Body<'_>, block: BlockId, webs: &[Vec<ValueId>]) -> Result<BTreeMap<ValueId, u32>, Error> {
         let seq = Sequence::of(body, block);
         let web: BTreeMap<ValueId, usize> = webs.iter().enumerate().flat_map(|(i, w)| w.iter().map(move |v| (*v, i))).collect();

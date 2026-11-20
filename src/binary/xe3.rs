@@ -12,9 +12,6 @@ use mlirformat::Ir;
 pub struct Xe3Isa;
 
 impl Xe3Isa {
-    /// Bytes of an encoded instruction (the uncompacted form)
-    pub const BYTES: usize = 16;
-
     /// `i` as gentool encodes it
     pub fn encode(i: &Inst) -> [u8; 16] {
         let mut e = Enc([0; 2]);

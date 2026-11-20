@@ -10,7 +10,6 @@ pub trait Lanes {
     fn lane_positions(&self, op: OpId, name: &str) -> Option<Vec<usize>>;
     fn lane_position(&self, op: OpId) -> Option<usize>;
     fn lanes_each(&mut self, op: OpId, o: &[Vec<ValueId>], f: impl FnMut(&mut Self, &[ValueId]) -> ValueId) -> bool;
-    fn lanes_same(&mut self, op: OpId, o: &[Vec<ValueId>], lanes: fn(&Type<'_>) -> Option<usize>) -> bool;
     fn lanes_extract(&mut self, op: OpId, o: &[Vec<ValueId>]) -> bool;
     fn lanes_insert(&mut self, op: OpId, o: &[Vec<ValueId>]) -> bool;
     fn lanes_from_elements(&mut self, op: OpId, o: &[Vec<ValueId>]) -> bool;
@@ -37,15 +36,6 @@ impl Lanes for ConversionRewriter<'_, '_, '_> {
         }
         let values: Vec<ValueId> = (0..n).map(|i| f(self, &o.iter().map(|v| v[i]).collect::<Vec<_>>())).collect();
         self.replace(op, vec![values]);
-        true
-    }
-
-    fn lanes_same(&mut self, op: OpId, o: &[Vec<ValueId>], lanes: fn(&Type<'_>) -> Option<usize>) -> bool {
-        let r = self.rw.body[op].results[0];
-        if lanes(&self.rw.body[r].ty) != Some(o[0].len()) {
-            return false;
-        }
-        self.replace(op, vec![o[0].clone()]);
         true
     }
 
