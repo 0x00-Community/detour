@@ -106,9 +106,9 @@ const BUFFER_HEIGHT_BITS: u32 = 14;
 const BUFFER_DEPTH_BITS: u32 = 11;
 
 /// GL's blending as the blend state's factors and functions
-struct XeBlend;
+struct Xe3Blend;
 
-impl XeBlend {
+impl Xe3Blend {
     const fn factor(f: BlendFactor) -> u32 {
         match f {
             BlendFactor::Zero => XE3_BLENDFACTOR_ZERO,
@@ -143,7 +143,7 @@ impl XeBlend {
     const fn factors(b: &Blend, i: usize) -> [u32; 2] {
         match b.equation[i] {
             BlendEquation::Min | BlendEquation::Max => [XE3_BLENDFACTOR_ONE; 2],
-            _ => [XeBlend::factor(b.src[i]), XeBlend::factor(b.dst[i])],
+            _ => [Xe3Blend::factor(b.src[i]), Xe3Blend::factor(b.dst[i])],
         }
     }
 }
@@ -939,7 +939,7 @@ impl Xe3Draw {
             alpha_test_function: ALPHA_TEST_NEVER_USED,
             independent_alpha_blend_enable: independent,
         }));
-        let [rgb, alpha] = [XeBlend::factors(&blend, 0), XeBlend::factors(&blend, 1)];
+        let [rgb, alpha] = [Xe3Blend::factors(&blend, 0), Xe3Blend::factors(&blend, 1)];
         let [r, g, b, a] = d.color_mask;
         self.place(None, ENTRY_ALIGN, &xe3!(StateBlendStateEntry {
             write_disable_red: !r,
@@ -949,10 +949,10 @@ impl Xe3Draw {
             color_buffer_blend_enable: d.blend.is_some(),
             source_blend_factor: rgb[0],
             destination_blend_factor: rgb[1],
-            color_blend_function: XeBlend::function(blend.equation[0]),
+            color_blend_function: Xe3Blend::function(blend.equation[0]),
             source_alpha_blend_factor: alpha[0],
             destination_alpha_blend_factor: alpha[1],
-            alpha_blend_function: XeBlend::function(blend.equation[1]),
+            alpha_blend_function: Xe3Blend::function(blend.equation[1]),
             post_blend_color_clamp_enable: true,
             pre_blend_color_clamp_enable: true,
             color_clamp_range: XE3_COLORCLAMP_RTFORMAT,

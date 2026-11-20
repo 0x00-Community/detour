@@ -1,9 +1,9 @@
 //! Draws on a GPU: a card (an Xe or amdgpu render node) and the device that keeps surfaces and draws on it, the same
 //! calls on either (`Device`)
 
-mod amd;
+mod amdgpu;
 mod target;
-mod xe3;
+mod xe;
 
 use std::io;
 use std::os::fd::{BorrowedFd, OwnedFd};
@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use mlirformat::Error;
 
-use crate::{Amd, ColorTarget, Compiled, Draw, Fence, Isa, Node, Syncobj, Xe};
+use crate::{Amdgpu, ColorTarget, Compiled, Draw, Fence, Isa, Node, Syncobj, Xe};
 pub(crate) use target::SurfaceMem;
 
 /// How long a submission may take before the GPU is called hung
@@ -52,7 +52,7 @@ pub struct Surface(pub(crate) usize);
 #[expect(clippy::large_enum_variant, reason = "a card or two in a process")]
 pub enum Card {
     Xe(Xe),
-    Amd(Amd),
+    Amdgpu(Amdgpu),
 }
 
 impl Card {
@@ -69,7 +69,7 @@ impl Card {
     pub fn path(&self) -> &Path {
         match self {
             Card::Xe(xe) => xe.path(),
-            Card::Amd(amd) => amd.path(),
+            Card::Amdgpu(amd) => amd.path(),
         }
     }
 
@@ -77,7 +77,7 @@ impl Card {
     pub fn isa(&self) -> Isa {
         match self {
             Card::Xe(_) => Isa::Xe3,
-            Card::Amd(_) => Isa::Rdna2,
+            Card::Amdgpu(_) => Isa::Rdna2,
         }
     }
 }
@@ -88,17 +88,17 @@ impl TryFrom<Node> for Card {
     fn try_from(node: Node) -> io::Result<Card> {
         match node.driver()?.as_str() {
             "xe" => Xe::try_from(node).map(Card::Xe),
-            "amdgpu" => Amd::try_from(node).map(Card::Amd),
+            "amdgpu" => Amdgpu::try_from(node).map(Card::Amdgpu),
             d => Err(io::Error::new(io::ErrorKind::Unsupported, format!("{}: driver {d}, not xe or amdgpu", node.path().display()))),
         }
     }
 }
 
-/// A card a device draws on, borrowed: a `Card`, an `Xe` or an `Amd`
+/// A card a device draws on, borrowed: a `Card`, an `Xe` or an `Amdgpu`
 #[derive(Clone, Copy)]
 pub enum CardRef<'x> {
     Xe(&'x Xe),
-    Amd(&'x Amd),
+    Amdgpu(&'x Amdgpu),
 }
 
 impl<'x> From<&'x Xe> for CardRef<'x> {
@@ -107,9 +107,9 @@ impl<'x> From<&'x Xe> for CardRef<'x> {
     }
 }
 
-impl<'x> From<&'x Amd> for CardRef<'x> {
-    fn from(amd: &'x Amd) -> Self {
-        CardRef::Amd(amd)
+impl<'x> From<&'x Amdgpu> for CardRef<'x> {
+    fn from(amd: &'x Amdgpu) -> Self {
+        CardRef::Amdgpu(amd)
     }
 }
 
@@ -117,15 +117,15 @@ impl<'x> From<&'x Card> for CardRef<'x> {
     fn from(card: &'x Card) -> Self {
         match card {
             Card::Xe(xe) => CardRef::Xe(xe),
-            Card::Amd(amd) => CardRef::Amd(amd),
+            Card::Amdgpu(amd) => CardRef::Amdgpu(amd),
         }
     }
 }
 
 #[expect(clippy::large_enum_variant, reason = "a device or two in a process")]
 enum Backend<'x> {
-    Xe(xe3::XeDevice<'x>),
-    Amd(amd::AmdDevice<'x>),
+    Xe(xe::XeDevice<'x>),
+    Amdgpu(amdgpu::AmdgpuDevice<'x>),
 }
 
 /// The GPU detour submits to, and what it keeps there in one address space: its surfaces (its own or dma-bufs
@@ -141,7 +141,7 @@ macro_rules! on {
     ($self:ident, $d:ident => $e:expr) => {
         match &$self.backend {
             Backend::Xe($d) => $e,
-            Backend::Amd($d) => $e,
+            Backend::Amdgpu($d) => $e,
         }
     };
 }
@@ -149,8 +149,8 @@ macro_rules! on {
 impl<'x> Device<'x> {
     pub fn new(card: impl Into<CardRef<'x>>) -> Device<'x> {
         let backend = match card.into() {
-            CardRef::Xe(xe) => Backend::Xe(xe3::XeDevice::new(xe)),
-            CardRef::Amd(amd) => Backend::Amd(amd::AmdDevice::new(amd)),
+            CardRef::Xe(xe) => Backend::Xe(xe::XeDevice::new(xe)),
+            CardRef::Amdgpu(amd) => Backend::Amdgpu(amdgpu::AmdgpuDevice::new(amd)),
         };
         Device { backend }
     }
@@ -159,7 +159,7 @@ impl<'x> Device<'x> {
     pub fn card(&self) -> CardRef<'x> {
         match &self.backend {
             Backend::Xe(d) => CardRef::Xe(d.xe),
-            Backend::Amd(d) => CardRef::Amd(d.amd),
+            Backend::Amdgpu(d) => CardRef::Amdgpu(d.amd),
         }
     }
 
@@ -167,7 +167,7 @@ impl<'x> Device<'x> {
     pub fn isa(&self) -> Isa {
         match self.backend {
             Backend::Xe(_) => Isa::Xe3,
-            Backend::Amd(_) => Isa::Rdna2,
+            Backend::Amdgpu(_) => Isa::Rdna2,
         }
     }
 

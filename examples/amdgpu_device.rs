@@ -3,7 +3,7 @@
 //! interpolated, a uniform block, a texture sampled). Checks the pixels radeonsi draws, an imported target, blending
 //! against the CPU, uniforms, textures (filters, wraps), indices, culling; then times many small draws.
 //!
-//!   cargo run --release --example amd_device
+//!   cargo run --release --example amdgpu_device
 
 use std::time::Instant;
 

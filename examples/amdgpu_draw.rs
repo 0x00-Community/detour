@@ -2,11 +2,11 @@
 //! its draw, its shader, vertex and target addresses moved onto ours; ACO's NGG vertex shader and pixel shader as
 //! machine words; a 64x64 linear RGBA8 target the CPU zeroes first and reads back after the fence.
 //!
-//!   cargo run --release --example amd_draw
+//!   cargo run --release --example amdgpu_draw
 
 use std::time::{Duration, Instant};
 
-use detour::{Amd, AmdIb, Bo, Caching, Engine, Fence, Gpu, MemType, Queue, Vm};
+use detour::{Amdgpu, AmdgpuIb, Bo, Caching, Engine, Fence, Gpu, MemType, Queue, Vm};
 
 /// PM4 type-3 packet header: opcode, then `n` dwords of body
 const fn pkt3(op: u32, n: u32) -> u32 {
@@ -255,7 +255,7 @@ fn words(w: &[u32]) -> Vec<u8> {
 }
 
 fn main() {
-    let amd = Amd::open_first().expect("an amdgpu render node");
+    let amd = Amdgpu::open_first().expect("an amdgpu render node");
     let base = amd.driver_info().virtual_address_offset.max(1 << 32);
     let (vs, ps, vtx, rt, bc, ib_addr) = (base + SHADERS, base + SHADERS + 0x100, base + VERTICES, base + TARGET, base + BORDER, base + IB);
 
@@ -319,7 +319,7 @@ fn main() {
     vm.bind(&bo, 0, base, SIZE, MemType::Streaming, &[]).unwrap();
     let done = amd.fence(false).unwrap();
     let t = Instant::now();
-    queue.submit(&AmdIb { addr: ib_addr, dwords: ib.len() as u32 }, &[], &[&done]).unwrap();
+    queue.submit(&AmdgpuIb { addr: ib_addr, dwords: ib.len() as u32 }, &[], &[&done]).unwrap();
     assert!(done.wait(Duration::from_secs(5)).unwrap(), "the draw did not finish");
     let took = t.elapsed();
     println!("{} dwords drawn in {:.3} ms; fault: {:?}", ib.len(), took.as_secs_f64() * 1e3, queue.fault(&done).unwrap());
