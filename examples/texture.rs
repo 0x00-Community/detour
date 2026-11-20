@@ -6,7 +6,7 @@
 //!
 //!   cargo run --release --example texture [FILTER...]      (cases whose name contains a filter)
 
-use detour::{
+use detour::{Isa, 
     ColorFormat, ColorTarget, Compiled, Device, Draw, Filter, Gpu, Sampled, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat,
     Wrap, Xe,
 };
@@ -249,7 +249,7 @@ fn cases() -> Vec<Case> {
 fn main() {
     let only: Vec<String> = std::env::args().skip(1).collect();
     let picked = |name: &str| only.is_empty() || only.iter().any(|f| name.contains(f.as_str()));
-    let tools = Toolchain::new();
+    let tools = Toolchain::new(Isa::Xe3);
     let mut body = tools.body();
     GlslReader::read(&mut body, SHADERS[0], GlslStage::Vertex).unwrap();
     GlslReader::read(&mut body, SHADERS[1], GlslStage::Fragment).unwrap();

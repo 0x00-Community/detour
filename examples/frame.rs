@@ -9,7 +9,7 @@
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd};
 use std::time::{Duration, Instant};
 
-use detour::{
+use detour::{Isa, 
     Bo, Caching, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, Fence, Gpu, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat,
     Xe,
 };
@@ -258,7 +258,7 @@ fn imported(xe: &Xe, device: &Device<'_>, programs: &[Compiled; 2], what: &str, 
 
 fn main() {
     let frames: u32 = std::env::args().nth(1).map_or(50, |n| n.parse().unwrap());
-    let tools = Toolchain::new();
+    let tools = Toolchain::new(Isa::Xe3);
     let bytes = [program(&tools, VARYING), program(&tools, UNIFORM)];
     let programs = [tools.load(&bytes[0]).unwrap(), tools.load(&bytes[1]).unwrap()];
     let xe = Xe::open_first().unwrap();

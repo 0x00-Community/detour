@@ -5,7 +5,7 @@
 //!
 //!   cargo run --release --example indexed
 
-use detour::{
+use detour::{Isa, 
     ColorFormat, ColorTarget, Compiled, Device, Draw, Gpu, IndexBuffer, IndexFormat, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement,
     VertexFormat, Xe,
 };
@@ -120,7 +120,7 @@ fn same(got: &[u8], want: &[u8]) -> Result<(), String> {
 }
 
 fn main() {
-    let tools = Toolchain::new();
+    let tools = Toolchain::new(Isa::Xe3);
     let mut body = tools.body();
     GlslReader::read(&mut body, SHADERS[0], GlslStage::Vertex).unwrap();
     GlslReader::read(&mut body, SHADERS[1], GlslStage::Fragment).unwrap();

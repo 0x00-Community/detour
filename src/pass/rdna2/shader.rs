@@ -8,6 +8,7 @@
 //!   - then each uniform block of `ubos`, in order: its address, low then high dword (2 SGPRs)
 //!   - then each vertex input, in location order: a buffer descriptor (V#, 4 SGPRs) whose base is the input's first
 //!     byte in the first vertex, its stride the buffer's, its format the input's (fetched with `idxen`)
+//!
 //! It begins with ACO's NGG passthrough prologue (s3: merged wave info; v0: the primitive's export data), exports
 //! `pos0`, then `param0..varyings`.
 //!
@@ -15,6 +16,7 @@
 //!   - each uniform block of `ubos`, in order: its address, low then high dword (2 SGPRs)
 //!   - then each sampled texture of `textures`, in order: its image descriptor (T#, 8 SGPRs) then its sampler (S#,
 //!     4 SGPRs)
+//!
 //! The primitive mask (for `m0`) is the SGPR after them. Its input VGPRs are those `ps_input` enables
 //! (`SPI_PS_INPUT_ENA` and `SPI_PS_INPUT_ADDR` both); it reads `inputs` varyings (`SPI_PS_INPUT_CNTL_0..`, each at
 //! its own offset) and exports `mrt0` as four fp16 values (`SPI_SHADER_COL_FORMAT` FP16_ABGR, compressed).

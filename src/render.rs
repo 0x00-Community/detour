@@ -9,7 +9,7 @@ use std::time::Duration;
 use mlirformat::Error;
 
 use crate::{
-    Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Syncobj, TargetLoad, Template, Tiling, Vm, Xe, Xe3Device, Xe3Draw, Xe3DrawCommands, XeBo, XeQueue,
+    Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Syncobj, TargetLoad, Template, Tiling, Vm, Shaders, Xe, Xe3Device, Xe3Draw, Xe3DrawCommands, Xe3Shader, XeBo, XeQueue,
     XeVm,
 };
 
@@ -731,13 +731,22 @@ impl<'x> State<'x> {
         Ok(())
     }
 
+    /// Program `p`'s Xe3 shaders
+    fn xe3(p: &Compiled) -> Result<(&Xe3Shader, &Xe3Shader), Error> {
+        match &p.shaders {
+            Shaders::Xe3 { vs, fs } => Ok((vs, fs)),
+            _ => Err(Error(format!("a program compiled for {:?}, drawn on Xe3", p.isa()))),
+        }
+    }
+
     /// Program `p`'s code in the arena: its vertex and fragment shader's addresses
     fn program(&mut self, p: &Compiled) -> Result<(u64, u64), Error> {
         if let Some(&(_, vs, fs)) = self.programs.iter().find(|(id, _, _)| *id == p.id) {
             return Ok((vs, fs));
         }
-        let vs = self.arena.put(self.xe, &self.vm, &p.vs.code)?;
-        let fs = self.arena.put(self.xe, &self.vm, &p.fs.code)?;
+        let (vs, fs) = Self::xe3(p)?;
+        let vs = self.arena.put(self.xe, &self.vm, &vs.code)?;
+        let fs = self.arena.put(self.xe, &self.vm, &fs.code)?;
         self.programs.push((p.id, vs, fs));
         Ok((vs, fs))
     }
@@ -758,7 +767,7 @@ impl<'x> State<'x> {
             self.arena.free.push(gone.piece);
         }
         let (vs, fs) = self.program(program)?;
-        let shape = Xe3Draw::shape(d, &program.vs, &program.fs)?;
+        let shape = Xe3Draw::shape(d, Self::xe3(program)?.0, Self::xe3(program)?.1)?;
         let outer = |h: &str| match h {
             "vs" => Some(vs),
             "fs" => Some(fs),
