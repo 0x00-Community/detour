@@ -292,7 +292,7 @@ pub enum Wrap {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Sampled {
     pub binding: u32,
-    pub surface: crate::Surface,
+    pub surface: Surface,
     pub filter: Filter,
     pub wrap: Wrap,
 }
@@ -352,3 +352,7 @@ impl Default for Draw<'_> {
         }
     }
 }
+
+/// A color target a device keeps (`Device::surface`): its pixels stay on the GPU between draws
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Surface(pub(crate) usize);

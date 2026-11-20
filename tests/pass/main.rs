@@ -1,5 +1,6 @@
-//! detour's passes: each GPU's lowering and command streams against what Mesa and acgpu ran
+//! detour's passes: each GPU's lowering against what Mesa, acgpu and a reading of the code ran
 
+mod rdna2;
 mod xe3;
 
 use mlirpass::Passes;

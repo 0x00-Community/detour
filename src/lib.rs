@@ -8,6 +8,7 @@ mod binary;
 mod dialect;
 mod kmd;
 mod pass;
+#[cfg(target_os = "linux")]
 mod render;
 mod shader;
 mod tiling;
@@ -16,6 +17,7 @@ pub use binary::*;
 pub use dialect::*;
 pub use kmd::*;
 pub use pass::*;
+#[cfg(target_os = "linux")]
 pub use render::*;
 pub use shader::*;
 pub use tiling::*;
