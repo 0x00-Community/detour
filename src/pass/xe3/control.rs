@@ -1,9 +1,8 @@
 #[allow(unused_imports, reason = "the alloc prelude")]
 use alloc::{borrow::ToOwned, boxed::Box, format, string::{String, ToString}, vec, vec::Vec};
 
-use mlirformat::Op;
 use mlirformat::{Attribute, Error};
-use crate::{A, Body, Kernels, OpData, OpId, Quiet, Rewriter, pass};
+use crate::{A, Body, OpData, OpId, Quiet, Rewriter, pass};
 use crate::{Xe3Kernel};
 
 /// Structured control flow while it is lowered to EU branches
@@ -92,7 +91,7 @@ impl<'a> Control<'_, 'a> {
 
 #[pass("xe3-control", on = "builtin.module")]
 pub fn xe3_control<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
-    for k in Kernels::all(body, op, Xe3Kernel::NAME) {
+    for k in Xe3Kernel::all(body, op) {
         let mut ops = Vec::new();
         body.walk_post(k, &mut |o| {
             if matches!(&*body[o].name, "scf.for" | "scf.if" | "scf.while") {
@@ -112,7 +111,7 @@ pub fn xe3_control<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
 pub fn xe3_branches<'a>(body: &mut Body<'a>, op: OpId) -> Result<(), Error> {
     let mut quiet = Quiet;
     let mut rw = Rewriter::new(body, &mut quiet);
-    for k in Kernels::all(rw.body, op, Xe3Kernel::NAME) {
+    for k in Xe3Kernel::all(rw.body, op) {
         let block = rw.body.top_block(k);
         let ops = rw.body.block_ops(block);
         let mut insts: Vec<(OpId, String)> = Vec::new();

@@ -30,8 +30,8 @@ application's layer, not detour's.
 - 🧩 **Draws** (`src/render.rs`, `src/shader.rs`): SPIR-V shaders (GLSL through [mlirpass](https://github.com/Jabberwocky238/mlirpass))
   compiled to Xe3 or RDNA2, ahead of time or in place; targets, vertex buffers, uniforms, sampled textures (any surface,
   so render to texture too), blending, scissors, dma-bufs.
-- 🔵 **Intel Xe3**: the xe3 dialect (EU instructions, genxml commands and states), SPIR-V and GPU kernels lowered to
-  Xe3 machine code, register allocation, scoreboard, a draw's image.
+- 🔵 **Intel Xe3**: the xe3 dialect (EU instructions, genxml commands and states), SPIR-V shaders lowered to Xe3
+  machine code, register allocation, scoreboard, a draw's image.
 - 🔴 **AMD RDNA2** (gfx1036): SPIR-V shaders compiled straight to GFX10 machine code (wave32, NGG passthrough; its
   own selection, register allocation and waits), a draw's PM4 state, and the `amdgpu` kernel interface (buffer objects,
   the address space, command submission with syncobjs, dma-bufs).
@@ -52,7 +52,7 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | 🔢 | Indexed draws and byte colors (`examples/indexed`): 3000 overlapping quads as four vertices and six u16 / u32 indices each, colors as `Unorm8x4`, from a middle index, indexed and plain draws taking turns | **5 / 5** cases **byte for byte** as the plain draw |
 | 🖼️ | Textures (`examples/texture`): a quad sampling a surface against a CPU reference: nearest and linear, magnified and minified, clamp / repeat / mirrored repeat, RGBA8 and R8, linear and Tile4; drawn into then sampled, and sampled then drawn over, in one batch; a part written (`Device::write`) | **15 / 15** cases, nearest **byte for byte**, linear within 2 of the f32 reference |
 | 🔣 | Encodings (`tests/binary`, `src/pass/rdna2`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc |
-| 🪜 | Lowerings (`tests/pass`) | Xe3 kernels as acgpu compiled them, GLSL reaching Xe3 |
+| 🪜 | Lowerings (`tests/pass`) | Xe3 and RDNA2 code of hand-written SPIR-V, GLSL and acdes's page programs, held against a reading of it |
 
 ## 🎮 GPUs
 

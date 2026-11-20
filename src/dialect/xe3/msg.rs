@@ -41,12 +41,6 @@ pub enum LscOp {
     Fence = 31,
 }
 
-impl Sfid {
-    pub fn of(shared: Option<bool>) -> Sfid {
-        if shared == Some(true) { Sfid::Slm } else { Sfid::Ugm }
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum AddrSurface {

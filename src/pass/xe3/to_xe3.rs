@@ -1,18 +1,12 @@
 #[allow(unused_imports, reason = "the alloc prelude")]
 use alloc::{borrow::ToOwned, format, string::{String, ToString}, vec, vec::Vec};
 
-use mlirformat::llvm_types::LlvmType;
 use mlirformat::{Attribute, Const, Error, FloatKind, Op, Scalar, ShapedKind, Type};
 
-use crate::Dimension;
 use mlirformat::spirv_types::SpirvType;
 
 use crate::{Lanes, A, Attrs, Body, ConversionRewriter, Heads, OpData, OpHead, OpId, Quiet, Rewriter, ShaderStage as Stage, SignatureConversion, TypeConverter, Updates, ValueId, WithAttrs, patterns};
 use crate::{AddrSize, AddrSurface, Xe3Sampler as Sampler, CacheStore, DataSize, EuPayload, Grf, Lsc, LscOp, Render, SendInfo, Sfid, VectSize, Xe3Kernel as Kernel};
-
-const GATEWAY_BARRIER: u32 = 4;
-
-const LSC_SLM_FENCE: u32 = 31 | 2 << 7;
 
 type Cr<'r, 'a, 'p> = ConversionRewriter<'r, 'a, 'p>;
 
@@ -21,10 +15,6 @@ type Emit<'e> = dyn FnMut(&str, &[ValueId], Vec<(&str, A)>, &'static str) -> Val
 
 mod std450;
 use std450::Std450;
-
-pub const XE3_COMPUTE_PARAMS: usize = 8;
-
-pub const XE3_COMPUTE_INLINE_GRF: u8 = 2;
 
 pub const XE3_BUFFER_BTI: u8 = 32;
 
@@ -43,9 +33,8 @@ pub struct Interpolate;
 impl Interpolate {
     pub const BX: u8 = 1;
     pub const BY: u8 = 2;
-    pub const fn setup(imask: bool) -> u8 {
-        3 + imask as u8
-    }
+    /// The first register of the attributes' setup data (after r0, then the barycentrics in r1..r2)
+    pub const SETUP: u8 = 3;
 
     pub fn plane(setup: u8, k: usize, p: usize) -> String {
         let reg = setup as usize + k / 5;
@@ -71,10 +60,7 @@ impl Xe3Types {
             Type::Integer { width: 8 | 16 | 32, .. } | Type::Index => Some("i32"),
             Type::Float(FloatKind::F64) => Some("f64"),
             Type::Integer { width: 64, .. } => Some("i64"),
-            _ => match LlvmType::try_from(t) {
-                Ok(LlvmType::Ptr(1 | 3)) => Some("i32"),
-                _ => None,
-            },
+            _ => None,
         }
     }
 
@@ -251,11 +237,11 @@ impl GpuToXe3 {
             let p = rw.create(data.with_attrs(vec![("exec", A::from(XE3_SIMD))]), &[ty]);
             rw.body[p].results[0]
         };
-        for k in crate::Kernels::all(rw.body, module, Kernel::NAME) {
+        for k in Kernel::all(rw.body, module) {
             let head = rw.body.head::<Kernel>(k)?;
             let regs = head.payload.unwrap_or_default();
-            let (fragment, compute) = (head.stage == Some(Stage::Fragment), head.stage == Some(Stage::Compute));
-            let setup = Interpolate::setup(head.imask == Some(true));
+            let fragment = head.stage == Some(Stage::Fragment);
+            let setup = Interpolate::SETUP;
             let block = rw.body.top_block(k);
             let args = rw.body[block].args.clone();
             rw.set_start(block);
@@ -289,7 +275,6 @@ impl GpuToXe3 {
                         let v = put(&mut rw, a, f32.clone());
                         put(&mut rw, OpData::build("xe3.eu.mad").operands(&[v, bx]).with_attrs(vec![("src2", A::str(Interpolate::plane(setup, k, 1)))]), f32.clone())
                     }
-                    None if compute => put(&mut rw, OpData::build("xe3.eu.mov").with_attrs(vec![("src0", A::str(format!("r{XE3_COMPUTE_INLINE_GRF}.{}<0;1,0>:ud", 4 * g)))]), ty),
                     None => put(&mut rw, OpData::of(&EuPayload::new(g, ty.clone()))?.0, ty),
                 };
                 rw.replace_all_uses(arg, v);
@@ -299,10 +284,9 @@ impl GpuToXe3 {
             for data in Self::ieee_prologue() {
                 rw.create(data, &[]);
             }
-            let reserve = match (fragment, compute) {
-                (true, _) => Interpolate::end(setup, regs.iter().filter(|k| **k >= 0).map(|k| *k as usize + 1).max().unwrap_or(0)),
-                (_, true) => XE3_COMPUTE_INLINE_GRF + 1,
-                _ => regs.iter().map(|&g| if g <= Self::VERTEX_INDEX { Self::VERTEX_INDEX - g + 3 } else { g + 1 }).max().unwrap_or(0).max(0) as u8,
+            let reserve = match fragment {
+                true => Interpolate::end(setup, regs.iter().filter(|k| **k >= 0).map(|k| *k as usize + 1).max().unwrap_or(0)),
+                false => regs.iter().map(|&g| if g <= Self::VERTEX_INDEX { Self::VERTEX_INDEX - g + 3 } else { g + 1 }).max().unwrap_or(0).max(0) as u8,
             };
             rw.update::<Kernel>(k, |k| k.reserve = Some(u32::from(reserve)))?;
         }
@@ -390,13 +374,6 @@ impl GpuToXe3 {
         Self::eu(cr, before, "xe3.eu.mov", &[], vec![("src0", A::str(format!("{bits:#x}:{ty}")))], elem)
     }
 
-    fn wide(elem: &str, size: Option<u32>) -> (Option<u32>, u32) {
-        match elem {
-            "f64" | "i64" => (Some(8), 2),
-            _ => (size, 1),
-        }
-    }
-
     fn vect_size(n: usize) -> Option<VectSize> {
         [VectSize::V1, VectSize::V2, VectSize::V3, VectSize::V4].get(n.wrapping_sub(1)).copied()
     }
@@ -427,15 +404,13 @@ impl GpuToXe3 {
     }
 
     pub fn stage_of(body: &Body<'_>, f: OpId) -> Option<Stage> {
-        match &*body[f].name {
-            "gpu.func" => body[f].gpu_kernel().then_some(Stage::Compute),
-            "func.func" => match body[f].get(Self::STAGE)? {
-                Attribute::Extended { ext, .. } => match ext.body.as_deref()? {
-                    "<Vertex>" => Some(Stage::Vertex),
-                    "<Fragment>" => Some(Stage::Fragment),
-                    "<GLCompute>" => Some(Stage::Compute),
-                    _ => None,
-                },
+        if body[f].name != "func.func" {
+            return None;
+        }
+        match body[f].get(Self::STAGE)? {
+            Attribute::Extended { ext, .. } => match ext.body.as_deref()? {
+                "<Vertex>" => Some(Stage::Vertex),
+                "<Fragment>" => Some(Stage::Fragment),
                 _ => None,
             },
             _ => None,
@@ -491,23 +466,6 @@ impl GpuToXe3 {
             at = body.parent_op(p);
         }
         None
-    }
-
-    fn lsc(lsc_op: LscOp, n: usize, binding: Option<u32>, size: Option<u32>) -> Option<(Lsc, u32)> {
-        let size = size.unwrap_or(4);
-        let data_size = match (size, n) {
-            (8, _) => DataSize::D64,
-            (4, _) => DataSize::D32,
-            (2, 1) => DataSize::D16U32,
-            (1, 1) => DataSize::D8U32,
-            _ => return None,
-        };
-        let vect_size = Self::vect_size(n)?;
-        let (surface, ex_desc) = match binding {
-            None => (AddrSurface::Flat, 0),
-            Some(k) => (AddrSurface::Bti, (k + u32::from(XE3_BUFFER_BTI)) << 24),
-        };
-        Some((Lsc { op: lsc_op, surface, addr_size: AddrSize::A32, data_size, cache: 0, vect_size, transpose: false, cmask: 0 }, ex_desc))
     }
 
     fn lanes(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>], to: &str, attrs: &[(&str, A)]) -> bool {
@@ -605,15 +563,13 @@ impl GpuToXe3 {
 
 #[map("arith.bitcast" => "xe3.eu.mov", via = Self::lanes(&[("as", A::str("ud"))]))]
 impl GpuToXe3 {
-    #[convert("func.func", "gpu.func")]
+    #[convert("func.func")]
     fn func(cr: &mut Cr<'_, '_, '_>, op: OpId, _: &[Vec<ValueId>]) -> bool {
         let Some(stage) = Self::stage_of(cr.rw.body, op) else { return false };
         let Some(Attribute::Type(Type::Function(fty))) = cr.rw.body[op].get("function_type").cloned() else { return false };
         let Some(name) = cr.rw.body[op].get("sym_name").cloned() else { return false };
         let region = cr.rw.body[op].regions[0];
-        let entry = cr.rw.body[region].blocks[0];
-        let attributions: Vec<ValueId> = cr.rw.body[entry].args[fty.inputs.len()..].to_vec();
-        let mut sig = SignatureConversion::new(fty.inputs.len() + attributions.len());
+        let mut sig = SignatureConversion::new(fty.inputs.len());
         let mut payload = Vec::new();
         let all = Self::interface_inputs(cr.rw.body, op, &fty.inputs);
         let builtins = Self::builtins(cr.rw.body, op, stage);
@@ -634,12 +590,6 @@ impl GpuToXe3 {
                     }
                     payload.extend(at.into_iter().take(n));
                 }
-                None if stage == Stage::Compute => {
-                    if n != 1 || i >= XE3_COMPUTE_PARAMS {
-                        return false;
-                    }
-                    payload.push(i as i64);
-                }
                 None => {
                     let j = i - builtins.len();
                     payload.extend((0..n).map(|c| (base + 4 * j + c) as i64));
@@ -648,7 +598,7 @@ impl GpuToXe3 {
             sig.add_inputs(i, vec![Type::from(Grf(elem)); n]);
         }
         let varyings = if stage == Stage::Vertex { fty.results.len().saturating_sub(1) } else { 0 };
-        if varyings > XE3_MAX_VARYINGS || (stage == Stage::Fragment && inputs > XE3_MAX_VARYINGS) || (stage == Stage::Compute && !fty.results.is_empty()) {
+        if varyings > XE3_MAX_VARYINGS || (stage == Stage::Fragment && inputs > XE3_MAX_VARYINGS) {
             return false;
         }
         let flag = |attr: &str| cr.rw.body[op].has_flag(attr);
@@ -656,20 +606,6 @@ impl GpuToXe3 {
         let dual = stage == Stage::Fragment && flag(Self::DUAL_SOURCE) && fty.results.len() == 2;
         let count = |attr: &str| cr.rw.body[op].get(attr).map(Attrs::as_int).transpose().map(|n| n.unwrap_or(0) as u32);
         let (Ok(bindings), Ok(buffers), Ok(push)) = (count(Self::BINDINGS), count(Self::BUFFERS), count(Self::PUSH)) else { return false };
-        let imask = 0u32;
-        let threads = match cr.rw.body[op].get("known_block_size").and_then(|a| a.dense_values()).as_deref() {
-            Some([x, ..]) => (*x as u32).div_ceil(u32::from(XE3_SIMD)),
-            _ => 1,
-        };
-        let mut shared = 0u32;
-        for (i, a) in attributions.iter().enumerate() {
-            let Some(n) = Self::bytes(&cr.rw.body[*a].ty) else { return false };
-            shared += n;
-            sig.add_inputs(fty.inputs.len() + i, Vec::new());
-        }
-        if stage == Stage::Compute && (threads > 64 || shared > 64 * 1024) {
-            return false;
-        }
         let kernel = Kernel {
             simd: Some(u32::from(XE3_SIMD)),
             payload: Some(payload),
@@ -677,14 +613,11 @@ impl GpuToXe3 {
             varyings: Some(varyings as u32),
             targets: (stage == Stage::Fragment).then_some(fty.results.len() as u32 - u32::from(omask) - u32::from(dual)),
             omask: omask.then_some(true),
-            imask: (stage == Stage::Fragment && imask > 0).then_some(true),
             bindings: Some(bindings),
             buffers: Some(buffers),
             push: Some(push),
-            threads: (stage == Stage::Compute && threads > 1).then_some(threads),
             system: (system != 0).then_some(system),
-            shared: (stage == Stage::Compute && shared > 0).then_some(shared),
-            ..Kernel::new(name, Some(stage), None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, mlirformat::Region { blocks: Vec::new() })
+            ..Kernel::new(name, Some(stage), None, None, None, None, None, None, None, None, None, None, None, None, mlirformat::Region { blocks: Vec::new() })
         };
         let Ok(data) = OpData::head(&kernel) else { return false };
         cr.rw.set_before(op);
@@ -787,15 +720,8 @@ impl GpuToXe3 {
         body[op].operands.iter().all(grf) && body[op].results.iter().all(grf) && args.into_iter().all(grf)
     }
 
-    #[convert("func.return", "gpu.return")]
+    #[convert("func.return")]
     fn ret(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
-        if Self::stage(cr.rw.body, op) == Some(Stage::Compute) {
-            let r0 = Self::payload(cr, op, 0, "ui32");
-            let attrs = vec![("sfid", A::str(<&str>::from(Sfid::Gateway))), ("desc", A::from(SendInfo::lengths(0, 1, 0))), ("src0_len", A::from(1u8)), ("eot", A::Bool(true))];
-            Self::send(cr, op, "xe3.eu.send", &[r0], attrs);
-            cr.erase(op);
-            return true;
-        }
         let Some(values) = o.first() else { return false };
         let Ok(values): Result<[ValueId; 4], _> = values.clone().try_into() else { return false };
         match Self::stage(cr.rw.body, op) {
@@ -1049,165 +975,9 @@ impl GpuToXe3 {
         })
     }
 
-    #[convert("gpu.block_id")]
-    fn block_id(cr: &mut Cr<'_, '_, '_>, op: OpId, _: &[Vec<ValueId>]) -> bool {
-        let Some(d) = cr.rw.body[op].get("dimension").and_then(|a| Dimension::try_from(a).ok()) else { return false };
-        let dword = [1, 6, 7][d as usize];
-        let v = Self::eu(cr, op, "xe3.eu.mov", &[], vec![("src0", A::str(format!("r0.{}<0;1,0>:ud", 4 * dword)))], "i32");
-        cr.replace(op, vec![vec![v]]);
-        true
-    }
-
-    #[convert("gpu.thread_id")]
-    fn thread_id(cr: &mut Cr<'_, '_, '_>, op: OpId, _: &[Vec<ValueId>]) -> bool {
-        if cr.rw.body[op].get("dimension").and_then(|a| Dimension::try_from(a).ok()) != Some(Dimension::X) {
-            return false;
-        }
-        let v = Self::eu(cr, op, "xe3.eu.mov", &[], vec![("src0", A::str("r1<1;1,0>:uw"))], "i32");
-        cr.replace(op, vec![vec![v]]);
-        true
-    }
-
-    #[convert("arith.index_cast", "arith.index_castui", "llvm.inttoptr")]
+    #[convert("arith.index_cast", "arith.index_castui")]
     fn same(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
         cr.replace(op, vec![o[0].clone()]);
-        true
-    }
-
-    #[convert("arith.trunci")]
-    fn trunci(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
-        let r = cr.rw.body[op].results[0];
-        if !cr.rw.body[r].uses.iter().all(|u| cr.rw.body[u.op].name == "llvm.store" && u.index == 0) {
-            return false;
-        }
-        cr.replace(op, vec![o[0].clone()]);
-        true
-    }
-
-    fn bytes(t: &Type<'_>) -> Option<u32> {
-        let Type::Shaped(s) = t else { return None };
-        let n: i64 = t.dims()?.iter().product();
-        Some(n as u32 * (s.elem.bit_width()? / 8))
-    }
-
-    fn shared(t: &Type<'_>) -> Option<bool> {
-        match LlvmType::try_from(t) {
-            Ok(LlvmType::Ptr(3)) => Some(true),
-            Ok(LlvmType::Ptr(1)) => Some(false),
-            _ => None,
-        }
-    }
-
-    fn size(t: &Type<'_>) -> Option<u32> {
-        let e = match t {
-            Type::Shaped(s) if s.kind == ShapedKind::Vector => &*s.elem,
-            t => t,
-        };
-        match e {
-            Type::Integer { width: 8, .. } => Some(1),
-            Type::Integer { width: 16, .. } => Some(2),
-            _ => None,
-        }
-    }
-
-    #[convert("llvm.load")]
-    fn load(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
-        let [addr] = o else { return false };
-        let r = cr.rw.body[op].results[0];
-        let ty = cr.rw.body[r].ty.clone();
-        let Some((n, elem)) = Xe3Types::of(&ty) else { return false };
-        let Some(shared) = Self::shared(&cr.rw.body[cr.rw.body[op].operands[0]].ty) else { return false };
-        let (size, regs) = Self::wide(elem, Self::size(&ty));
-        let Some((lsc, ex_desc)) = Self::lsc(LscOp::Load, n, None, size) else { return false };
-        let mut attrs = vec![("sfid", A::str(<&str>::from(Sfid::of(Some(shared))))), ("desc", A::from(SendInfo::lengths(lsc.desc(), 1, n as u32 * regs))), ("src0_len", A::from(1u8))];
-        if ex_desc != 0 {
-            attrs.push(("ex_desc", A::from(ex_desc)));
-        }
-        let values = Self::create(cr, op, "xe3.eu.send", addr, attrs, &vec![Type::from(Grf(elem)); n]);
-        cr.replace(op, vec![values]);
-        true
-    }
-
-    #[convert("llvm.store")]
-    fn store(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
-        let [value, addr] = o else { return false };
-        let ty = cr.rw.body[cr.rw.body[op].operands[0]].ty.clone();
-        let Some(shared) = Self::shared(&cr.rw.body[cr.rw.body[op].operands[1]].ty) else { return false };
-        let elem = value.first().and_then(|v| Grf::try_from(&cr.rw.body[*v].ty).ok()).map_or("i32", |g| g.0);
-        let (size, regs) = Self::wide(elem, Self::size(&ty));
-        let Some((lsc, ex_desc)) = Self::lsc(LscOp::Store, value.len(), None, size) else { return false };
-        let mut payload = addr.clone();
-        payload.extend(value);
-        let mut attrs = vec![("sfid", A::str(<&str>::from(Sfid::of(Some(shared))))), ("desc", A::from(SendInfo::lengths(lsc.desc(), 1, 0))), ("src0_len", A::from(1u8)), ("src1_len", A::from(value.len() as u8 * regs as u8))];
-        if ex_desc != 0 {
-            attrs.push(("ex_desc", A::from(ex_desc)));
-        }
-        Self::send(cr, op, "xe3.eu.send", &payload, attrs);
-        cr.erase(op);
-        true
-    }
-
-    #[convert("llvm.atomicrmw")]
-    fn atomic(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
-        use mlirformat::llvm::AtomicBinOp as B;
-        let [addr, value] = o else { return false };
-        let Some(shared) = Self::shared(&cr.rw.body[cr.rw.body[op].operands[0]].ty) else { return false };
-        let Ok(rmw) = cr.rw.body.head::<mlirformat::llvm::AtomicRMWOp>(op) else { return false };
-        let lsc_op = match rmw.bin_op {
-            B::Add => LscOp::AtomicAdd,
-            B::Sub => LscOp::AtomicSub,
-            B::Min => LscOp::AtomicMin,
-            B::Max => LscOp::AtomicMax,
-            B::Umin => LscOp::AtomicUmin,
-            B::Umax => LscOp::AtomicUmax,
-            B::And => LscOp::AtomicAnd,
-            B::Or => LscOp::AtomicOr,
-            B::Xor => LscOp::AtomicXor,
-            B::Xchg => LscOp::AtomicStore,
-            _ => return false,
-        };
-        let Some((lsc, _)) = Self::lsc(lsc_op, 1, None, None) else { return false };
-        let mut payload = addr.clone();
-        payload.extend(value);
-        let attrs = vec![("sfid", A::str(<&str>::from(Sfid::of(Some(shared))))), ("desc", A::from(SendInfo::lengths(lsc.desc(), 1, 1))), ("src0_len", A::from(1u8)), ("src1_len", A::from(1u8))];
-        let old = Self::create(cr, op, "xe3.eu.send", &payload, attrs, &[Type::from(Grf("i32"))]);
-        cr.replace(op, vec![old]);
-        true
-    }
-
-    #[convert("gpu.barrier")]
-    fn barrier(cr: &mut Cr<'_, '_, '_>, op: OpId, _: &[Vec<ValueId>]) -> bool {
-        let all = || vec![("w", A::Bool(true)), ("as", A::str("ud"))];
-        Self::create(cr, op, "xe3.eu.sync", &[], vec![("exec", A::from(1u8)), ("fn", A::str("allwr"))], &[]);
-        let r0 = Self::payload(cr, op, 0, "i32");
-        let fence_attrs = vec![("exec", A::from(1u8)), ("w", A::Bool(true)), ("sfid", A::str(<&str>::from(Sfid::Slm))), ("desc", A::from(SendInfo::lengths(LSC_SLM_FENCE, 1, 1))), ("src0_len", A::from(1u8))];
-        let fence = Self::create(cr, op, "xe3.eu.send", &[r0], fence_attrs, &[Type::from(Grf("i32"))])[0];
-        let with = |extra: (&'static str, A)| {
-            let mut a = all();
-            a.push(extra);
-            a
-        };
-        let r02 = Self::eu(cr, op, "xe3.eu.mov", &[], with(("src0", A::str("r0.8<0;1,0>:ud"))), "i32");
-        let top = Self::imm(cr, op, 0xff00_0000, "i32");
-        let id = Self::eu(cr, op, "xe3.eu.and", &[r02, top], all(), "i32");
-        let eight = Self::imm(cr, op, 8, "i32");
-        let below = Self::eu(cr, op, "xe3.eu.shr", &[id, eight], all(), "i32");
-        let both = Self::eu(cr, op, "xe3.eu.or", &[id, below], all(), "i32");
-        let active = Self::imm(cr, op, 0x100, "i32");
-        let dword2 = Self::eu(cr, op, "xe3.eu.or", &[both, active], all(), "i32");
-        let local = Self::eu(cr, op, "xe3.eu.mov", &[], vec![("w", A::Bool(true)), ("src0", A::str("r1<1;1,0>:uw"))], "i32");
-        let fifteen = Self::imm(cr, op, 15, "i32");
-        let channel = Self::eu(cr, op, "xe3.eu.and", &[local, fifteen], all(), "i32");
-        let two = Self::imm(cr, op, 2, "i32");
-        let is2 = Self::eu(cr, op, "xe3.eu.cmp", &[channel, two], vec![("w", A::Bool(true)), ("cond", A::str("z")), ("dst_as", A::str("d"))], "f32");
-        let only2 = Self::eu(cr, op, "xe3.eu.and", &[dword2, is2], all(), "i32");
-        let zero = Self::imm(cr, op, 0, "i32");
-        let none = Self::eu(cr, op, "xe3.eu.and", &[fence, zero], all(), "i32");
-        let payload = Self::eu(cr, op, "xe3.eu.or", &[only2, none], all(), "i32");
-        let desc = SendInfo::lengths(GATEWAY_BARRIER, 1, 0);
-        Self::send(cr, op, "xe3.eu.send", &[payload], vec![("sfid", A::str(<&str>::from(Sfid::Gateway))), ("desc", A::from(desc)), ("src0_len", A::from(1u8)), ("w", A::Bool(true))]);
-        Self::create(cr, op, "xe3.eu.sync", &[], vec![("exec", A::from(1u8)), ("fn", A::str("bar"))], &[]);
-        cr.erase(op);
         true
     }
 

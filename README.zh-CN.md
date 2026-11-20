@@ -29,7 +29,7 @@ detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做
 - 🧩 **绘制** (`src/render.rs`、`src/shader.rs`): SPIR-V 着色器 (GLSL 经 [mlirpass](https://github.com/Jabberwocky238/mlirpass))
   编成 Xe3 或 RDNA2 机器码, 可预编译也可现编; 目标、顶点缓冲、uniform、采样纹理 (任何 surface, 所以也能渲染到纹理)、
   混合、scissor、dma-buf.
-- 🔵 **Intel Xe3**: xe3 方言 (EU 指令、genxml 命令和状态)、SPIR-V 和 GPU kernel 下降到 Xe3 机器码、寄存器分配、
+- 🔵 **Intel Xe3**: xe3 方言 (EU 指令、genxml 命令和状态)、SPIR-V 着色器下降到 Xe3 机器码、寄存器分配、
   记分板、一次绘制的镜像.
 - 🔴 **AMD RDNA2** (gfx1036): SPIR-V 着色器直接编成 GFX10 机器码 (wave32、NGG passthrough; 自己的指令选择、寄存器分配
   和等待)、一次绘制的 PM4 状态, 以及 `amdgpu` 内核接口 (buffer object、地址空间、带 syncobj 的命令提交、dma-buf).
@@ -48,7 +48,7 @@ detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做
 | 🔢 | 索引绘制和字节颜色 (`examples/indexed`): 3000 个重叠的四边形, 每个 4 个顶点加 6 个 u16 / u32 索引, 颜色用 `Unorm8x4`, 从中间的索引开始, 索引和非索引绘制交替 | **5 / 5** 例和非索引绘制**逐字节一致** |
 | 🖼️ | 纹理 (`examples/texture`): 四边形采样一个 surface, 对照 CPU 参考: nearest 和 linear、放大和缩小、clamp / repeat / mirrored repeat、RGBA8 和 R8、linear 和 Tile4; 同一批里先画进再采样、先采样再覆盖; 局部写入 (`Device::write`) | **15 / 15** 例, nearest **逐字节一致**, linear 与 f32 参考差 2 以内 |
 | 🔣 | 编码 (`tests/binary`、`src/pass/rdna2`) | Xe3 EU 对 gentool、genxml 对 Mesa, RDNA2 对 llvm-mc |
-| 🪜 | 下降 (`tests/pass`) | Xe3 kernel 对 acgpu、GLSL 到 Xe3 |
+| 🪜 | 下降 (`tests/pass`) | 手写 SPIR-V、GLSL 和 acdes 页面程序的 Xe3、RDNA2 机器码, 对照读过的基准 |
 
 ## 🎮 支持的 GPU
 

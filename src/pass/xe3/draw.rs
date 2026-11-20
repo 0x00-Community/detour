@@ -227,7 +227,6 @@ pub struct Xe3Shader {
     pub varyings: u32,
     pub targets: u32,
     pub omask: bool,
-    pub imask: bool,
     pub bindings: u32,
     pub buffers: u32,
     /// the system values the vertex fetcher writes after the attributes: 1 the vertex index, 2 the instance index
@@ -247,7 +246,6 @@ impl Xe3Shader {
             varyings: h.varyings.unwrap_or(0),
             targets: h.targets.unwrap_or(1),
             omask: h.omask.unwrap_or(false),
-            imask: h.imask.unwrap_or(false),
             bindings: h.bindings.unwrap_or(0),
             buffers: h.buffers.unwrap_or(0),
             system: h.system.unwrap_or(0),
@@ -260,9 +258,8 @@ impl Xe3Shader {
         let stage = match self.stage {
             ShaderStage::Vertex => 0,
             ShaderStage::Fragment => 1,
-            _ => 2,
         };
-        let fields = [stage, self.inputs, self.varyings, self.targets, u32::from(self.omask), u32::from(self.imask), self.bindings, self.buffers, self.system];
+        let fields = [stage, self.inputs, self.varyings, self.targets, u32::from(self.omask), self.bindings, self.buffers, self.system];
         for f in fields.into_iter().chain([self.code.len() as u32]) {
             out.extend(f.to_le_bytes());
         }
@@ -272,13 +269,13 @@ impl Xe3Shader {
     /// One read from `bytes` (`write`'s), which then start after it
     pub fn read(bytes: &mut &[u8]) -> Result<Xe3Shader, Error> {
         let short = || Error("a program cut short".into());
-        let mut words = [0u32; 10];
+        let mut words = [0u32; 9];
         for w in &mut words {
             let (head, rest) = bytes.split_first_chunk::<4>().ok_or_else(short)?;
             *w = u32::from_le_bytes(*head);
             *bytes = rest;
         }
-        let [stage, inputs, varyings, targets, omask, imask, bindings, buffers, system, len] = words;
+        let [stage, inputs, varyings, targets, omask, bindings, buffers, system, len] = words;
         let (code, rest) = bytes.split_at_checked(len as usize).ok_or_else(short)?;
         *bytes = rest;
         let stage = match stage {
@@ -286,7 +283,7 @@ impl Xe3Shader {
             1 => ShaderStage::Fragment,
             s => return Err(Error(format!("a shader of stage {s}"))),
         };
-        Ok(Xe3Shader { stage, inputs, varyings, targets, omask: omask != 0, imask: imask != 0, bindings, buffers, system, code: code.to_vec() })
+        Ok(Xe3Shader { stage, inputs, varyings, targets, omask: omask != 0, bindings, buffers, system, code: code.to_vec() })
     }
 }
 
@@ -437,7 +434,7 @@ pub struct Xe3Draw {
 
 impl Xe3Draw {
     /// SPIR-V vertex and fragment shaders (spirv.module ops at the top of the module) to Xe3 kernels
-    pub const SHADERS: &'static str = "builtin.module(xevm-attach-target{chip=ptl}, convert-spirv-entry-points, gpu-inline-calls, convert-spirv-cf-to-cf, sroa, mem2reg, gpu-local-arrays, mem2reg, lift-cf-to-scf, canonicalize, cse, convert-gpu-to-xe3, xe3-regalloc, xe3-control, xe3-swsb, xe3-branches, xe3-pad)";
+    pub const SHADERS: &'static str = "builtin.module(xevm-attach-target{chip=ptl}, convert-spirv-entry-points, convert-spirv-cf-to-cf, sroa, mem2reg, gpu-local-arrays, mem2reg, lift-cf-to-scf, canonicalize, cse, convert-gpu-to-xe3, xe3-regalloc, xe3-control, xe3-swsb, xe3-branches, xe3-pad)";
     /// A scissor rectangle's alignment: 64 bytes. genxml's pointer keeps bits 5 and up, but on Xe3 (Panther Lake) a
     /// rectangle 32 bytes past a 64-byte boundary is not the one the draw uses
     pub const SCISSOR_ALIGN: u64 = 64;
@@ -1006,9 +1003,7 @@ impl Xe3Draw {
         self.cmd(&Cmd3dstateTe::default());
         self.cmd(&Cmd3dstateDs::default());
         self.cmd(&Cmd3dstateGs::default());
-        let imask = fh.imask;
-        let fragment_inputs = fh.inputs;
-        let setup = if fragment_inputs > 0 { Interpolate::setup(imask) } else { 1 + u8::from(imask) };
+        let setup = if fh.inputs > 0 { Interpolate::SETUP } else { 1 };
         self.cmd(&xe3!(Cmd3dstatePs {
             kernel_0_enable: true,
             kernel_0_simd_width: PS_SIMD16,
@@ -1021,7 +1016,7 @@ impl Xe3Draw {
             kernel_0_poly_packing_policy: XE3_POLY_PACK16_FIXED,
             vector_mask_enable: false,
         }));
-        self.cmd(&xe3!(Cmd3dstatePsExtra { pixel_shader_valid: true, omask_present_to_render_target: fh.omask, input_coverage_mask_state: u32::from(imask) }));
+        self.cmd(&xe3!(Cmd3dstatePsExtra { pixel_shader_valid: true, omask_present_to_render_target: fh.omask }));
         self.cmd(&Cmd3dstateStreamout::default());
         self.cmd(&xe3!(Cmd3dstateClip {
             api_mode: XE3_APIMODE_D3D,
@@ -1056,7 +1051,7 @@ impl Xe3Draw {
             line_strip_list_provoking_vertex_select: LINE_PROVOKING,
             triangle_strip_list_provoking_vertex_select: TRIANGLE_PROVOKING,
         }));
-        let bary = if fragment_inputs == 0 { 0 } else { BARYCENTRIC_PERSPECTIVE_PIXEL };
+        let bary = if fh.inputs == 0 { 0 } else { BARYCENTRIC_PERSPECTIVE_PIXEL };
         self.cmd(&xe3!(Cmd3dstateWm { point_rasterization_rule: POINT_RASTERIZATION_UPPER_RIGHT, line_antialiasing_region_width: LINE_AA_REGION_1_PIXEL, statistics_enable: true, barycentric_interpolation_mode: bary }));
         self.cmd(&xe3!(Cmd3dstateSbe {
             number_of_sf_output_attributes: varyings,

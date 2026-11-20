@@ -1,4 +1,4 @@
-//! detour's passes: each GPU's lowering against what Mesa and acgpu ran, and its code against a reading of it
+//! detour's passes: each GPU's code against a reading of it
 //! (`DETOUR_BLESS=1` rewrites the expected files after such a reading)
 
 mod rdna2;
