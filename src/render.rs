@@ -9,7 +9,7 @@ use std::time::Duration;
 use mlirformat::Error;
 
 use crate::{
-    Bo, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, MemType, Native, Queue, Syncobj, TargetLoad, Template, Tiling, Vm, Xe, Xe3Draw, Xe3DrawImage, XeBo, XeQueue,
+    Bo, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Syncobj, TargetLoad, Template, Tiling, Vm, Xe, Xe3Draw, Xe3DrawImage, XeBo, XeQueue,
     XeVm,
 };
 
@@ -39,6 +39,8 @@ const BATCH_ALIGN: usize = 64;
 /// The uniforms' ring, vertex buffer i's (`VERTEX_ADDR + i * VERTEX_SPAN`), a ring's least size and where each
 /// draw's bytes start in it
 const UNIFORM_ADDR: u64 = 1 << 35;
+/// The indices' ring
+const INDEX_ADDR: u64 = 1 << 34;
 const VERTEX_ADDR: u64 = 1 << 36;
 const VERTEX_SPAN: u64 = 1 << 32;
 const RING_MIN: usize = 1 << 20;
@@ -197,6 +199,7 @@ impl<'x> Ring<'x> {
 /// What a draw writes, from its image (`Xe3DrawCommands`)
 struct Commands {
     primitive: Command,
+    index_buffer: Command,
     vertex_buffers: Command,
     scissor_rect: Command,
     scissor_pointer: Command,
@@ -214,7 +217,7 @@ struct Commands {
 impl Commands {
     /// The bytes a draw's commands take at most
     fn bytes(&self) -> usize {
-        [&self.vertex_buffers, &self.scissor_pointer, &self.table_vs, &self.table_ps, &self.viewport_cc, &self.viewport_sf_clip, &self.primitive, &self.barrier].iter().map(|c| c.bytes()).sum()
+        [&self.index_buffer, &self.vertex_buffers, &self.scissor_pointer, &self.table_vs, &self.table_ps, &self.viewport_cc, &self.viewport_sf_clip, &self.primitive, &self.barrier].iter().map(|c| c.bytes()).sum()
     }
 }
 
@@ -258,6 +261,7 @@ impl<'x> Shape<'x> {
             .collect();
         let commands = Commands {
             primitive: Command::new(&c.primitive, &names(&["count", "first", "instances"]))?,
+            index_buffer: Command::new(&c.index_buffer, &names(&["ib", "ib_size"]))?,
             vertex_buffers: Command::new(&c.vertex_buffers, &vb)?,
             scissor_rect: Command::new(&c.scissor_rect, &names(&["x0", "y0", "x1", "y1"]))?,
             scissor_pointer: Command::new(&c.scissor_pointer, &names(&["scissor"]))?,
@@ -346,6 +350,7 @@ fn key(program: u64, d: &Draw<'_>) -> u64 {
         (t.binding, t.filter, t.wrap).hash(&mut h);
     }
     discriminant(&d.primitive).hash(&mut h);
+    d.indices.map(|i| i.format).hash(&mut h);
     (discriminant(&d.cull), d.front_ccw, d.color_mask, d.blend.is_some()).hash(&mut h);
     if let Some(b) = &d.blend {
         (b.src.map(|f| f as u8), b.dst.map(|f| f as u8), b.equation.map(|e| e as u8), b.color.map(f32::to_bits)).hash(&mut h);
@@ -460,6 +465,7 @@ struct Current {
     shape: u64,
     flush: u64,
     vertices: Vec<u64>,
+    indices: Option<[u64; 2]>,
     table: Option<(usize, Vec<u64>, Vec<usize>)>,
     viewport: Option<u64>,
     scissor: Option<[u32; 4]>,
@@ -478,6 +484,7 @@ struct State<'x> {
     dynamic_at: usize,
     vertices: Vec<Ring<'x>>,
     uniforms: Ring<'x>,
+    indices: Ring<'x>,
     /// each binding's uniform bytes last written into the ring, and where
     held: Vec<(u32, u64, Vec<u8>)>,
     shapes: Vec<Shape<'x>>,
@@ -519,6 +526,7 @@ impl<'x> State<'x> {
             dynamic_at: 0,
             vertices: Vec::new(),
             uniforms: Ring::new(UNIFORM_ADDR),
+            indices: Ring::new(INDEX_ADDR),
             held: Vec::new(),
             shapes: Vec::new(),
             clock: 0,
@@ -611,7 +619,7 @@ impl<'x> State<'x> {
     /// is), so the next frame's draws need not wait; a ring that started over so lets its writes past that again
     /// once the batch before this one is done
     fn wrap(&mut self, previous: Option<Rc<Syncobj<'x>>>) -> Result<(), Error> {
-        let rings = || self.vertices.iter().chain([&self.uniforms]);
+        let rings = || self.vertices.iter().chain([&self.uniforms, &self.indices]);
         let limited = rings().any(|r| r.limit < r.size);
         let short = rings().any(|r| r.at - r.mark > r.limit.max(r.at) - r.at);
         if (limited || short)
@@ -619,7 +627,7 @@ impl<'x> State<'x> {
         {
             wait(p, "a draw")?;
         }
-        for r in self.vertices.iter_mut().chain([&mut self.uniforms]) {
+        for r in self.vertices.iter_mut().chain([&mut self.uniforms, &mut self.indices]) {
             r.limit = r.size;
             if short {
                 (r.limit, r.at, r.last) = (r.mark, 0, None);
@@ -711,7 +719,8 @@ impl<'x> State<'x> {
         let vertices = d.buffers.iter().enumerate().all(|(i, b)| self.vertices.get(i).is_some_and(|r| r.fits(b.bytes)) || b.bytes.is_empty());
         let fresh = d.uniforms.iter().filter(|(b, bytes)| !self.held.iter().any(|(h, _, held)| h == b && held == bytes)).map(|(_, bytes)| bytes.len());
         let uniforms = Ring::after(self.uniforms.at, fresh) <= self.uniforms.size;
-        calls && dynamic && pool && vertices && uniforms
+        let indices = d.indices.is_none_or(|i| self.indices.fits(i.bytes));
+        calls && dynamic && pool && vertices && uniforms && indices
     }
 
     /// Draw `d` did not fit in the batch being recorded: each ring wants room for twice the batch with it
@@ -721,6 +730,9 @@ impl<'x> State<'x> {
         }
         let uniforms = Ring::after(0, d.uniforms.iter().map(|(_, b)| b.len()));
         self.uniforms.outgrown(uniforms);
+        if let Some(i) = d.indices {
+            self.indices.outgrown(i.bytes.len());
+        }
     }
 
     /// Every ring from its start, with room for draw `d` (nothing running)
@@ -738,7 +750,8 @@ impl<'x> State<'x> {
             r.restart(self.xe, &self.vm, d.buffers.get(i).map_or(0, |b| b.bytes.len()))?;
         }
         let uniforms = Ring::after(0, d.uniforms.iter().map(|(_, b)| b.len()));
-        self.uniforms.restart(self.xe, &self.vm, uniforms)
+        self.uniforms.restart(self.xe, &self.vm, uniforms)?;
+        self.indices.restart(self.xe, &self.vm, d.indices.map_or(0, |i| i.bytes.len()))
     }
 
     /// `words` written at the batch's end
@@ -778,7 +791,7 @@ impl<'x> State<'x> {
         if self.current.as_ref().is_none_or(|c| c.shape != key) {
             self.words.extend([MI_BATCH_BUFFER_START_2ND, state as u32, (state >> 32) as u32]);
             self.write()?;
-            self.current = Some(Current { shape: key, flush, vertices: Vec::new(), table: None, viewport: None, scissor: None });
+            self.current = Some(Current { shape: key, flush, vertices: Vec::new(), indices: None, table: None, viewport: None, scissor: None });
         }
         let mut h = DefaultHasher::new();
         (d.viewport.map(f32::to_bits), d.depth_range.map(f32::to_bits), d.target.width, d.target.height).hash(&mut h);
@@ -823,6 +836,14 @@ impl<'x> State<'x> {
             self.shapes[i].commands.vertex_buffers.emit(&mut self.words, &values);
             self.write()?;
             self.current.as_mut().unwrap().vertices = values;
+        }
+        if let Some(ib) = d.indices {
+            let indices = [self.indices.put(ib.bytes)?, ib.bytes.len() as u64];
+            if self.current.as_ref().is_some_and(|c| c.indices != Some(indices)) {
+                self.shapes[i].commands.index_buffer.emit(&mut self.words, &indices);
+                self.write()?;
+                self.current.as_mut().unwrap().indices = Some(indices);
+            }
         }
         let rect = Xe3Draw::scissor(d);
         if self.current.as_ref().is_some_and(|c| c.scissor != Some(rect)) {
@@ -1029,6 +1050,15 @@ impl<'x> Device<'x> {
                 "a draw into a {}x{} {:?} {:?} target, surface {s:?} is {}x{} {:?} {:?}",
                 d.target.width, d.target.height, d.target.format, d.target.tiling, t.width, t.height, t.format, t.tiling
             )));
+        }
+        if let Some(ib) = d.indices {
+            let size = match ib.format {
+                IndexFormat::U16 => 2,
+                IndexFormat::U32 => 4,
+            };
+            if !ib.bytes.len().is_multiple_of(size) || (d.first as usize + d.count as usize) * size > ib.bytes.len() {
+                return Err(Error(format!("indices {}..{} of {} bytes of {:?} indices", d.first, d.first + d.count, ib.bytes.len(), ib.format)));
+            }
         }
         for x in &d.textures {
             if x.surface == s {

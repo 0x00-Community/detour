@@ -102,6 +102,7 @@ impl<'t> Gpu<'t> {
                     uniforms: op.uniforms.iter().map(|(b, u)| (*b, u.as_slice())).collect(),
                     textures: Vec::new(),
                     primitive: op.primitive,
+                    indices: None,
                     first: op.first,
                     count: op.count,
                     instances: op.instances,

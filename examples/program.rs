@@ -88,6 +88,7 @@ fn draw(compiled: &Compiled<'_>, inputs: &[(u32, Vec<f32>)], device: &Device<'_>
         uniforms: Vec::new(),
         textures: Vec::new(),
         primitive: DrawPrimitive::Triangles,
+        indices: None,
         first: 0,
         count: VERTICES,
         instances: 1,

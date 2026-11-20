@@ -172,6 +172,7 @@ impl SurfaceFormat {
             VertexFormat::Float32x2 => SurfaceFormat::R32G32_FLOAT,
             VertexFormat::Float32x3 => SurfaceFormat::R32G32B32_FLOAT,
             VertexFormat::Float32x4 => SurfaceFormat::R32G32B32A32_FLOAT,
+            VertexFormat::Unorm8x4 => SurfaceFormat::R8G8B8A8_UNORM,
         }
     }
 
@@ -249,6 +250,8 @@ pub struct Xe3DrawImage {
 /// 4 GiB). The color target's size is in its surface state (`width`, `height`, less one)
 pub struct Xe3DrawCommands {
     pub primitive: Template,
+    /// the index buffer (`ib`: its address, `ib_size`: its bytes; no dwords when the draw has none)
+    pub index_buffer: Template,
     pub vertex_buffers: Template,
     pub scissor_rect: Template,
     pub scissor_pointer: Template,
@@ -507,15 +510,39 @@ impl<'a> Xe3Draw<'_, 'a> {
         let table_pointers_ps = Xe3Draw::template(&xe3!(Cmd3dstateBindingTablePointersPs { pointer_to_ps_binding_table: A::sym("bt") }))?;
         let viewport_cc = Xe3Draw::template(&xe3!(Cmd3dstateViewportStatePointersCc { cc_viewport_pointer: A::sym("cc") }))?;
         let viewport_sf_clip = Xe3Draw::template(&xe3!(Cmd3dstateViewportStatePointersSfClip { sf_clip_viewport_pointer: A::sym("sf_clip") }))?;
-        let primitive = Xe3Draw::template(&xe3!(Cmd3dprimitiveExtended {
-            vertex_access_type: XE3_SEQUENTIAL,
-            vertex_count_per_instance: A::sym("count"),
-            instance_count: A::sym("instances"),
-            start_vertex_location: A::sym("first"),
-            base_vertex_location: 0u32,
-            extended_parameters_present: true,
-            extended_parameter_0: A::sym("first"),
-        }))?;
+        let primitive = match d.indices {
+            None => Xe3Draw::template(&xe3!(Cmd3dprimitiveExtended {
+                vertex_access_type: XE3_SEQUENTIAL,
+                vertex_count_per_instance: A::sym("count"),
+                instance_count: A::sym("instances"),
+                start_vertex_location: A::sym("first"),
+                base_vertex_location: 0u32,
+                extended_parameters_present: true,
+                extended_parameter_0: A::sym("first"),
+            }))?,
+            Some(_) => Xe3Draw::template(&xe3!(Cmd3dprimitiveExtended {
+                vertex_access_type: XE3_RANDOM,
+                vertex_count_per_instance: A::sym("count"),
+                instance_count: A::sym("instances"),
+                start_vertex_location: A::sym("first"),
+                base_vertex_location: 0u32,
+                extended_parameters_present: true,
+                extended_parameter_0: 0u32,
+            }))?,
+        };
+        let index_buffer = match d.indices {
+            None => Template::default(),
+            Some(i) => Xe3Draw::template(&xe3!(Cmd3dstateIndexBuffer {
+                index_format: match i.format {
+                    IndexFormat::U16 => XE3_INDEX_WORD,
+                    IndexFormat::U32 => XE3_INDEX_DWORD,
+                },
+                mocs: MOCS,
+                l3_bypass_disable: true,
+                buffer_starting_address: A::sym("ib"),
+                buffer_size: A::sym("ib_size"),
+            }))?,
+        };
         let vertex_buffers = match d.buffers.is_empty() {
             true => Template::default(),
             false => {
@@ -549,6 +576,7 @@ impl<'a> Xe3Draw<'_, 'a> {
         }))?;
         Ok(Xe3DrawCommands {
             primitive,
+            index_buffer,
             vertex_buffers,
             scissor_rect,
             scissor_pointer,
