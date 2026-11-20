@@ -9,7 +9,7 @@ use std::time::Duration;
 use mlirformat::Error;
 
 use crate::{
-    Bo, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Syncobj, TargetLoad, Template, Tiling, Vm, Xe, Xe3Draw, Xe3DrawImage, XeBo, XeQueue,
+    Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Syncobj, TargetLoad, Template, Tiling, Vm, Xe, Xe3Draw, Xe3DrawImage, XeBo, XeQueue,
     XeVm,
 };
 
@@ -76,6 +76,24 @@ fn put(bo: &mut XeBo<'_>, at: usize, words: &[u32]) -> Result<(), Error> {
         d.copy_from_slice(&w.to_le_bytes());
     }
     Ok(())
+}
+
+/// DRM's format modifiers for a surface's tiling: linear, and Intel's Tile4 (fourcc_mod_code(INTEL, 9))
+pub const DRM_FORMAT_MOD_LINEAR: u64 = 0;
+pub const I915_FORMAT_MOD_4_TILED: u64 = 1 << 56 | 9;
+/// DRM fourccs of the color formats: R8G8B8A8 in memory order (DRM's ABGR8888), R8
+pub const DRM_FORMAT_ABGR8888: u32 = u32::from_le_bytes(*b"AB24");
+pub const DRM_FORMAT_R8: u32 = u32::from_le_bytes(*b"R8  ");
+
+/// A surface exported as a dma-buf (`Device::export`): plane 0 from `offset`, rows `pitch` bytes apart, laid out as
+/// `modifier` says, in DRM format `fourcc`
+#[derive(Debug)]
+pub struct Exported {
+    pub fd: OwnedFd,
+    pub offset: u64,
+    pub pitch: u32,
+    pub modifier: u64,
+    pub fourcc: u32,
 }
 
 /// A color target the device keeps: its pixels stay on the GPU between draws
@@ -952,6 +970,35 @@ impl<'x> Device<'x> {
         let s = st.adopt(t, bo, 0, t.pitch(), &[MemType::Streaming])?;
         st.load(s, &t.load)?;
         Ok(s)
+    }
+
+    /// A new surface for target `t` the display engine can scan out (a compositor's output, flipped to KMS): like
+    /// `surface`, its memory write-combined and marked for scanout; `export` gives it to KMS
+    pub fn scanout(&self, t: &ColorTarget<'_>) -> Result<Surface, Error> {
+        let mut st = self.state()?;
+        let size = (t.size() as u64).next_multiple_of(self.xe.info().min_alignment.max(4096));
+        let bo = self.xe.bo(BoDesc { size, caching: Caching::WriteCombined, scanout: true }).map_err(io)?;
+        let s = st.adopt(t, bo, 0, t.pitch(), &[MemType::Streaming])?;
+        st.load(s, &t.load)?;
+        Ok(s)
+    }
+
+    /// Surface `s` as a dma-buf for another process or device (a compositor, KMS): its fd and how its pixels lie
+    /// in it. Its draws are not waited for: `fence` says when they are done
+    pub fn export(&self, s: Surface) -> Result<Exported, Error> {
+        let mut st = self.state()?;
+        let t = st.target(s)?;
+        let modifier = match t.tiling {
+            Tiling::Linear => DRM_FORMAT_MOD_LINEAR,
+            Tiling::Tile4 => I915_FORMAT_MOD_4_TILED,
+        };
+        let fourcc = match t.format {
+            ColorFormat::Rgba8Unorm => DRM_FORMAT_ABGR8888,
+            ColorFormat::R8Unorm => DRM_FORMAT_R8,
+            ColorFormat::Rgba32Float => return Err(Error("an Rgba32Float surface: no DRM format to export it as".into())),
+        };
+        let fd = t.bo.export().map_err(io)?;
+        Ok(Exported { fd, offset: t.offset as u64, pitch: t.pitch, modifier, fourcc })
     }
 
     /// A surface drawn straight into dma-buf `fd` (a GBM buffer, a udmabuf...): targets like `t` (its size, format:

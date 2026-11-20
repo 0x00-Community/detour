@@ -41,11 +41,13 @@ pub enum Engine {
 pub struct BoDesc {
     pub size: u64,
     pub caching: Caching,
+    /// the display engine may scan it out (write-combined)
+    pub scanout: bool,
 }
 
 impl From<(u64, Caching)> for BoDesc {
     fn from((size, caching): (u64, Caching)) -> Self {
-        Self { size, caching }
+        Self { size, caching, scanout: false }
     }
 }
 

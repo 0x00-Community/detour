@@ -240,6 +240,7 @@ impl Gpu for Xe {
                 Caching::WriteBack => sys::DRM_XE_GEM_CPU_CACHING_WB,
                 Caching::WriteCombined => sys::DRM_XE_GEM_CPU_CACHING_WC,
             },
+            flags: if desc.scanout { sys::DRM_XE_GEM_CREATE_FLAG_SCANOUT } else { 0 },
             ..Default::default()
         };
         self.node.xe(sys::DRM_IOCTL_XE_GEM_CREATE, &mut c)?;
