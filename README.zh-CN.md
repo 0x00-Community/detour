@@ -27,14 +27,14 @@ detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做
 其余的交给通用后端 (wgpu).
 
 - 🧩 **绘制** (`src/render.rs`、`src/shader.rs`): SPIR-V 着色器 (GLSL 经 [mlirpass](https://github.com/Jabberwocky238/mlirpass))
-  编成 Xe3 机器码, 可预编译也可现编; 目标、顶点缓冲、uniform、采样纹理 (任何 surface, 所以也能渲染到纹理)、
+  编成 Xe3 或 RDNA2 机器码, 可预编译也可现编; 目标、顶点缓冲、uniform、采样纹理 (任何 surface, 所以也能渲染到纹理)、
   混合、scissor、dma-buf.
 - 🔵 **Intel Xe3**: xe3 方言 (EU 指令、genxml 命令和状态)、SPIR-V 和 GPU kernel 下降到 Xe3 机器码、寄存器分配、
   记分板、一次绘制的镜像.
-- 🔴 **AMD RDNA2** (gfx1036): rdna2 方言 (GFX10 指令、寄存器、PM4)、GPU kernel 下降到 RDNA2 机器码和 IB, 对照 llvm-mc
-  和 Mesa; `amdgpu` 内核接口 (buffer object、地址空间、带 syncobj 的命令提交、dma-buf); 下一步是绘制.
-- 🔌 **以插件方式接 mlirformat 和 mlirpass**: `src/dialect` 给 mlirformat 加 GPU 方言 (`MlirOpt::load`), `src/pass`
-  给 mlirpass 加下降 (`Passes::with(DetourPasses::add)`), `src/binary` 写出机器码和镜像 (`Binaries`、`Read` / `Write`).
+- 🔴 **AMD RDNA2** (gfx1036): SPIR-V 着色器直接编成 GFX10 机器码 (wave32、NGG passthrough; 自己的指令选择、寄存器分配
+  和等待)、一次绘制的 PM4 状态, 以及 `amdgpu` 内核接口 (buffer object、地址空间、带 syncobj 的命令提交、dma-buf).
+- 🔌 **以插件方式接 mlirformat 和 mlirpass**: `src/dialect` 给 mlirformat 加 xe3 方言 (`MlirOpt::load`), `src/pass`
+  给 mlirpass 加下降 (`Passes::with(DetourPasses::add)`), `src/binary` 编码 Xe3 机器码、打包 genxml 记录.
 - 🐧 **内核接口** (`src/kmd`, `xe` 驱动在 `src/kmd/xe`): DRM render node、BO、VM 绑定、执行队列、syncobj, 走 Linux 的 `xe` 驱动.
 
 ## 🎯 对照 Mesa 核对
@@ -47,15 +47,15 @@ detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做
 | 📤 | 导出和扫描输出 (`examples/export`): 可扫描输出的 surface (Tile4 和 Linear, 1920×1080) 画好后导出成 dma-buf (`Device::export`: fd、pitch、modifier、fourcc), 由另一个设备导入读回, 再交给 KMS 建 framebuffer (带 modifier 的 `ADDFB2`) | **2 / 2** |
 | 🔢 | 索引绘制和字节颜色 (`examples/indexed`): 3000 个重叠的四边形, 每个 4 个顶点加 6 个 u16 / u32 索引, 颜色用 `Unorm8x4`, 从中间的索引开始, 索引和非索引绘制交替 | **5 / 5** 例和非索引绘制**逐字节一致** |
 | 🖼️ | 纹理 (`examples/texture`): 四边形采样一个 surface, 对照 CPU 参考: nearest 和 linear、放大和缩小、clamp / repeat / mirrored repeat、RGBA8 和 R8、linear 和 Tile4; 同一批里先画进再采样、先采样再覆盖; 局部写入 (`Device::write`) | **15 / 15** 例, nearest **逐字节一致**, linear 与 f32 参考差 2 以内 |
-| 🔣 | 编码 (`tests/binary`) | Xe3 EU 对 gentool、genxml 对 Mesa, RDNA2 对 llvm-mc 和 Mesa 寄存器宏: **4 / 4** |
-| 🪜 | 下降 (`tests/pass`) | kernel 对 acgpu (Xe3、RDNA2)、GLSL 到 Xe3、RDNA2 IB 对 Mesa: **4 / 4** |
+| 🔣 | 编码 (`tests/binary`、`src/pass/rdna2`) | Xe3 EU 对 gentool、genxml 对 Mesa, RDNA2 对 llvm-mc |
+| 🪜 | 下降 (`tests/pass`) | Xe3 kernel 对 acgpu、GLSL 到 Xe3 |
 
 ## 🎮 支持的 GPU
 
 | GPU | 内核驱动 | 状态 |
 | --- | --- | --- |
 | 🔵 **Intel Xe3** (Panther Lake, PCI 8086:b0a0) | `xe` | 绘制 (见上) |
-| 🔴 **AMD RDNA2** (gfx1036, Granite Ridge Radeon 610M, PCI 1002:13c0) | `amdgpu` | 方言、下降、PM4 已对照 llvm-mc 和 Mesa; 内核接口能提交 (`examples/amd_info`); 还没有绘制 |
+| 🔴 **AMD RDNA2** (gfx1036, Granite Ridge Radeon 610M, PCI 1002:13c0) | `amdgpu` | 绘制 (acdes 的页面; `examples/programs`、`examples/amdgpu_draw`) |
 
 detour 只驱动 x86_64 Linux 上的这两种核显. 没有任何回退: 没有 CPU 光栅, 也不转给系统的驱动.
 
@@ -63,14 +63,14 @@ detour 只驱动 x86_64 Linux 上的这两种核显. 没有任何回退: 没有 
 
 | 路径 | 内容 |
 | --- | --- |
-| `src/dialect` | mlirformat 插件: `xe3`、`rdna2`、`image` 方言 |
-| `src/pass` | mlirpass 插件: `convert-gpu-to-*`、寄存器分配、等待、命令流、镜像布局、`Xe3Draw`、编 SPIR-V 和 RDNA2 的 `gpu-module-to-binary` |
-| `src/binary` | 机器码和镜像: 各 GPU 的编码器、按布局表打包记录、写出镜像 |
+| `src/dialect` | `xe3` 方言 (mlirformat 插件)、RDNA2 指令表、打包记录用的布局表 |
+| `src/pass` | mlirpass 插件: `convert-gpu-to-xe3`、寄存器分配、控制流、SWSB、`Xe3Draw`; RDNA2 着色器编译器 (`Rdna2Graphics`) 和绘制状态 |
+| `src/binary` | Xe3 机器码、按布局表打包记录 |
 | `src/shader.rs`、`src/render.rs` | 工具链 (mlirpass + detour 的 pass) 和执行绘制的设备 |
 | `src/kmd` | 内核接口: DRM、`Gpu` trait、`xe` 驱动 (`src/kmd/xe`)、`amdgpu` 驱动 (`src/kmd/amdgpu`) |
-| `examples/` | `correct` (正确性对 CPU 参考和 Mesa; `support/glref.c`)、`texture` (采样纹理对 CPU 参考)、`indexed` (索引绘制)、`export` (dma-buf 和扫描输出)、`program` (预编译的程序)、`shapes` 和 `frame` (一帧里的绘制, 计时)、`xe_info`、`amd_info` |
+| `examples/` | `correct` (正确性对 CPU 参考和 Mesa; `support/glref.c`)、`texture` (采样纹理对 CPU 参考)、`indexed` (索引绘制)、`export` (dma-buf 和扫描输出)、`program` (预编译的程序)、`shapes` 和 `frame` (一帧里的绘制, 计时)、`programs` (画 acdes 的程序)、`xe_info`、`amdgpu_info`、`amdgpu_draw`、`amdgpu_device` |
 | `tests/binary`、`tests/pass` | 编码、下降 |
-| `scripts/` | 方言生成器 (`xe3gen`、`rdna2gen`) 和它们读的 Mesa 数据 (`data/{intel,amd}`)、opcode 表, 以及各测试期望值的来源 (`*_oracle.*`) |
+| `scripts/` | xe3 方言生成器 (`xe3gen`) 和它读的 Mesa 数据 (`data/intel`)、RDNA2 opcode 表 (`rdna2_opcodes.py`、`data/amd`), 以及各测试期望值的来源 (`*_oracle.*`) |
 
 ## 🚀 快速开始
 

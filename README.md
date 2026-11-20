@@ -28,16 +28,16 @@ draws (`Device::draw`) whose shaders it compiles to the GPU's machine code, whos
 (wgpu).
 
 - 🧩 **Draws** (`src/render.rs`, `src/shader.rs`): SPIR-V shaders (GLSL through [mlirpass](https://github.com/Jabberwocky238/mlirpass))
-  compiled to Xe3, ahead of time or in place; targets, vertex buffers, uniforms, sampled textures (any surface,
+  compiled to Xe3 or RDNA2, ahead of time or in place; targets, vertex buffers, uniforms, sampled textures (any surface,
   so render to texture too), blending, scissors, dma-bufs.
 - 🔵 **Intel Xe3**: the xe3 dialect (EU instructions, genxml commands and states), SPIR-V and GPU kernels lowered to
   Xe3 machine code, register allocation, scoreboard, a draw's image.
-- 🔴 **AMD RDNA2** (gfx1036): the rdna2 dialect (GFX10 instructions, registers, PM4), GPU kernels lowered to RDNA2
-  machine code and indirect buffers, checked against llvm-mc and Mesa; the `amdgpu` kernel interface (buffer objects, the address space, command
-  submission with syncobjs, dma-bufs); draws are next.
-- 🔌 **On mlirformat and mlirpass as plugins**: `src/dialect` adds the GPU dialects to mlirformat (`MlirOpt::load`),
-  `src/pass` adds the lowerings to mlirpass (`Passes::with(DetourPasses::add)`), `src/binary` writes machine code and
-  images (`Binaries`, `Read` / `Write`).
+- 🔴 **AMD RDNA2** (gfx1036): SPIR-V shaders compiled straight to GFX10 machine code (wave32, NGG passthrough; its
+  own selection, register allocation and waits), a draw's PM4 state, and the `amdgpu` kernel interface (buffer objects,
+  the address space, command submission with syncobjs, dma-bufs).
+- 🔌 **On mlirformat and mlirpass as plugins**: `src/dialect` adds the xe3 dialect to mlirformat (`MlirOpt::load`),
+  `src/pass` adds the lowerings to mlirpass (`Passes::with(DetourPasses::add)`), `src/binary` encodes Xe3 machine code
+  and packs genxml records.
 - 🐧 **Kernel interface** (`src/kmd`, its `xe` driver in `src/kmd/xe`): DRM render nodes, buffer objects, VM binds, exec queues, syncobjs,
   on Linux's `xe` driver.
 
@@ -51,15 +51,15 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | 📤 | Export and scanout (`examples/export`): a scanout surface (Tile4 and Linear, 1920×1080) drawn into, exported as a dma-buf (`Device::export`: fd, pitch, modifier, fourcc), imported by another device and read back, and taken by KMS as a framebuffer (`ADDFB2` with the modifier) | **2 / 2** |
 | 🔢 | Indexed draws and byte colors (`examples/indexed`): 3000 overlapping quads as four vertices and six u16 / u32 indices each, colors as `Unorm8x4`, from a middle index, indexed and plain draws taking turns | **5 / 5** cases **byte for byte** as the plain draw |
 | 🖼️ | Textures (`examples/texture`): a quad sampling a surface against a CPU reference: nearest and linear, magnified and minified, clamp / repeat / mirrored repeat, RGBA8 and R8, linear and Tile4; drawn into then sampled, and sampled then drawn over, in one batch; a part written (`Device::write`) | **15 / 15** cases, nearest **byte for byte**, linear within 2 of the f32 reference |
-| 🔣 | Encodings (`tests/binary`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc and Mesa's registers: **4 / 4** |
-| 🪜 | Lowerings (`tests/pass`) | kernels as acgpu compiled them (Xe3, RDNA2), GLSL reaching Xe3, an RDNA2 IB as Mesa writes it: **4 / 4** |
+| 🔣 | Encodings (`tests/binary`, `src/pass/rdna2`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc |
+| 🪜 | Lowerings (`tests/pass`) | Xe3 kernels as acgpu compiled them, GLSL reaching Xe3 |
 
 ## 🎮 GPUs
 
 | GPU | Kernel driver | Status |
 | --- | --- | --- |
 | 🔵 **Intel Xe3** (Panther Lake, PCI 8086:b0a0) | `xe` | draws (above) |
-| 🔴 **AMD RDNA2** (gfx1036, Granite Ridge Radeon 610M, PCI 1002:13c0) | `amdgpu` | dialect, lowering and PM4 checked against llvm-mc and Mesa; the kernel interface submits (`examples/amd_info`); no draws yet |
+| 🔴 **AMD RDNA2** (gfx1036, Granite Ridge Radeon 610M, PCI 1002:13c0) | `amdgpu` | draws (acdes's pages; `examples/programs`, `examples/amdgpu_draw`) |
 
 detour drives these integrated GPUs on x86_64 Linux and nothing else. There is no fallback: no CPU
 rasterizer and no hand-off to the system's drivers.
@@ -68,14 +68,14 @@ rasterizer and no hand-off to the system's drivers.
 
 | Path | What |
 | --- | --- |
-| `src/dialect` | mlirformat plugins: the `xe3`, `rdna2` and `image` dialects |
-| `src/pass` | mlirpass plugins: `convert-gpu-to-*`, register allocation, waits, command streams, image layout, `Xe3Draw`, `gpu-module-to-binary` for SPIR-V and RDNA2 |
-| `src/binary` | machine code and images: each GPU's encoder, records packed by layout tables, image writing |
+| `src/dialect` | the `xe3` dialect (a mlirformat plugin), RDNA2's instruction table, the layout tables records are packed by |
+| `src/pass` | mlirpass plugins: `convert-gpu-to-xe3`, register allocation, control flow, SWSB, `Xe3Draw`; RDNA2's shader compiler (`Rdna2Graphics`) and draw state |
+| `src/binary` | Xe3 machine code, records packed by layout tables |
 | `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + detour's passes) and the device a draw runs on |
 | `src/kmd` | the kernel interface: DRM, the `Gpu` trait, the `xe` driver (`src/kmd/xe`) and the `amdgpu` driver (`src/kmd/amdgpu`) |
-| `examples/` | `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `texture` (sampled textures vs a CPU reference), `indexed` (indexed draws), `export` (dma-bufs and scanout), `program` (programs compiled ahead of time), `shapes` and `frame` (draws in a frame, timed), `xe_info`, `amd_info` |
+| `examples/` | `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `texture` (sampled textures vs a CPU reference), `indexed` (indexed draws), `export` (dma-bufs and scanout), `program` (programs compiled ahead of time), `shapes` and `frame` (draws in a frame, timed), `programs` (acdes's programs drawn), `xe_info`, `amdgpu_info`, `amdgpu_draw`, `amdgpu_device` |
 | `tests/binary`, `tests/pass` | encodings, and lowerings |
-| `scripts/` | the dialects' generators (`xe3gen`, `rdna2gen`) and the Mesa data they read (`data/{intel,amd}`), opcode tables, and the oracles each test's expected bytes come from (`*_oracle.*`) |
+| `scripts/` | the xe3 dialect's generator (`xe3gen`) and the Mesa data it reads (`data/intel`), the RDNA2 opcode table (`rdna2_opcodes.py`, `data/amd`), and the oracles each test's expected bytes come from (`*_oracle.*`) |
 
 ## 🚀 Quick start
 

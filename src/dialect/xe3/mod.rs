@@ -17,7 +17,7 @@ pub use msg::{AddrSize, AddrSurface, CacheStore, DataSize, Lsc, LscOp, Render, S
 use alloc::format;
 use alloc::vec::Vec;
 
-use crate::dialect::image::Layouts;
+use crate::dialect::layout::Layouts;
 use crate::dialect::isa::{OpRows, RegType, ShaderStage};
 use mlirformat::{Attribute, Type, mlir};
 #[allow(unused_imports, reason = "the instruction modules name each other's types from here")]

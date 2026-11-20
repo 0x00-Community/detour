@@ -6,7 +6,7 @@ use mlirpass::{Body, Ctx, GlslDialect, Interfaces, PassManager, Passes};
 /// What `Toolchain::program` writes ahead of the compiled program: this, the detour version, the GPU, each ending in
 /// a newline
 const PROGRAM_MAGIC: &str = "detour program";
-use crate::{DetourPasses, ImageDialect, Kernels, Rdna2Dialect, Rdna2Graphics, Rdna2Shader, ShaderStage, Xe3Dialect, Xe3Draw, Xe3Kernel, Xe3Shader};
+use crate::{DetourPasses, Kernels, Rdna2Graphics, Rdna2Shader, ShaderStage, Xe3Dialect, Xe3Draw, Xe3Kernel, Xe3Shader};
 
 /// The instruction set a program is compiled for: a GPU detour draws on
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -41,8 +41,6 @@ impl Toolchain<'_> {
         let mut opt = MlirOpt::upstream();
         opt.load(GlslDialect);
         opt.load(Xe3Dialect);
-        opt.load(Rdna2Dialect);
-        opt.load(ImageDialect);
         let mut passes = Passes::upstream();
         passes.with(DetourPasses::add);
         Toolchain { opt, interfaces: Interfaces::upstream(), passes, isa }

@@ -1,11 +1,11 @@
 [package]
 # detour is taken on crates.io (a function-hooking library): the package is detour-gpu, the library is still detour
 name = "detour-gpu"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 # mlirformat's (0.6 onwards) `if let` guards (rust-toolchain.toml pins it here; a git dependent like acde-base reads this)
 rust-version = "1.96"
-description = "detour: a GPU userspace driver in Rust over mlirpass, tuned to a few GPUs (Xe3 so far): draws, shaders through SPIR-V; its GPUs' dialects (src/dialect), lowerings (src/pass) and machine code (src/binary)"
+description = "detour: a GPU userspace driver in Rust over mlirpass, tuned to a few GPUs (Intel Xe3, AMD RDNA2): draws, shaders through SPIR-V compiled to each GPU's machine code"
 readme = "README.md"
 repository = "https://github.com/0x00-Community/detour"
 license = "Apache-2.0"
@@ -27,7 +27,7 @@ rustix = { version = "1", features = ["fs", "mm", "time"] }
 serde = { version = "1", features = ["derive"] }
 
 [workspace]
-members = ["scripts/rdna2gen", "scripts/xe3gen"]
+members = ["scripts/xe3gen"]
 
 [profile.release]
 debug = 1

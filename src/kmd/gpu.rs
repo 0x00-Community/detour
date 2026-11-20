@@ -10,24 +10,12 @@ pub enum Caching {
     WriteCombined,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemType {
     Coherent,
     Streaming,
     Scanout,
     Compressed,
-}
-
-impl From<crate::ImageMemType> for MemType {
-    fn from(m: crate::ImageMemType) -> Self {
-        match m {
-            crate::ImageMemType::Coherent => Self::Coherent,
-            crate::ImageMemType::Streaming => Self::Streaming,
-            crate::ImageMemType::Scanout => Self::Scanout,
-            crate::ImageMemType::Compressed => Self::Compressed,
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

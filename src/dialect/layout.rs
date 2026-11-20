@@ -1,131 +1,13 @@
-//! GPU images as an MLIR dialect: memories (`image.memory`) holding command streams
-//! (`image.stream`), data and words, and the tables a GPU dialect's packed records are laid out by
-//! (`Layouts`: each record's fields, their bits and how a value is encoded), with the values its
-//! fields take (`Fill`, `Real`, `Fields`). Not an upstream dialect: load it with
-//! `MlirOpt::load(ImageDialect)`. Laying an image out is mlirpass's, its bytes mlirbinary's.
+//! The tables a GPU dialect's packed records are laid out by (`Layouts`: each record's fields, their
+//! bits and how a value is encoded), with the values its fields take (`Fill`, `Real`, `Fields`).
 
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
-use serde::{Deserialize, Serialize};
-
-use mlirformat::{Attribute, Error, NamedAttr, Region, Str, Type, mlir};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct ImageDialect;
-
-impl mlirformat::Dialect for ImageDialect {
-    fn namespace(&self) -> &'static str {
-        "image"
-    }
-
-    fn ops(&self) -> Vec<mlirformat::Template> {
-        Containers.ops()
-    }
-
-    fn op_infos(&self) -> Vec<mlirformat::OpInfo> {
-        ImageDialect::INHERENT.iter().map(|(name, inherent)| mlirformat::OpInfo { name, traits: &[], effects: mlirformat::Effects::Unknown, inherent }).collect()
-    }
-}
-
-impl ImageDialect {
-    pub const INHERENT: &[(&str, &[&str])] = &[
-        ("image.memory", &["sym_name", "mem", "align", "size", "addr"]),
-        ("image.stream", &["sym_name", "align", "offset", "cdm", "vdm"]),
-        ("image.data", &["sym_name", "bytes", "size", "align", "offset"]),
-        ("image.words", &["sym_name", "values", "align", "offset"]),
-    ];
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum MemType {
-    Coherent,
-    Streaming,
-    Scanout,
-    Compressed,
-}
-
-#[mlir::op("image.memory", format = "$sym_name attr-dict-with-keyword $body")]
-pub struct Memory<'a> {
-    #[attr(symbol)]
-    pub sym_name: Attribute<'a>,
-    pub mem: Option<MemType>,
-    pub align: Option<u64>,
-    pub size: Option<u64>,
-    pub addr: Option<u64>,
-    pub body: Region<'a>,
-}
-
-#[mlir::op("image.stream", format = "$sym_name attr-dict-with-keyword $body")]
-pub struct Stream<'a> {
-    #[attr(symbol)]
-    pub sym_name: Attribute<'a>,
-    pub align: Option<u64>,
-    pub offset: Option<u64>,
-    pub cdm: bool,
-    pub vdm: bool,
-    pub body: Region<'a>,
-}
-
-#[mlir::op("image.data", format = "$sym_name attr-dict")]
-pub struct Data<'a> {
-    #[attr(symbol)]
-    pub sym_name: Attribute<'a>,
-    pub bytes: Option<Attribute<'a>>,
-    pub size: Option<u64>,
-    pub align: Option<u64>,
-    pub offset: Option<u64>,
-}
-
-#[mlir::op("image.words", format = "$sym_name attr-dict")]
-pub struct Words<'a> {
-    #[attr(symbol)]
-    pub sym_name: Attribute<'a>,
-    pub values: Vec<Attribute<'a>>,
-    pub align: Option<u64>,
-    pub offset: Option<u64>,
-}
-
-#[mlir::dialect("image", ops = [Memory, Stream, Data, Words])]
-pub struct Containers;
-
-impl<'a> Memory<'a> {
-    /// A symbol's name as `sym_name` holds it
-    pub fn name(name: impl Into<String>) -> Attribute<'a> {
-        Attribute::Str { lit: Str::Owned(name.into()), ty: None }
-    }
-
-    pub fn named(name: impl Into<String>, mem: MemType) -> Self {
-        Memory::new(Self::name(name), Some(mem), None, None, None, Region { blocks: Vec::new() })
-    }
-}
-
-impl<'a> Stream<'a> {
-    pub fn named(name: impl Into<String>) -> Self {
-        Stream::new(Memory::name(name), None, None, false, false, Region { blocks: Vec::new() })
-    }
-}
-
-impl<'a> Data<'a> {
-    pub fn zeros(name: impl Into<String>, size: u64) -> Self {
-        Data::new(Memory::name(name), None, Some(size), None, None)
-    }
-
-    pub fn bytes(name: impl Into<String>, bytes: Attribute<'a>) -> Self {
-        Data::new(Memory::name(name), Some(bytes), None, None, None)
-    }
-}
-
-/// Where an item sits in its memory (set by the layout)
-pub struct Placed;
-
-impl Placed {
-    pub const ALIGN: &str = "align";
-    pub const OFFSET: &str = "offset";
-}
+use mlirformat::{Attribute, Error, NamedAttr, Type};
+use mlirpass::A;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ty<'t> {
@@ -222,6 +104,26 @@ macro_rules! fills {
 }
 
 fills!(i32, u32, i64, u64);
+
+impl From<A> for Fill {
+    fn from(a: A) -> Self {
+        Fill::try_from(&a).unwrap_or_else(|e| panic!("{e}"))
+    }
+}
+
+impl TryFrom<&A> for Fill {
+    type Error = Error;
+
+    fn try_from(a: &A) -> Result<Fill, Error> {
+        match a {
+            A::Int(v) => Ok(Fill::Int(*v)),
+            A::Bool(b) => Ok(Fill::Bool(*b)),
+            A::Sym(s) => Ok(Fill::at(s.clone(), 0)),
+            A::In(m, s) => Ok(Fill::Place { path: vec![m.clone(), s.clone()], add: 0 }),
+            other => Err(Error(format!("{other:?} is not a field's value"))),
+        }
+    }
+}
 
 impl Fill {
     pub fn at(name: impl Into<String>, add: i64) -> Fill {
