@@ -1,3 +1,8 @@
 [registries.ac]
 index = "sparse+http://gitea.dopamine/api/packages/AC/cargo/"
 credential-provider = "cargo:token"
+
+# detour runs on x86-64-v3 hosts (AVX2, BMI2, FMA): every build here targets exactly that, whatever a user's
+# own config says (target rustflags win over build.rustflags)
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=x86-64-v3"]
