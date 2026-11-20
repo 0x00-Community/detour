@@ -10,7 +10,7 @@ mod msg;
 
 pub use cmd::*;
 pub use eu::{
-    Arf, Cond, Dpas, Elem, File, Format as EuFormat, Inst, MathFn, Opcode as EuOpcode, Operand as EuOperand, Pipe, Pred, Region as EuRegion, SbidMode, SendInfo, Swsb, SyncFn,
+    Arf, Cond, Elem, File, Format as EuFormat, Inst, MathFn, Opcode as EuOpcode, Operand as EuOperand, Pipe, Pred, Region as EuRegion, SbidMode, SendInfo, Swsb, SyncFn,
 };
 pub use msg::{AddrSize, AddrSurface, CacheStore, DataSize, Lsc, LscOp, Render, Sampler as Xe3Sampler, Sfid, VectSize};
 
@@ -73,7 +73,7 @@ pub struct EuPayload<'a> {
 impl Xe3Dialect {
     pub const INHERENT: &[(&str, &[&str])] = &[
         ("xe3.eu.payload", &["grf"]),
-        ("xe3.kernel", &["sym_name", "stage", "simd", "payload", "inputs", "varyings", "targets", "omask", "bindings", "buffers", "push", "reserve", "pad", "system"]),
+        ("xe3.kernel", &["sym_name", "stage", "simd", "payload", "inputs", "varyings", "bindings", "buffers", "reserve", "pad", "system"]),
     ];
 }
 
@@ -86,11 +86,8 @@ pub struct Xe3Kernel<'a> {
     pub payload: Option<Vec<i64>>,
     pub inputs: Option<u32>,
     pub varyings: Option<u32>,
-    pub targets: Option<u32>,
-    pub omask: Option<bool>,
     pub bindings: Option<u32>,
     pub buffers: Option<u32>,
-    pub push: Option<u32>,
     pub reserve: Option<u32>,
     pub pad: Option<u64>,
     /// the system values the vertex fetcher writes into the input after the attributes: 1 the vertex index, 2 the
@@ -112,7 +109,7 @@ crate::attr_ops! { "xe3" EuOps;
     EuRol "xe3.eu.rol", EuRor "xe3.eu.ror", EuSel "xe3.eu.sel", EuShl "xe3.eu.shl", EuShr "xe3.eu.shr",
     EuSmov "xe3.eu.smov", EuSrnd "xe3.eu.srnd", EuSubb "xe3.eu.subb", EuXor "xe3.eu.xor", EuAdd3 "xe3.eu.add3",
     EuBfe "xe3.eu.bfe", EuBfi2 "xe3.eu.bfi2", EuBfn "xe3.eu.bfn", EuCsel "xe3.eu.csel", EuDp4a "xe3.eu.dp4a",
-    EuMad "xe3.eu.mad", EuDpas "xe3.eu.dpas", EuMadm "xe3.eu.madm", EuSend "xe3.eu.send", EuSendc "xe3.eu.sendc",
+    EuMad "xe3.eu.mad", EuMadm "xe3.eu.madm", EuSend "xe3.eu.send", EuSendc "xe3.eu.sendc",
     EuBrd "xe3.eu.brd", EuCall "xe3.eu.call", EuCalla "xe3.eu.calla", EuEndif "xe3.eu.endif", EuJmpi "xe3.eu.jmpi",
     EuJoin "xe3.eu.join", EuRet "xe3.eu.ret", EuWhile "xe3.eu.while", EuBrc "xe3.eu.brc", EuBreak "xe3.eu.break",
     EuContinue "xe3.eu.continue", EuElse "xe3.eu.else", EuGoto "xe3.eu.goto", EuHalt "xe3.eu.halt", EuIf "xe3.eu.if",

@@ -96,10 +96,6 @@ mod f {
     pub const SYNC_CTRL: F = (95, 92);
     pub const BFN_COND_MODIFIER: F = (45, 44);
 
-    pub const DPAS_RCOUNT: F = (45, 43);
-    pub const DPAS_SDEPTH: F = (49, 48);
-    pub const DPAS_SRC2_SUBBYTE: F = (85, 84);
-    pub const DPAS_SRC1_SUBBYTE: F = (87, 86);
     pub const BFN_FUNC_CONTROL: [F; 2] = [(95, 92), (87, 84)];
 
     pub const SEND_EOT: F = (34, 34);
@@ -172,7 +168,7 @@ impl Enc {
         self.set(f::ATOMIC_CONTROL, i.atomic as u64);
         self.set(f::CHAN_OFFSET, (i.chan_offset / 8) as u64);
 
-        if matches!(format, Format::One | Format::Two | Format::Dpas) || (format == Format::Three && i.op != Opcode::Bfn) {
+        if matches!(format, Format::One | Format::Two) || (format == Format::Three && i.op != Opcode::Bfn) {
             self.set(f::SATURATE, i.saturate as u64);
         }
         if i.op == Opcode::Math {
@@ -190,7 +186,7 @@ impl Enc {
         } else {
             let has_cond = match format {
                 Format::One => !(i.src[0].file == File::Imm && i.src[0].ty.size() >= 8),
-                Format::Two | Format::Three | Format::Dpas => true,
+                Format::Two | Format::Three => true,
                 _ => false,
             };
             if has_cond {
@@ -282,22 +278,6 @@ impl Enc {
                 } else {
                     self.set2(f::BFN_FUNC_CONTROL, i.bfn_ctrl as u64);
                 }
-            }
-            Format::Dpas => {
-                let [s0, s1, s2] = &i.src;
-                self.set(f::DPAS_RCOUNT, (i.dpas.rcount - 1) as u64);
-                self.set(f::DPAS_SDEPTH, i.dpas.sdepth_code());
-                self.set(f::THREE_EXEC_DATA_TYPE, i.dst.ty.is_float() as u64);
-                self.set(f::THREE_DST_TYPE, i.dst.ty.code3());
-                self.set(f::THREE_SRC0_TYPE, s0.ty.code3());
-                self.set(f::THREE_SRC1_TYPE, s1.ty.code3());
-                self.set(f::THREE_SRC2_TYPE, s2.ty.code3());
-                self.set(f::DPAS_SRC1_SUBBYTE, i.dpas.src1_subbyte as u64);
-                self.set(f::DPAS_SRC2_SUBBYTE, i.dpas.src2_subbyte as u64);
-                self.direct(f::THREE_DST_OPERAND, &i.dst, false);
-                self.direct(f::THREE_SRC0_OPERAND, s0, false);
-                self.direct(f::THREE_SRC1_OPERAND, s1, false);
-                self.direct(f::THREE_SRC2_OPERAND, s2, false);
             }
             Format::Send => {
                 let s = &i.send;

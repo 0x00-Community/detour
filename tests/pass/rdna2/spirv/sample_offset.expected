@@ -1,0 +1,1 @@
+refused: RDNA2: spirv.ImageSampleImplicitLod of !spirv.sampled_image<!spirv.image<f32, Dim2D, NoDepth, NonArrayed, SingleSampled, NeedSampler, Unknown>>: only 2D, non-arrayed, level 0 sampling (one mip level) yet

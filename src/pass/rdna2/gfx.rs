@@ -13,7 +13,7 @@ use mlirformat::spirv_types::SpirvType;
 use mlirformat::{Const, Error, Scalar};
 
 use super::gfx_mir::*;
-use crate::{Attrs, Body, BlockId, GpuToXe3, OpId, PassManager, Passes, Rdna2Opcode as Op, Rdna2Shader, ShaderStage, ValueId, Xe3Draw, Xe3Types};
+use crate::{Attrs, Body, BlockId, GpuToXe3, OpId, PassManager, Passes, Rdna2Opcode as Op, Rdna2Shader, ShaderStage, ValueId, Xe3Draw, Xe3Types, Matrices};
 use crate::{RDNA2_PERSP_CENTER, RDNA2_VS_USER_SGPR};
 
 /// ACO's NGG passthrough prologue (wave32): export the primitive (s3: merged wave info, v0: its data), then run
@@ -100,6 +100,9 @@ enum Kind {
     Fma,
     Pow,
     Dot,
+    /// a vector or matrix product (`Matrices::products`)
+    Products,
+    Transpose,
     /// one VALU op on one operand
     Unary(Op),
     /// arithmetic it has no selection for
@@ -137,6 +140,10 @@ impl Kind {
             "math.fma" | "spirv.GL.Fma" => Kind::Fma,
             "math.powf" | "spirv.GL.Pow" => Kind::Pow,
             "spirv.Dot" => Kind::Dot,
+            "spirv.VectorTimesScalar" | "spirv.MatrixTimesScalar" | "spirv.MatrixTimesVector" | "spirv.VectorTimesMatrix" | "spirv.MatrixTimesMatrix" | "spirv.OuterProduct" => {
+                Kind::Products
+            }
+            "spirv.Transpose" => Kind::Transpose,
             "math.sqrt" | "spirv.GL.Sqrt" => Kind::Unary(Op::VSqrtF32),
             "math.rsqrt" | "spirv.GL.InverseSqrt" => Kind::Unary(Op::VRsqF32),
             "math.floor" | "spirv.GL.Floor" => Kind::Unary(Op::VFloorF32),
@@ -153,7 +160,7 @@ impl Kind {
     fn alu(self) -> bool {
         !matches!(
             self,
-            Kind::Constant | Kind::Poison | Kind::AccessChain | Kind::Load | Kind::Extract | Kind::Insert | Kind::FromElements | Kind::Broadcast | Kind::Shuffle | Kind::Sample { .. } | Kind::If | Kind::Yield | Kind::Other
+            Kind::Constant | Kind::Poison | Kind::AccessChain | Kind::Load | Kind::Extract | Kind::Insert | Kind::FromElements | Kind::Broadcast | Kind::Shuffle | Kind::Transpose | Kind::Sample { .. } | Kind::If | Kind::Yield | Kind::Other
         )
     }
 }
@@ -184,6 +191,19 @@ fn abs(o: Opnd) -> Opnd {
     match o.src {
         Src::K(b) if o.plain() => Opnd::of(Src::K(b & 0x7fff_ffff)),
         _ => Opnd { neg: false, abs: true, ..o },
+    }
+}
+
+/// Where lane `c` of the uniform load `o` at byte `off` is: its dword in the block (a matrix's columns
+/// `xe3.matrix_stride` bytes apart)
+fn ubo_dword(body: &Body<'_>, o: OpId, off: u32, c: u32) -> u32 {
+    let stride = body[o].get("xe3.matrix_stride").and_then(|a| Attrs::as_int(a).ok());
+    match (stride, SpirvType::try_from(&body[body[o].results[0]].ty)) {
+        (Some(s), Ok(SpirvType::Matrix { column, .. })) => {
+            let rows = Xe3Types::lanes(&column).unwrap_or(1) as u32;
+            off / 4 + c / rows * (s as u32 / 4) + c % rows
+        }
+        _ => off / 4 + c,
     }
 }
 
@@ -242,7 +262,7 @@ impl<'b, 'a> Lower<'b, 'a> {
                 let r = body[o].results[0];
                 let set = ubos.entry(b).or_default();
                 for c in used(body, r) {
-                    set.insert(off / 4 + c);
+                    set.insert(ubo_dword(body, o, off, c));
                 }
             } else if matches!(kind, Kind::Sample { .. })
                 && let Some(b) = int(o, "xe3.binding")
@@ -666,11 +686,10 @@ impl<'b, 'a> Lower<'b, 'a> {
             Kind::AccessChain => set(self, vec![Val::None]),
             Kind::Load => {
                 let int = |n: &str| body[o].get(n).and_then(|a| Attrs::as_int(a).ok()).map(|v| v as u32);
-                if body[o].get("xe3.matrix_stride").is_some() || body[o].get("xe3.push_offset").is_some() {
-                    return Err(Error("RDNA2: matrices and push constants in uniform blocks not yet".into()));
-                }
                 let vals = match (int("xe3.binding"), int("xe3.offset")) {
-                    (Some(b), Some(off)) => (0..lanes as u32).map(|c| self.ubo.get(&(b, off / 4 + c)).map_or(Val::None, |s| Val::X(Opnd::of(*s)))).collect(),
+                    (Some(b), Some(off)) => {
+                        (0..lanes as u32).map(|c| self.ubo.get(&(b, ubo_dword(body, o, off, c))).map_or(Val::None, |s| Val::X(Opnd::of(*s)))).collect()
+                    }
                     _ if matches!(SpirvType::try_from(&body[r.unwrap()].ty), Ok(SpirvType::SampledImage(_))) => vec![Val::None],
                     _ => return Err(Error(format!("RDNA2: a load of {} not yet", body[r.unwrap()].ty))),
                 };
@@ -728,6 +747,30 @@ impl<'b, 'a> Lower<'b, 'a> {
                 set(self, vals);
             }
             Kind::If => self.lower_if(o)?,
+            Kind::Transpose => {
+                let order = Matrices::transpose(&body[operands[0]].ty).ok_or_else(|| Error("RDNA2: a transpose of no matrix".into()))?;
+                let v = self.vals(operands[0])?;
+                set(self, order.into_iter().map(|i| v[i]).collect());
+            }
+            Kind::Products => {
+                let terms = Matrices::products(name, &body[operands[0]].ty, &body[operands[1]].ty).ok_or_else(|| Error(format!("RDNA2: {name} of these shapes")))?;
+                let (a, b) = (self.vals(operands[0])?, self.vals(operands[1])?);
+                let fusable = matches!(r.and_then(|r| self.single_user(r)), Some(Kind::AddF | Kind::SubF));
+                let mut out = Vec::new();
+                for t in terms {
+                    let mut acc: Option<Val> = None;
+                    for &(x, y) in &t {
+                        let (x, y) = (self.x(a[x])?, self.x(b[y])?);
+                        let p = self.mul(x, y, fusable || t.len() > 1);
+                        acc = Some(match acc {
+                            None => p,
+                            Some(s) => self.add(s, p)?,
+                        });
+                    }
+                    out.push(acc.ok_or_else(|| Error(format!("RDNA2: {name} of no terms")))?);
+                }
+                set(self, out);
+            }
             Kind::CmpF => {
                 let p = body[o].get("predicate").and_then(|a| Attrs::as_int(a).ok()).ok_or_else(|| Error("RDNA2: cmpf without predicate".into()))?;
                 let op = match p {
@@ -1133,21 +1176,21 @@ mod tests {
         Inst::Alu { op, dst, src: src.iter().map(|s| Opnd::of(*s)).collect(), clamp: false }
     }
 
-    /// An if made before `x` (r0) and yielding it from its else: then `r1 = x + 1`, else `r1 = x`, `r1` read after
+    /// `x` (r0) made before an if that yields it from its else: then `r1 = y + 1` (y: r2), else `r1 = x`, `r1` read after
     fn branchy(read_x_after: bool) -> Vec<Inst> {
-        let (x, r, m) = (Src::R(0, 0), Src::R(1, 0), Src::Phys(VCC));
+        let (x, r, y, m) = (Src::R(0, 0), Src::R(1, 0), Src::R(2, 0), Src::Phys(VCC));
         let mut code = vec![
             alu(Op::VMovB32, x, &[Src::K(2.0f32.to_bits())]),
             Inst::BranchZero { mask: m, label: 1 },
-            alu(Op::VAddF32, r, &[Src::R(2, 0), Src::K(1.0f32.to_bits())]),
+            alu(Op::VAddF32, r, &[y, Src::K(1.0f32.to_bits())]),
             Inst::Branch { op: Op::SBranch, label: 2 },
             Inst::Label(1),
             alu(Op::VMovB32, r, &[x]),
             Inst::Label(2),
-            alu(Op::VMulF32, Src::R(2, 0), &[r, r]),
+            alu(Op::VMulF32, y, &[r, r]),
         ];
         if read_x_after {
-            code.push(alu(Op::VMulF32, Src::R(2, 0), &[x, x]));
+            code.push(alu(Op::VMulF32, y, &[x, x]));
         }
         code
     }

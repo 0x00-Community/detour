@@ -1,5 +1,5 @@
-// Every field of every genxml item detour generates set to the value Mesa's C pack functions were given; oracle.expected is
-// what Mesa packed (the old acgpu-intel-genxml oracle, scripts/intel-genxml-oracle.sh at 2881453).
+// Every field of every genxml item detour generates set to a value; oracle.expected is what Mesa's C pack functions
+// packed for those values (packed outside this repository: no Mesa here).
 xe3.state.3dstate_constant_all_data {constant_buffer_read_length = 0x13, pointer_to_constant_buffer = 0xb94b465d62d5d8a0}
 xe3.state.binding_table_state {surface_state_pointer = 0x1ff24540}
 xe3.state.blend_state_entry {write_disable_blue = false, write_disable_green = true, write_disable_red = false, write_disable_alpha = true, alpha_blend_function = 0x4, destination_alpha_blend_factor = 0xe, source_alpha_blend_factor = 0x19, color_blend_function = 0x6, destination_blend_factor = 0x18, source_blend_factor = 0x1e, color_buffer_blend_enable = false, post_blend_color_clamp_enable = false, pre_blend_color_clamp_enable = false, color_clamp_range = 0x3, pre_blend_source_only_clamp_enable = true, simple_float_blend_enable = false, logic_op_function = 0x1, logic_op_enable = true}

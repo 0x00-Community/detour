@@ -5,17 +5,18 @@
 //!
 //!   cargo run --release --example export
 
+#[path = "support/glsl.rs"]
+mod glsl;
+
 use std::fs::OpenOptions;
 use std::os::fd::{AsFd, AsRawFd};
 
 use detour::{Isa, ColorFormat, ColorTarget, Compiled, Device, Draw, Exported, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
-use mlirpass::{GlslReader, GlslStage};
 
 const SHADERS: [&str; 2] = [
     "#version 300 es\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec4 color;\nout vec4 c;\nvoid main() { c = color; gl_Position = vec4(pos, 0.0, 1.0); }\n",
     "#version 300 es\nprecision highp float;\nin vec4 c;\nout vec4 o;\nvoid main() { o = c; }\n",
 ];
-const TO_SPIRV: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=vulkan})";
 const W: u32 = 1920;
 const H: u32 = 1080;
 const COLOR: [u8; 4] = [10, 200, 90, 255];
@@ -126,12 +127,7 @@ fn run(xe: &Xe, program: &Compiled, tiling: Tiling, card: Option<&std::path::Pat
 
 fn main() {
     let tools = Toolchain::new(Isa::Xe3);
-    let mut body = tools.body();
-    GlslReader::read(&mut body, SHADERS[0], GlslStage::Vertex).unwrap();
-    GlslReader::read(&mut body, SHADERS[1], GlslStage::Fragment).unwrap();
-    let root = body.root;
-    tools.pipeline(TO_SPIRV).and_then(|p| p.run(&mut body, root)).unwrap();
-    let program = tools.compile(body).unwrap_or_else(|e| panic!("{}", e.0));
+    let program = tools.compile(&glsl::spirv(SHADERS[0], SHADERS[1]).unwrap()).unwrap_or_else(|e| panic!("{}", e.0));
     let xe = Xe::open_first().unwrap();
     let card = card(xe.path());
     let mut failed = 0;

@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicU64, Ordering};
 
 use mlirformat::{Error, MlirOpt};
-use mlirpass::{Body, Ctx, GlslDialect, Interfaces, PassManager, Passes};
+use mlirpass::{Body, Ctx, Interfaces, Passes};
 
 /// What `Toolchain::program` writes ahead of the compiled program: this, the detour version, the GPU, each ending in
 /// a newline
@@ -39,7 +39,6 @@ pub struct Toolchain<'i> {
 impl Toolchain<'_> {
     pub fn new(isa: Isa) -> Self {
         let mut opt = MlirOpt::upstream();
-        opt.load(GlslDialect);
         opt.load(Xe3Dialect);
         let mut passes = Passes::upstream();
         passes.with(DetourPasses::add);
@@ -50,20 +49,14 @@ impl Toolchain<'_> {
         self.isa
     }
 
-    pub fn body(&self) -> Body<'_> {
-        Body::new(Ctx::new(&self.opt, &self.interfaces))
-    }
-
-    pub fn pipeline(&self, text: &str) -> Result<PassManager, Error> {
-        PassManager::parse(&self.passes, text)
-    }
-
-    pub fn show(&self, body: &Body<'_>) -> String {
+    fn show(&self, body: &Body<'_>) -> String {
         body.show(&self.opt, false, |_| true)
     }
 
-    /// The SPIR-V shaders at the top of `body` compiled by mlirpass for the device's GPU, to machine code
-    pub fn compile(&self, body: Body<'_>) -> Result<Compiled, Error> {
+    /// `spirv`, MLIR text with a vertex and a fragment `spirv.module` at the top, compiled for the toolchain's
+    /// instruction set in place
+    pub fn compile(&self, spirv: &str) -> Result<Compiled, Error> {
+        let body = Body::parse(Ctx::new(&self.opt, &self.interfaces), spirv)?;
         match self.isa {
             Isa::Xe3 => self.compile_xe3(body),
             Isa::Rdna2 => self.compile_rdna2(body),
@@ -95,12 +88,10 @@ impl Toolchain<'_> {
         }
     }
 
-    /// A program compiled ahead of time (a build script's work): `spirv`, MLIR text with a vertex and a fragment
-    /// `spirv.module` at the top, compiled for the toolchain's instruction set, as the bytes `load` takes. The same text and detour give the
-    /// same bytes
+    /// A program compiled ahead of time (a build script's work): `spirv` compiled as `compile` does, as the bytes
+    /// `load` takes. The same text and detour give the same bytes
     pub fn program(&self, spirv: &str) -> Result<Vec<u8>, Error> {
-        let body = Body::parse(Ctx::new(&self.opt, &self.interfaces), spirv)?;
-        let compiled = self.compile(body)?;
+        let compiled = self.compile(spirv)?;
         let mut out = format!("{PROGRAM_MAGIC}\n{}\n{}\n", env!("CARGO_PKG_VERSION"), self.isa.name()).into_bytes();
         match &compiled.shaders {
             Shaders::Xe3 { vs, fs } => {

@@ -11,6 +11,8 @@
 
 #[path = "correct/gpu.rs"]
 mod gpu;
+#[path = "support/glsl.rs"]
+mod glsl;
 #[path = "correct/mesa.rs"]
 mod mesa;
 #[path = "correct/raster.rs"]

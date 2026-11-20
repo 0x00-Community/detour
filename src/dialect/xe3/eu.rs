@@ -159,7 +159,6 @@ pub enum Format {
     Branch1,
     Branch2,
     Nop,
-    Dpas,
 }
 
 macro_rules! opcodes {
@@ -235,7 +234,6 @@ opcodes! {
     Csel = 114, Three;
     Dp4a = 88, Three;
     Mad = 91, Three;
-    Dpas = 89, Dpas;
     Madm = 93, Three;
     Send = 49, Send;
     Sendc = 50, Send;
@@ -367,11 +365,6 @@ impl Swsb {
             SbidMode::Null => pipe | rd,
             _ if rd != 0 => {
                 let mode = match self.mode {
-                    _ if matches!(op, Opcode::Dpas) => match self.mode {
-                        SbidMode::Set => 0b01,
-                        SbidMode::Src => 0b10,
-                        _ => 0b11,
-                    },
                     SbidMode::Set => {
                         debug_assert!(matches!(op, Opcode::Send | Opcode::Sendc));
                         match self.pipe {
@@ -389,28 +382,6 @@ impl Swsb {
             SbidMode::Set => sbid | 0xc0,
             SbidMode::Dst => sbid | 0x80,
             SbidMode::Src => sbid | 0xa0,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Dpas {
-    pub sdepth: u8,
-    pub rcount: u8,
-    pub src1_subbyte: u8,
-    pub src2_subbyte: u8,
-}
-
-impl Dpas {
-    pub const DEFAULT: Dpas = Dpas { sdepth: 8, rcount: 8, src1_subbyte: 0, src2_subbyte: 0 };
-
-    pub const fn sdepth_code(self) -> u64 {
-        match self.sdepth {
-            16 => 0,
-            2 => 1,
-            4 => 2,
-            8 => 3,
-            _ => panic!("systolic depth is 2, 4, 8 or 16"),
         }
     }
 }
@@ -444,7 +415,6 @@ pub struct Inst {
     pub sync: SyncFn,
     pub bfn_ctrl: u8,
     pub send: SendInfo,
-    pub dpas: Dpas,
     pub jip: i32,
     pub uip: i32,
     pub branch_ctrl: bool,
@@ -470,7 +440,6 @@ impl Inst {
             sync: SyncFn::Nop,
             bfn_ctrl: 0,
             send: SendInfo { sfid: 0, desc: 0, ex_desc: 0, src1_len: 0, eot: false, ex_bso: false },
-            dpas: Dpas::DEFAULT,
             jip: 0,
             uip: 0,
             branch_ctrl: false,

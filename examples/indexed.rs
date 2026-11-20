@@ -5,14 +5,15 @@
 //!
 //!   cargo run --release --example indexed
 
+#[path = "support/glsl.rs"]
+mod glsl;
+
 use detour::{Isa, ColorFormat, ColorTarget, Compiled, Device, Draw, IndexBuffer, IndexFormat, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
-use mlirpass::{GlslReader, GlslStage};
 
 const SHADERS: [&str; 2] = [
     "#version 300 es\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec4 color;\nout vec4 c;\nvoid main() { c = color; gl_Position = vec4(pos, 0.0, 1.0); }\n",
     "#version 300 es\nprecision highp float;\nin vec4 c;\nout vec4 o;\nvoid main() { o = c; }\n",
 ];
-const TO_SPIRV: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=vulkan})";
 const SIZE: u32 = 256;
 const QUADS: u32 = 3000;
 
@@ -118,12 +119,7 @@ fn same(got: &[u8], want: &[u8]) -> Result<(), String> {
 
 fn main() {
     let tools = Toolchain::new(Isa::Xe3);
-    let mut body = tools.body();
-    GlslReader::read(&mut body, SHADERS[0], GlslStage::Vertex).unwrap();
-    GlslReader::read(&mut body, SHADERS[1], GlslStage::Fragment).unwrap();
-    let root = body.root;
-    tools.pipeline(TO_SPIRV).and_then(|p| p.run(&mut body, root)).unwrap();
-    let program = tools.compile(body).unwrap_or_else(|e| panic!("{}", e.0));
+    let program = tools.compile(&glsl::spirv(SHADERS[0], SHADERS[1]).unwrap()).unwrap_or_else(|e| panic!("{}", e.0));
     let xe = Xe::open_first().unwrap();
     let device = Device::new(&xe);
     let run = Run { device: &device, program: &program };
