@@ -5,10 +5,12 @@
 //!
 //!   cargo run --release --example indexed
 
+#[path = "support/card.rs"]
+mod card;
 #[path = "support/glsl.rs"]
 mod glsl;
 
-use detour::{Isa, ColorFormat, ColorTarget, Compiled, Device, Draw, IndexBuffer, IndexFormat, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
+use detour::{ColorFormat, ColorTarget, Compiled, Device, Draw, IndexBuffer, IndexFormat, Surface, TargetLoad, Toolchain, VertexBuffer, VertexElement, VertexFormat};
 
 const SHADERS: [&str; 2] = [
     "#version 300 es\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec4 color;\nout vec4 c;\nvoid main() { c = color; gl_Position = vec4(pos, 0.0, 1.0); }\n",
@@ -74,7 +76,7 @@ fn indices(quads: u32, format: IndexFormat) -> Vec<u8> {
 }
 
 fn target() -> ColorTarget<'static> {
-    ColorTarget { width: SIZE, height: SIZE, format: ColorFormat::Rgba8Unorm, tiling: Tiling::Tile4, load: TargetLoad::Keep(&[]) }
+    ColorTarget { width: SIZE, height: SIZE, format: ColorFormat::Rgba8Unorm, tiling: card::tiled(), load: TargetLoad::Keep(&[]) }
 }
 
 struct Run<'a, 't> {
@@ -118,10 +120,10 @@ fn same(got: &[u8], want: &[u8]) -> Result<(), String> {
 }
 
 fn main() {
-    let tools = Toolchain::new(Isa::Xe3);
+    let card = card::open();
+    let tools = Toolchain::new(card.isa());
     let program = tools.compile(&glsl::spirv(SHADERS[0], SHADERS[1]).unwrap()).unwrap_or_else(|e| panic!("{}", e.0));
-    let xe = Xe::open_first().unwrap();
-    let device = Device::new(&xe);
+    let device = Device::new(card);
     let run = Run { device: &device, program: &program };
     let quads: Vec<_> = (0..QUADS).map(quad).collect();
     let (floats, bytes) = (corners(&quads, false), corners(&quads, true));

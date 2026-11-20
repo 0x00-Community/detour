@@ -521,11 +521,13 @@ impl Rdna2Draw {
         for c in 0..2 {
             let (comb, sx_comb) = Rdna2Draw::equation(b.equation[c]);
             // min and max take no factors
+            let alpha = c == 1;
+            // alpha's SrcAlphaSaturate is one (min(As, 1 - Ad) scales the color only); the CB takes it as zero
+            let saturate = |f| if alpha && f == BlendFactor::SrcAlphaSaturate { BlendFactor::One } else { f };
             let (src, dst) = match b.equation[c] {
                 BlendEquation::Min | BlendEquation::Max => (BlendFactor::One, BlendFactor::One),
-                _ => (b.src[c], b.dst[c]),
+                _ => (saturate(b.src[c]), saturate(b.dst[c])),
             };
-            let alpha = c == 1;
             let src_opt = Rdna2Draw::opt(src, alpha);
             let mut dst_opt = Rdna2Draw::opt(dst, alpha);
             if Rdna2Draw::uses_dst(src) {
@@ -708,10 +710,7 @@ impl Rdna2Draw {
         match indices {
             None => out.extend([Rdna2Packet::header(Rdna2Packet::DRAW_INDEX_AUTO, 2), count, 2]),
             Some((addr, format, n)) => {
-                let size = match format {
-                    IndexFormat::U16 => 2,
-                    IndexFormat::U32 => 4,
-                };
+                let size = format.bytes() as u64;
                 let at = addr + u64::from(first) * size;
                 out.extend([
                     Rdna2Packet::header(Rdna2Packet::DRAW_INDEX_2, 5),

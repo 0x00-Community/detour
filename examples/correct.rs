@@ -9,6 +9,8 @@
 //!
 //!   cargo run --release --example correct [FILTER...]      (cases whose name contains a filter)
 
+#[path = "support/card.rs"]
+mod card;
 #[path = "correct/gpu.rs"]
 mod gpu;
 #[path = "support/glsl.rs"]
@@ -22,7 +24,7 @@ mod reference;
 #[path = "correct/shaders.rs"]
 mod shaders;
 
-use detour::{Isa, Device, Toolchain};
+use detour::{Device, Toolchain};
 use gpu::Gpu;
 use reference::FillRule;
 
@@ -151,9 +153,9 @@ fn math(gpu: &Gpu<'_>, t: &mut Tally) {
 
 fn main() {
     let filters: Vec<String> = std::env::args().skip(1).collect();
-    let tools = Toolchain::new(Isa::Xe3);
-    let xe = detour::Xe::open_first().expect("an Xe3 render node");
-    let gpu = Gpu::new(&tools, Device::new(&xe));
+    let card = card::open();
+    let tools = Toolchain::new(card.isa());
+    let gpu = Gpu::new(&tools, Device::new(card));
     let mut t = Tally { filters, failed: Vec::new(), passed: 0 };
     raster(&gpu, &mut t, raster::coverage(), false);
     raster(&gpu, &mut t, raster::state(), false);

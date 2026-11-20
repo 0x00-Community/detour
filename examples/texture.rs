@@ -6,10 +6,12 @@
 //!
 //!   cargo run --release --example texture [FILTER...]      (cases whose name contains a filter)
 
+#[path = "support/card.rs"]
+mod card;
 #[path = "support/glsl.rs"]
 mod glsl;
 
-use detour::{Isa, ColorFormat, ColorTarget, Compiled, Device, Draw, Filter, Sampled, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Wrap, Xe};
+use detour::{ColorFormat, ColorTarget, Compiled, Device, Draw, Filter, Sampled, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Wrap};
 
 const SHADERS: [&str; 2] = [
     "#version 300 es\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec2 uv;\nout vec2 t;\nvoid main() { t = uv; gl_Position = vec4(pos, 0.0, 1.0); }\n",
@@ -166,8 +168,8 @@ fn compare(got: &[u8], want: &[u8], width: u32, tolerance: u8) -> Result<(), Str
 fn run(device: &Device<'_>, program: &Compiled, c: &Case) -> Result<(), String> {
     let texture = device.surface(&c.texture.target()).map_err(|e| e.0)?;
     let size = [c.width, c.height];
-    let surface = target(device, size, Tiling::Tile4)?;
-    draw(device, program, texture, c.filter, c.wrap, c.uv, surface, size, Tiling::Tile4)?;
+    let surface = target(device, size, card::tiled())?;
+    draw(device, program, texture, c.filter, c.wrap, c.uv, surface, size, card::tiled())?;
     let got = device.read(surface, (c.width * c.height * 4) as usize).map_err(|e| e.0)?;
     device.free(texture).and(device.free(surface)).map_err(|e| e.0)?;
     compare(&got, &c.reference(), c.width, c.tolerance)
@@ -178,9 +180,9 @@ fn render_to_texture(device: &Device<'_>, program: &Compiled) -> Result<(), Stri
     let t = Texture::new(16, 16, ColorFormat::Rgba8Unorm, Tiling::Linear, 7);
     let a = device.surface(&t.target()).map_err(|e| e.0)?;
     let size = [16, 16];
-    let (b, c) = (target(device, size, Tiling::Tile4)?, target(device, size, Tiling::Linear)?);
+    let (b, c) = (target(device, size, card::tiled())?, target(device, size, Tiling::Linear)?);
     for _ in 0..3 {
-        draw(device, program, a, Filter::Nearest, Wrap::ClampToEdge, [0.0, 0.0, 1.0, 1.0], b, size, Tiling::Tile4)?;
+        draw(device, program, a, Filter::Nearest, Wrap::ClampToEdge, [0.0, 0.0, 1.0, 1.0], b, size, card::tiled())?;
         draw(device, program, b, Filter::Nearest, Wrap::ClampToEdge, [0.0, 0.0, 1.0, 1.0], c, size, Tiling::Linear)?;
     }
     let got = device.read(c, 16 * 16 * 4).map_err(|e| e.0)?;
@@ -190,13 +192,13 @@ fn render_to_texture(device: &Device<'_>, program: &Compiled) -> Result<(), Stri
 
 /// Texture `a` sampled into `c`, then `a` drawn over (sampling `d`) in the same batch: `c` holds `a` as it was
 fn sample_then_overwrite(device: &Device<'_>, program: &Compiled) -> Result<(), String> {
-    let (ta, td) = (Texture::new(64, 64, ColorFormat::Rgba8Unorm, Tiling::Tile4, 21), Texture::new(64, 64, ColorFormat::Rgba8Unorm, Tiling::Tile4, 22));
+    let (ta, td) = (Texture::new(64, 64, ColorFormat::Rgba8Unorm, card::tiled(), 21), Texture::new(64, 64, ColorFormat::Rgba8Unorm, card::tiled(), 22));
     let (a, d) = (device.surface(&ta.target()).map_err(|e| e.0)?, device.surface(&td.target()).map_err(|e| e.0)?);
     let size = [64, 64];
     let c = target(device, size, Tiling::Linear)?;
     let whole = [0.0, 0.0, 1.0, 1.0];
     draw(device, program, a, Filter::Nearest, Wrap::ClampToEdge, whole, c, size, Tiling::Linear)?;
-    draw(device, program, d, Filter::Nearest, Wrap::ClampToEdge, whole, a, size, Tiling::Tile4)?;
+    draw(device, program, d, Filter::Nearest, Wrap::ClampToEdge, whole, a, size, card::tiled())?;
     let got = device.read(c, 64 * 64 * 4).map_err(|e| e.0)?;
     let overwritten = device.read(a, 64 * 64 * 4).map_err(|e| e.0)?;
     [a, c, d].into_iter().try_for_each(|s| device.free(s)).map_err(|e| e.0)?;
@@ -205,7 +207,7 @@ fn sample_then_overwrite(device: &Device<'_>, program: &Compiled) -> Result<(), 
 
 /// A texture's part written, then sampled: the part new, the rest as it was
 fn write_part(device: &Device<'_>, program: &Compiled) -> Result<(), String> {
-    let mut t = Texture::new(32, 16, ColorFormat::R8Unorm, Tiling::Tile4, 3);
+    let mut t = Texture::new(32, 16, ColorFormat::R8Unorm, card::tiled(), 3);
     let texture = device.surface(&t.target()).map_err(|e| e.0)?;
     let size = [32, 16];
     let surface = target(device, size, Tiling::Linear)?;
@@ -230,27 +232,27 @@ fn cases() -> Vec<Case> {
     let case = |name, texture, width, height, uv, filter, wrap, tolerance| Case { name, texture, width, height, uv, filter, wrap, tolerance };
     vec![
         case("nearest 1:1, linear texture", rgba(8, 8, Tiling::Linear, 1), 8, 8, whole, Filter::Nearest, Wrap::ClampToEdge, 0),
-        case("nearest 1:1, Tile4 texture", rgba(64, 48, Tiling::Tile4, 2), 64, 48, whole, Filter::Nearest, Wrap::ClampToEdge, 0),
-        case("linear 1:1", rgba(16, 16, Tiling::Tile4, 3), 16, 16, whole, Filter::Linear, Wrap::ClampToEdge, 1),
+        case("nearest 1:1, Tile4 texture", rgba(64, 48, card::tiled(), 2), 64, 48, whole, Filter::Nearest, Wrap::ClampToEdge, 0),
+        case("linear 1:1", rgba(16, 16, card::tiled(), 3), 16, 16, whole, Filter::Linear, Wrap::ClampToEdge, 1),
         case("nearest magnified", rgba(4, 4, Tiling::Linear, 4), 16, 16, whole, Filter::Nearest, Wrap::ClampToEdge, 0),
         case("linear magnified", rgba(4, 4, Tiling::Linear, 5), 16, 16, whole, Filter::Linear, Wrap::ClampToEdge, 2),
-        case("linear minified", rgba(32, 32, Tiling::Tile4, 6), 16, 16, whole, Filter::Linear, Wrap::ClampToEdge, 2),
+        case("linear minified", rgba(32, 32, card::tiled(), 6), 16, 16, whole, Filter::Linear, Wrap::ClampToEdge, 2),
         case("repeat", rgba(4, 4, Tiling::Linear, 7), 16, 16, [0.0, 0.0, 2.0, 2.0], Filter::Nearest, Wrap::Repeat, 0),
         case("mirrored repeat", rgba(4, 4, Tiling::Linear, 8), 16, 16, [0.0, 0.0, 2.0, 2.0], Filter::Nearest, Wrap::MirroredRepeat, 0),
         case("clamp to edge", rgba(4, 4, Tiling::Linear, 9), 16, 16, [-0.5, -0.5, 1.5, 1.5], Filter::Nearest, Wrap::ClampToEdge, 0),
-        case("linear repeat", rgba(4, 4, Tiling::Tile4, 10), 16, 16, [-1.0, 0.0, 1.0, 2.0], Filter::Linear, Wrap::Repeat, 2),
+        case("linear repeat", rgba(4, 4, card::tiled(), 10), 16, 16, [-1.0, 0.0, 1.0, 2.0], Filter::Linear, Wrap::Repeat, 2),
         case("R8, nearest", Texture::new(16, 8, ColorFormat::R8Unorm, Tiling::Linear, 11), 16, 8, whole, Filter::Nearest, Wrap::ClampToEdge, 0),
-        case("R8, linear magnified", Texture::new(8, 8, ColorFormat::R8Unorm, Tiling::Tile4, 12), 32, 32, whole, Filter::Linear, Wrap::ClampToEdge, 2),
+        case("R8, linear magnified", Texture::new(8, 8, ColorFormat::R8Unorm, card::tiled(), 12), 32, 32, whole, Filter::Linear, Wrap::ClampToEdge, 2),
     ]
 }
 
 fn main() {
     let only: Vec<String> = std::env::args().skip(1).collect();
     let picked = |name: &str| only.is_empty() || only.iter().any(|f| name.contains(f.as_str()));
-    let tools = Toolchain::new(Isa::Xe3);
+    let card = card::open();
+    let tools = Toolchain::new(card.isa());
     let program = tools.compile(&glsl::spirv(SHADERS[0], SHADERS[1]).unwrap()).unwrap_or_else(|e| panic!("{}", e.0));
-    let xe = Xe::open_first().unwrap();
-    let device = Device::new(&xe);
+    let device = Device::new(card);
     let mut failed = 0;
     let mut report = |name: &str, r: Result<(), String>| {
         failed += usize::from(r.is_err());
