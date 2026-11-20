@@ -100,6 +100,7 @@ impl<'t> Gpu<'t> {
                     buffers: op.buffers.iter().map(|(b, stride)| VertexBuffer { bytes: b, stride: *stride }).collect(),
                     elements: op.elements.clone(),
                     uniforms: op.uniforms.iter().map(|(b, u)| (*b, u.as_slice())).collect(),
+                    textures: Vec::new(),
                     primitive: op.primitive,
                     first: op.first,
                     count: op.count,

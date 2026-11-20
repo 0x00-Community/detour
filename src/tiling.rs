@@ -11,6 +11,8 @@ pub enum Tiling {
 const RUN: u32 = 16;
 
 impl Tiling {
+    /// The bytes the CPU moves at a time, a run on one row in every tiling
+    pub const RUN: u32 = RUN;
     pub const TILE4_WIDTH: u32 = 128;
     pub const TILE4_ROWS: u32 = 32;
     const TILE4_BYTES: usize = 4096;
