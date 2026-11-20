@@ -33,7 +33,8 @@ draws (`Device::draw`) whose shaders it compiles to the GPU's machine code, whos
 - 🔵 **Intel Xe3**: the xe3 dialect (EU instructions, genxml commands and states), SPIR-V and GPU kernels lowered to
   Xe3 machine code, register allocation, scoreboard, a draw's image.
 - 🔴 **AMD RDNA2** (gfx1036): the rdna2 dialect (GFX10 instructions, registers, PM4), GPU kernels lowered to RDNA2
-  machine code and indirect buffers, checked against llvm-mc and Mesa; the `amdgpu` kernel interface is next.
+  machine code and indirect buffers, checked against llvm-mc and Mesa; the `amdgpu` kernel interface (buffer objects, the address space, command
+  submission with syncobjs, dma-bufs); draws are next.
 - 🔌 **On mlirformat and mlirpass as plugins**: `src/dialect` adds the GPU dialects to mlirformat (`MlirOpt::load`),
   `src/pass` adds the lowerings to mlirpass (`Passes::with(DetourPasses::add)`), `src/binary` writes machine code and
   images (`Binaries`, `Read` / `Write`).
@@ -58,7 +59,7 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | GPU | Kernel driver | Status |
 | --- | --- | --- |
 | 🔵 **Intel Xe3** (Panther Lake, PCI 8086:b0a0) | `xe` | draws (above) |
-| 🔴 **AMD RDNA2** (gfx1036, Granite Ridge Radeon 610M, PCI 1002:13c0) | `amdgpu` | dialect, lowering and PM4 checked against llvm-mc and Mesa; no kernel interface or draws yet |
+| 🔴 **AMD RDNA2** (gfx1036, Granite Ridge Radeon 610M, PCI 1002:13c0) | `amdgpu` | dialect, lowering and PM4 checked against llvm-mc and Mesa; the kernel interface submits (`examples/amd_info`); no draws yet |
 
 detour drives these integrated GPUs on x86_64 Linux and nothing else. There is no fallback: no CPU
 rasterizer and no hand-off to the system's drivers.
@@ -71,8 +72,8 @@ rasterizer and no hand-off to the system's drivers.
 | `src/pass` | mlirpass plugins: `convert-gpu-to-*`, register allocation, waits, command streams, image layout, `Xe3Draw`, `gpu-module-to-binary` for SPIR-V and RDNA2 |
 | `src/binary` | machine code and images: each GPU's encoder, records packed by layout tables, image writing |
 | `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + detour's passes) and the device a draw runs on |
-| `src/kmd` | the kernel interface: DRM, the `Gpu` trait, and the `xe` driver (`src/kmd/xe`) |
-| `examples/` | `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `texture` (sampled textures vs a CPU reference), `indexed` (indexed draws), `export` (dma-bufs and scanout), `program` (programs compiled ahead of time), `shapes` and `frame` (draws in a frame, timed), `xe_info` |
+| `src/kmd` | the kernel interface: DRM, the `Gpu` trait, the `xe` driver (`src/kmd/xe`) and the `amdgpu` driver (`src/kmd/amdgpu`) |
+| `examples/` | `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `texture` (sampled textures vs a CPU reference), `indexed` (indexed draws), `export` (dma-bufs and scanout), `program` (programs compiled ahead of time), `shapes` and `frame` (draws in a frame, timed), `xe_info`, `amd_info` |
 | `tests/binary`, `tests/pass` | encodings, and lowerings |
 | `scripts/` | the dialects' generators (`xe3gen`, `rdna2gen`) and the Mesa data they read (`data/{intel,amd}`), opcode tables, and the oracles each test's expected bytes come from (`*_oracle.*`) |
 
