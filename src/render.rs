@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use mlirformat::Error;
 
-use crate::{Amdgpu, ColorTarget, Compiled, Draw, Fence, Isa, Node, Syncobj, Xe};
+use crate::{Amdgpu, ColorTarget, Compiled, Draw, Fence, Isa, Node, Surface, Syncobj, Xe};
 pub(crate) use target::SurfaceMem;
 
 /// How long a submission may take before the GPU is called hung
@@ -43,10 +43,6 @@ pub struct Exported {
     pub modifier: u64,
     pub fourcc: u32,
 }
-
-/// A color target the device keeps: its pixels stay on the GPU between draws
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Surface(pub(crate) usize);
 
 /// A GPU detour draws on: an Intel Xe3 (`xe`) or an AMD RDNA2 (`amdgpu`) render node
 #[expect(clippy::large_enum_variant, reason = "a card or two in a process")]

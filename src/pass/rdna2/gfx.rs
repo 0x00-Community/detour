@@ -72,6 +72,93 @@ enum Val {
     None,
 }
 
+/// What an op is to the selection: its name read once, then matched as this
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    Constant,
+    Poison,
+    AccessChain,
+    Load,
+    Extract,
+    Insert,
+    FromElements,
+    Broadcast,
+    Shuffle,
+    Sample { explicit: bool },
+    If,
+    Yield,
+    CmpF,
+    Select,
+    AddF,
+    SubF,
+    MulF,
+    DivF,
+    NegF,
+    AbsF,
+    MaxF,
+    MinF,
+    Clamp,
+    Fma,
+    Pow,
+    Dot,
+    /// one VALU op on one operand
+    Unary(Op),
+    /// arithmetic it has no selection for
+    Arith,
+    Other,
+}
+
+impl Kind {
+    fn of(name: &str) -> Kind {
+        match name {
+            "arith.constant" => Kind::Constant,
+            "ub.poison" => Kind::Poison,
+            "spirv.AccessChain" => Kind::AccessChain,
+            "spirv.Load" => Kind::Load,
+            "vector.extract" => Kind::Extract,
+            "vector.insert" => Kind::Insert,
+            "vector.from_elements" => Kind::FromElements,
+            "vector.broadcast" => Kind::Broadcast,
+            "vector.shuffle" => Kind::Shuffle,
+            "spirv.ImageSampleImplicitLod" => Kind::Sample { explicit: false },
+            "spirv.ImageSampleExplicitLod" => Kind::Sample { explicit: true },
+            "scf.if" => Kind::If,
+            "scf.yield" | "func.return" => Kind::Yield,
+            "arith.cmpf" => Kind::CmpF,
+            "arith.select" => Kind::Select,
+            "arith.addf" => Kind::AddF,
+            "arith.subf" => Kind::SubF,
+            "arith.mulf" => Kind::MulF,
+            "arith.divf" => Kind::DivF,
+            "arith.negf" => Kind::NegF,
+            "math.absf" | "spirv.GL.FAbs" => Kind::AbsF,
+            "arith.maxnumf" | "arith.maximumf" | "spirv.GL.FMax" => Kind::MaxF,
+            "arith.minnumf" | "arith.minimumf" | "spirv.GL.FMin" => Kind::MinF,
+            "spirv.GL.FClamp" => Kind::Clamp,
+            "math.fma" | "spirv.GL.Fma" => Kind::Fma,
+            "math.powf" | "spirv.GL.Pow" => Kind::Pow,
+            "spirv.Dot" => Kind::Dot,
+            "math.sqrt" | "spirv.GL.Sqrt" => Kind::Unary(Op::VSqrtF32),
+            "math.rsqrt" | "spirv.GL.InverseSqrt" => Kind::Unary(Op::VRsqF32),
+            "math.floor" | "spirv.GL.Floor" => Kind::Unary(Op::VFloorF32),
+            "math.ceil" | "spirv.GL.Ceil" => Kind::Unary(Op::VCeilF32),
+            "spirv.GL.Fract" => Kind::Unary(Op::VFractF32),
+            "math.exp2" | "spirv.GL.Exp2" => Kind::Unary(Op::VExpF32),
+            "math.log2" | "spirv.GL.Log2" => Kind::Unary(Op::VLogF32),
+            n if n.starts_with("arith.") || n.starts_with("math.") || n.starts_with("spirv.GL.") => Kind::Arith,
+            _ => Kind::Other,
+        }
+    }
+
+    /// Whether it is ALU work (for the flattening choice)
+    fn alu(self) -> bool {
+        !matches!(
+            self,
+            Kind::Constant | Kind::Poison | Kind::AccessChain | Kind::Load | Kind::Extract | Kind::Insert | Kind::FromElements | Kind::Broadcast | Kind::Shuffle | Kind::Sample { .. } | Kind::If | Kind::Yield | Kind::Other
+        )
+    }
+}
+
 fn f(bits: u32) -> f32 {
     f32::from_bits(bits)
 }
@@ -107,7 +194,7 @@ fn used(body: &Body<'_>, v: ValueId) -> Vec<u32> {
     let mut set = BTreeSet::new();
     for u in body[v].uses.iter() {
         let o = u.op;
-        if &*body[o].name == "vector.extract"
+        if Kind::of(&body[o].name) == Kind::Extract
             && let Some(p) = body.dense_i64(o, "static_position").first()
         {
             set.insert(*p as u32);
@@ -130,6 +217,8 @@ struct Lower<'b, 'a> {
     memo: Vec<Memo>,
     labels: u32,
     ubo: BTreeMap<(u32, u32), Src>,
+    /// an if's result register an arm copies a value made before the if into: (result, value)
+    copies: Vec<(u32, u32)>,
 }
 
 impl<'b, 'a> Lower<'b, 'a> {
@@ -147,8 +236,8 @@ impl<'b, 'a> Lower<'b, 'a> {
         let int = |o: OpId, n: &str| body[o].get(n).and_then(|a| Attrs::as_int(a).ok()).map(|v| v as u32);
         let (mut ubos, mut textures) = (BTreeMap::<u32, BTreeSet<u32>>::new(), BTreeSet::new());
         for &o in &all {
-            let name = &*body[o].name;
-            if name == "spirv.Load"
+            let kind = Kind::of(&body[o].name);
+            if kind == Kind::Load
                 && let (Some(b), Some(off)) = (int(o, "xe3.binding"), int(o, "xe3.offset"))
             {
                 let r = body[o].results[0];
@@ -156,7 +245,7 @@ impl<'b, 'a> Lower<'b, 'a> {
                 for c in used(body, r) {
                     set.insert(off / 4 + c);
                 }
-            } else if name.starts_with("spirv.Image")
+            } else if matches!(kind, Kind::Sample { .. })
                 && let Some(b) = int(o, "xe3.binding")
             {
                 textures.insert(b);
@@ -173,7 +262,7 @@ impl<'b, 'a> Lower<'b, 'a> {
             textures: textures.into_iter().collect(),
             ps_input: if vertex { 0 } else { RDNA2_PERSP_CENTER },
         };
-        let mut l = Lower { body, abi, regs: Vec::new(), code: Vec::new(), vals: BTreeMap::new(), memo: vec![Memo::new()], labels: 0, ubo: BTreeMap::new() };
+        let mut l = Lower { body, abi, regs: Vec::new(), code: Vec::new(), vals: BTreeMap::new(), memo: vec![Memo::new()], labels: 0, ubo: BTreeMap::new(), copies: Vec::new() };
         let user = if vertex { RDNA2_VS_USER_SGPR } else { 0 };
         let end = l.label();
         if vertex {
@@ -217,6 +306,8 @@ impl<'b, 'a> Lower<'b, 'a> {
         }
         l.code.push(Inst::Label(end));
         l.code.push(Inst::Sopp { op: Op::SEndpgm, imm: 0 });
+        coalesce(&mut l.code, &mut l.regs, &l.copies);
+        tidy(&mut l.code);
         fold_clamps(&mut l.code);
         let reserved = user + l.abi.user_sgprs() + (!vertex) as u32;
         let alloc = allocate(&l.code, &l.regs, reserved)?;
@@ -441,9 +532,9 @@ impl<'b, 'a> Lower<'b, 'a> {
     }
 
     /// The single user of a value, if one
-    fn single_user(&self, v: ValueId) -> Option<&str> {
+    fn single_user(&self, v: ValueId) -> Option<Kind> {
         let u = self.body[v].uses.single()?;
-        Some(&self.body[u.op].name)
+        Some(Kind::of(&self.body[u.op].name))
     }
 
     fn add(&mut self, a: Val, b: Val) -> Result<Val, Error> {
@@ -512,15 +603,15 @@ impl<'b, 'a> Lower<'b, 'a> {
     /// Lowers a block's ops; its terminator's operands' components (`scf.yield`, `func.return`)
     fn block(&mut self, block: BlockId) -> Result<Option<Vec<Val>>, Error> {
         for o in self.body.block_ops(block) {
-            let name = self.body[o].name.to_string();
-            if name == "scf.yield" || name == "func.return" {
+            let kind = Kind::of(&self.body[o].name);
+            if kind == Kind::Yield {
                 let mut out = Vec::new();
                 for &v in self.body[o].operands.iter() {
                     out.extend(self.vals(v)?);
                 }
                 return Ok(Some(out));
             }
-            self.op(o, &name)?;
+            self.op(o, kind)?;
         }
         Ok(None)
     }
@@ -533,21 +624,22 @@ impl<'b, 'a> Lower<'b, 'a> {
     fn cost(&self, block: BlockId) -> usize {
         let mut n = 0;
         for o in self.body.block_ops(block) {
-            let name = &*self.body[o].name;
-            if name == "scf.if" {
+            let kind = Kind::of(&self.body[o].name);
+            if kind == Kind::If {
                 n += 2 + self.body[o].regions.iter().map(|r| self.body[*r].blocks.first().map_or(0, |b| self.cost(*b))).sum::<usize>();
-            } else if name.starts_with("arith.") && name != "arith.constant" || name.starts_with("math.") || name.starts_with("spirv.GL.") || name == "spirv.Dot" {
+            } else if kind.alu() {
                 n += self.body[o].results.first().map_or(1, |r| self.lanes(*r));
             }
         }
         n
     }
 
-    fn op(&mut self, o: OpId, name: &str) -> Result<(), Error> {
+    fn op(&mut self, o: OpId, kind: Kind) -> Result<(), Error> {
         let body = self.body;
+        let name = &*body[o].name;
         let results: Vec<ValueId> = body[o].results.to_vec();
         let operands: Vec<ValueId> = body[o].operands.to_vec();
-        if name != "scf.if" && results.iter().all(|r| body[*r].uses.is_empty()) {
+        if kind != Kind::If && results.iter().all(|r| body[*r].uses.is_empty()) {
             return Ok(());
         }
         let r = results.first().copied();
@@ -557,8 +649,8 @@ impl<'b, 'a> Lower<'b, 'a> {
                 l.vals.insert(r, v);
             }
         };
-        match name {
-            "arith.constant" => {
+        match kind {
+            Kind::Constant => {
                 let value = body[o].get("value").cloned().ok_or_else(|| Error("RDNA2: a constant without a value".into()))?;
                 let c = Const::try_from(&value).map_err(|_| Error(format!("RDNA2: constant {value}")))?;
                 let vals = (0..lanes)
@@ -571,9 +663,9 @@ impl<'b, 'a> Lower<'b, 'a> {
                     .collect::<Result<_, _>>()?;
                 set(self, vals);
             }
-            "ub.poison" => set(self, vec![Val::X(k(0.0)); lanes]),
-            "spirv.AccessChain" => set(self, vec![Val::None]),
-            "spirv.Load" => {
+            Kind::Poison => set(self, vec![Val::X(k(0.0)); lanes]),
+            Kind::AccessChain => set(self, vec![Val::None]),
+            Kind::Load => {
                 let int = |n: &str| body[o].get(n).and_then(|a| Attrs::as_int(a).ok()).map(|v| v as u32);
                 if body[o].get("xe3.matrix_stride").is_some() || body[o].get("xe3.push_offset").is_some() {
                     return Err(Error("RDNA2: matrices and push constants in uniform blocks not yet".into()));
@@ -585,43 +677,43 @@ impl<'b, 'a> Lower<'b, 'a> {
                 };
                 set(self, vals);
             }
-            "vector.extract" => {
+            Kind::Extract => {
                 let p = body.dense_i64(o, "static_position");
                 let v = self.vals(operands[0])?;
                 let at = *p.first().ok_or_else(|| Error("RDNA2: a dynamic extract".into()))? as usize;
                 set(self, vec![v[at]]);
             }
-            "vector.insert" => {
+            Kind::Insert => {
                 let p = body.dense_i64(o, "static_position");
                 let mut v = self.vals(operands[1])?;
                 v[p[0] as usize] = self.vals(operands[0])?[0];
                 set(self, v);
             }
-            "vector.from_elements" => {
+            Kind::FromElements => {
                 let mut v = Vec::new();
                 for x in operands {
                     v.extend(self.vals(x)?);
                 }
                 set(self, v);
             }
-            "vector.broadcast" => {
+            Kind::Broadcast => {
                 let v = self.vals(operands[0])?[0];
                 set(self, vec![v; lanes]);
             }
-            "vector.shuffle" => {
+            Kind::Shuffle => {
                 let mut all = self.vals(operands[0])?;
                 all.extend(self.vals(operands[1])?);
                 let v = body.dense_i64(o, "mask").into_iter().map(|m| all[m as usize]).collect();
                 set(self, v);
             }
-            "spirv.ImageSampleImplicitLod" | "spirv.ImageSampleExplicitLod" => {
+            Kind::Sample { explicit } => {
                 let b = body[o].get("xe3.binding").and_then(|a| Attrs::as_int(a).ok()).ok_or_else(|| Error("RDNA2: a sample of no binding".into()))? as u32;
                 let t = self.abi.texture_sgpr(b).ok_or_else(|| Error("RDNA2: an unbound texture".into()))?;
-                let explicit_zero = name == "spirv.ImageSampleExplicitLod"
+                let explicit_zero = explicit
                     && operands.len() == 3
                     && matches!(self.vals(operands[2])?.first(), Some(Val::X(o)) if konst_of(*o) == Some(0.0));
                 let image = body[operands[0]].ty.to_string();
-                if !image.contains("Dim2D") || image.contains(" Arrayed") || !(name == "spirv.ImageSampleImplicitLod" && operands.len() == 2 || explicit_zero) {
+                if !image.contains("Dim2D") || image.contains(" Arrayed") || !(!explicit && operands.len() == 2 || explicit_zero) {
                     return Err(Error(format!("RDNA2: {name} of {image}: only 2D, non-arrayed, level 0 sampling (one mip level) yet")));
                 }
                 let coord = self.vals(operands[1])?;
@@ -636,8 +728,8 @@ impl<'b, 'a> Lower<'b, 'a> {
                 }
                 set(self, vals);
             }
-            "scf.if" => self.lower_if(o)?,
-            "arith.cmpf" => {
+            Kind::If => self.lower_if(o)?,
+            Kind::CmpF => {
                 let p = body[o].get("predicate").and_then(|a| Attrs::as_int(a).ok()).ok_or_else(|| Error("RDNA2: cmpf without predicate".into()))?;
                 let op = match p {
                     1 => Op::VCmpEqF32,
@@ -664,7 +756,7 @@ impl<'b, 'a> Lower<'b, 'a> {
                 }
                 set(self, v);
             }
-            "arith.select" => {
+            Kind::Select => {
                 let c = self.vals(operands[0])?;
                 let (a, b) = (self.vals(operands[1])?, self.vals(operands[2])?);
                 let mut v = Vec::new();
@@ -677,34 +769,34 @@ impl<'b, 'a> Lower<'b, 'a> {
             }
             _ => {
                 let args: Vec<Vec<Val>> = operands.iter().map(|v| self.vals(*v)).collect::<Result<_, _>>()?;
-                let only = r.and_then(|r| self.single_user(r)).map(alloc::borrow::ToOwned::to_owned);
-                let fusable = |u: &Option<alloc::string::String>| matches!(u.as_deref(), Some("arith.addf" | "arith.subf"));
+                let only = r.and_then(|r| self.single_user(r));
+                let fusable = matches!(only, Some(Kind::AddF | Kind::SubF));
                 let mut out = Vec::new();
                 for i in 0..lanes {
                     let a = |k: usize| args[k][if args[k].len() > 1 { i } else { 0 }];
-                    let v = match name {
-                        "arith.addf" => self.add(a(0), a(1))?,
-                        "arith.subf" => self.sub(a(0), a(1))?,
-                        "arith.mulf" => {
+                    let v = match kind {
+                        Kind::AddF => self.add(a(0), a(1))?,
+                        Kind::SubF => self.sub(a(0), a(1))?,
+                        Kind::MulF => {
                             let (x, y) = (self.x(a(0))?, self.x(a(1))?);
-                            self.mul(x, y, fusable(&only))
+                            self.mul(x, y, fusable)
                         }
-                        "arith.divf" => {
+                        Kind::DivF => {
                             let (x, y) = (self.x(a(0))?, self.x(a(1))?);
                             let rcp = self.unary(Op::VRcpF32, y);
-                            self.mul(x, rcp, fusable(&only))
+                            self.mul(x, rcp, fusable)
                         }
-                        "arith.negf" => Val::X(neg(self.x(a(0))?)),
-                        "math.absf" | "spirv.GL.FAbs" => Val::X(abs(self.x(a(0))?)),
-                        "arith.maxnumf" | "arith.maximumf" | "spirv.GL.FMax" => {
+                        Kind::NegF => Val::X(neg(self.x(a(0))?)),
+                        Kind::AbsF => Val::X(abs(self.x(a(0))?)),
+                        Kind::MaxF => {
                             let (x, y) = (self.x(a(0))?, self.x(a(1))?);
-                            if matches!(only.as_deref(), Some("arith.minnumf" | "arith.minimumf" | "spirv.GL.FMin")) && (konst_of(y).is_some() || konst_of(x).is_some()) {
+                            if only == Some(Kind::MinF) && (konst_of(y).is_some() || konst_of(x).is_some()) {
                                 Val::Lazy(Op::VMaxF32, x, y)
                             } else {
                                 Val::X(self.alu(Op::VMaxF32, vec![x, y], false))
                             }
                         }
-                        "arith.minnumf" | "arith.minimumf" | "spirv.GL.FMin" => match (a(0), a(1)) {
+                        Kind::MinF => match (a(0), a(1)) {
                             (Val::Lazy(Op::VMaxF32, x, lo), hi) | (hi, Val::Lazy(Op::VMaxF32, x, lo)) if konst_of(self.x(hi)?).is_some() => {
                                 let hi = self.x(hi)?;
                                 let (x, lo) = if konst_of(lo).is_some() { (x, lo) } else { (lo, x) };
@@ -715,29 +807,26 @@ impl<'b, 'a> Lower<'b, 'a> {
                                 Val::X(self.alu(Op::VMinF32, vec![x, y], false))
                             }
                         },
-                        "spirv.GL.FClamp" => {
+                        Kind::Clamp => {
                             let (x, lo, hi) = (self.x(a(0))?, self.x(a(1))?, self.x(a(2))?);
                             Val::X(self.clamp(x, lo, hi))
                         }
-                        "math.sqrt" | "spirv.GL.Sqrt" => { let x = self.x(a(0))?; Val::X(self.unary(Op::VSqrtF32, x)) },
-                        "math.rsqrt" | "spirv.GL.InverseSqrt" => { let x = self.x(a(0))?; Val::X(self.unary(Op::VRsqF32, x)) },
-                        "math.floor" | "spirv.GL.Floor" => { let x = self.x(a(0))?; Val::X(self.unary(Op::VFloorF32, x)) },
-                        "math.ceil" | "spirv.GL.Ceil" => { let x = self.x(a(0))?; Val::X(self.unary(Op::VCeilF32, x)) },
-                        "spirv.GL.Fract" => { let x = self.x(a(0))?; Val::X(self.unary(Op::VFractF32, x)) },
-                        "math.exp2" | "spirv.GL.Exp2" => { let x = self.x(a(0))?; Val::X(self.unary(Op::VExpF32, x)) },
-                        "math.log2" | "spirv.GL.Log2" => { let x = self.x(a(0))?; Val::X(self.unary(Op::VLogF32, x)) },
-                        "math.fma" | "spirv.GL.Fma" => {
+                        Kind::Unary(op) => {
+                            let x = self.x(a(0))?;
+                            Val::X(self.unary(op, x))
+                        }
+                        Kind::Fma => {
                             let (x, y, z) = (self.x(a(0))?, self.x(a(1))?, self.x(a(2))?);
                             Val::X(self.alu(Op::VFmaF32, vec![x, y, z], false))
                         }
-                        "math.powf" | "spirv.GL.Pow" => {
+                        Kind::Pow => {
                             let (x, y) = (self.x(a(0))?, self.x(a(1))?);
                             let l = self.unary(Op::VLogF32, x);
                             let m = self.mul(l, y, false);
                             let m = self.x(m)?;
                             Val::X(self.unary(Op::VExpF32, m))
                         }
-                        "spirv.Dot" => {
+                        Kind::Dot => {
                             let mut acc: Option<Val> = None;
                             for (&x, &y) in args[0].iter().zip(&args[1]) {
                                 let (x, y) = (self.x(x)?, self.x(y)?);
@@ -773,6 +862,7 @@ impl<'b, 'a> Lower<'b, 'a> {
 
     fn lower_if(&mut self, o: OpId) -> Result<(), Error> {
         let body = self.body;
+        let start = self.code.len();
         let m = self.mask(body[o].operands[0])?;
         let uniform = self.uniform(Opnd::of(m));
         let arms: Vec<Option<BlockId>> = body[o].regions.iter().map(|r| body[*r].blocks.first().copied()).collect();
@@ -818,7 +908,7 @@ impl<'b, 'a> Lower<'b, 'a> {
             save = Some(s);
         }
         let mut all_uniform = uniform;
-        all_uniform &= self.arm(then, &rs)?;
+        all_uniform &= self.arm(then, &rs, start)?;
         if uniform {
             self.code.push(Inst::Branch { op: Op::SBranch, label: end });
         }
@@ -828,7 +918,7 @@ impl<'b, 'a> Lower<'b, 'a> {
             self.code.push(Inst::Alu { op: Op::SAndn2B32, dst: Src::Phys(EXEC), src: vec![Opnd::of(Src::R(s, 0)), exec], clamp: false });
             self.code.push(Inst::Branch { op: Op::SCbranchExecz, label: end });
         }
-        all_uniform &= self.arm(els, &rs)?;
+        all_uniform &= self.arm(els, &rs, start)?;
         self.code.push(Inst::Label(end));
         if let Some(s) = save {
             let exec = Opnd::of(Src::Phys(EXEC));
@@ -851,10 +941,11 @@ impl<'b, 'a> Lower<'b, 'a> {
     }
 
     /// An if's arm lowered in its own scope, its yields written to `rs` (a value made in the arm and yielded once
-    /// is made in its result register); whether all it yields is uniform
-    fn arm(&mut self, block: Option<BlockId>, rs: &[u32]) -> Result<bool, Error> {
+    /// is made in its result register; one made before the if, at code `start`, copied is noted in `copies`); whether
+    /// all it yields is uniform
+    fn arm(&mut self, block: Option<BlockId>, rs: &[u32], start: usize) -> Result<bool, Error> {
         let Some(block) = block else { return Ok(true) };
-        let start = self.code.len();
+        let own = self.code.len();
         self.memo.push(Memo::new());
         let y = self.block(block)?.unwrap_or_default();
         let mut uniform = true;
@@ -869,9 +960,9 @@ impl<'b, 'a> Lower<'b, 'a> {
                 && self.regs[v as usize].size == 1
                 && !renamed.contains_key(&v)
                 && !rs.contains(&v)
-                && self.code[start..].iter().any(|inst| defines(inst, v))
+                && self.code[own..].iter().any(|inst| defines(inst, v))
             {
-                for inst in &mut self.code[start..] {
+                for inst in &mut self.code[own..] {
                     rename(inst, v, r);
                 }
                 renamed.insert(v, r);
@@ -882,10 +973,70 @@ impl<'b, 'a> Lower<'b, 'a> {
                 _ => o,
             };
             let src = self.bare(src);
+            if let Src::R(v, 0) = src.src
+                && src.plain()
+                && matches!(self.regs[v as usize], VReg { class: Class::V, size: 1, align: 1, mask: false, .. })
+                && !self.code[start..].iter().any(|inst| defines(inst, v))
+            {
+                self.copies.push((r, v));
+            }
             self.code.push(Inst::Alu { op: Op::VMovB32, dst: Src::R(r, 0), src: vec![src], clamp: false });
         }
         self.memo.pop();
         Ok(uniform)
+    }
+}
+
+/// An if's result register `r` an arm copies value `v` into, `v` made before the if and read nowhere else: `r` is `v`,
+/// the copy gone. The other arm writing `v` does not clobber it: it runs on the lanes this arm does not (or, on a
+/// uniform branch, instead of it)
+fn coalesce(code: &mut Vec<Inst>, regs: &mut [VReg], copies: &[(u32, u32)]) {
+    let mut to: BTreeMap<u32, u32> = BTreeMap::new();
+    let find = |to: &BTreeMap<u32, u32>, mut v: u32| {
+        while let Some(&n) = to.get(&v) {
+            v = n;
+        }
+        v
+    };
+    for &(r, v) in copies {
+        let (r, v) = (find(&to, r), find(&to, v));
+        let copy = |inst: &Inst| matches!(inst, Inst::Alu { op: Op::VMovB32, dst: Src::R(d, 0), src, .. } if *d == r && src[0] == Opnd::of(Src::R(v, 0)));
+        let mut reads = 0;
+        for inst in code.iter() {
+            inst.uses(|s| reads += usize::from(s == Src::R(v, 0)));
+        }
+        if r == v || reads != 1 || !code.iter().any(copy) {
+            continue;
+        }
+        code.retain(|inst| !copy(inst));
+        code.iter_mut().for_each(|inst| rename(inst, r, v));
+        regs[v as usize].uniform &= regs[r as usize].uniform;
+        to.insert(r, v);
+    }
+}
+
+/// Control flow an empty arm left: a branch to the label that follows it (past labels only), and an else's
+/// `s_andn2_b32 exec` whose next instruction restores exec (`s_or_b32 exec, exec, s` gives `s` either way)
+fn tidy(code: &mut Vec<Inst>) {
+    let next = |code: &[Inst], i: usize| code[i + 1..].iter().position(|x| !matches!(x, Inst::Label(_))).map(|n| i + 1 + n);
+    let mut i = 0;
+    while i < code.len() {
+        let gone = match &code[i] {
+            Inst::Branch { label, .. } | Inst::BranchZero { label, .. } => {
+                let to = *label;
+                code[i + 1..next(code, i).unwrap_or(code.len())].iter().any(|x| matches!(x, Inst::Label(l) if *l == to))
+            }
+            Inst::Alu { op: Op::SAndn2B32, dst: Src::Phys(EXEC), src, .. } => next(code, i).is_some_and(|j| {
+                matches!(&code[j], Inst::Alu { op: Op::SOrB32, dst: Src::Phys(EXEC), src: or, .. } if or[0].src == Src::Phys(EXEC) && or[1] == src[0])
+            }),
+            _ => false,
+        };
+        if gone {
+            code.remove(i);
+            i = i.saturating_sub(1);
+        } else {
+            i += 1;
+        }
     }
 }
 
@@ -968,5 +1119,84 @@ fn rename(inst: &mut Inst, from: u32, to: u32) {
         }
         Inst::BranchZero { mask, .. } => f(mask),
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn v() -> VReg {
+        VReg { class: Class::V, size: 1, align: 1, mask: false, uniform: false }
+    }
+
+    fn alu(op: Op, dst: Src, src: &[Src]) -> Inst {
+        Inst::Alu { op, dst, src: src.iter().map(|s| Opnd::of(*s)).collect(), clamp: false }
+    }
+
+    /// An if made before `x` (r0) and yielding it from its else: then `r1 = x + 1`, else `r1 = x`, `r1` read after
+    fn branchy(read_x_after: bool) -> Vec<Inst> {
+        let (x, r, m) = (Src::R(0, 0), Src::R(1, 0), Src::Phys(VCC));
+        let mut code = vec![
+            alu(Op::VMovB32, x, &[Src::K(2.0f32.to_bits())]),
+            Inst::BranchZero { mask: m, label: 1 },
+            alu(Op::VAddF32, r, &[Src::R(2, 0), Src::K(1.0f32.to_bits())]),
+            Inst::Branch { op: Op::SBranch, label: 2 },
+            Inst::Label(1),
+            alu(Op::VMovB32, r, &[x]),
+            Inst::Label(2),
+            alu(Op::VMulF32, Src::R(2, 0), &[r, r]),
+        ];
+        if read_x_after {
+            code.push(alu(Op::VMulF32, Src::R(2, 0), &[x, x]));
+        }
+        code
+    }
+
+    #[test]
+    fn an_if_result_takes_the_register_of_what_an_arm_copies() {
+        let mut regs = [v(), v(), v()];
+        let mut code = branchy(false);
+        coalesce(&mut code, &mut regs, &[(1, 0)]);
+        assert_eq!(code.iter().filter(|i| matches!(i, Inst::Alu { op: Op::VMovB32, .. })).count(), 1, "the else copy is gone");
+        assert!(code.iter().all(|i| !defines(i, 1)), "r1 is r0");
+        assert!(matches!(&code[2], Inst::Alu { op: Op::VAddF32, dst: Src::R(0, 0), .. }));
+
+        // the copied value read again: the copy stays
+        let mut code = branchy(true);
+        let before = code.len();
+        coalesce(&mut code, &mut regs, &[(1, 0)]);
+        assert_eq!(code.len(), before);
+    }
+
+    #[test]
+    fn an_empty_arm_leaves_no_control_flow() {
+        let (s, exec) = (Src::R(0, 0), Src::Phys(EXEC));
+        let mut code = vec![
+            alu(Op::SAndSaveexecB32, s, &[Src::Phys(VCC)]),
+            Inst::Branch { op: Op::SCbranchExecz, label: 1 },
+            alu(Op::VAddF32, Src::R(1, 0), &[Src::R(2, 0), Src::R(2, 0)]),
+            Inst::Label(1),
+            alu(Op::SAndn2B32, exec, &[s, exec]),
+            Inst::Branch { op: Op::SCbranchExecz, label: 2 },
+            Inst::Label(2),
+            alu(Op::SOrB32, exec, &[exec, s]),
+        ];
+        tidy(&mut code);
+        assert_eq!(code.len(), 6, "the else's exec flip and its skip are gone: {code:?}");
+        assert!(matches!(code[1], Inst::Branch { label: 1, .. }), "the then's skip stays");
+        assert!(matches!(code[5], Inst::Alu { op: Op::SOrB32, .. }));
+
+        // a uniform if with an empty else: its branch past the else goes too
+        let mut code = vec![
+            Inst::BranchZero { mask: Src::Phys(VCC), label: 1 },
+            alu(Op::VAddF32, Src::R(1, 0), &[Src::R(2, 0), Src::R(2, 0)]),
+            Inst::Branch { op: Op::SBranch, label: 2 },
+            Inst::Label(1),
+            Inst::Label(2),
+        ];
+        tidy(&mut code);
+        assert_eq!(code.len(), 4);
+        assert!(matches!(code[0], Inst::BranchZero { label: 1, .. }));
     }
 }

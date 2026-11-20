@@ -63,6 +63,7 @@ impl Opnd {
     }
 }
 
+#[derive(Debug)]
 pub(crate) enum Inst {
     /// SALU and VALU; a VOPC's or VOP3b's lane mask is its `dst`, `v_cndmask`'s mask its third source
     Alu { op: Op, dst: Src, src: Vec<Opnd>, clamp: bool },
@@ -576,18 +577,13 @@ impl<'c> Encoder<'c> {
         Ok(())
     }
 
-    /// The code, branches resolved, padded with `s_code_end` past the instruction prefetch
+    /// The code, branches resolved (the device places it with `s_code_end` after it, past the instruction prefetch)
     pub fn finish(mut self) -> Result<Vec<u8>, Error> {
         for (at, label) in &self.fixups {
             let to = *self.labels.get(label).ok_or_else(|| Error(format!("RDNA2: no label {label}")))?;
             let off = to as i64 - *at as i64 - 1;
             self.out[*at] |= (off as i16 as u16) as u32;
         }
-        let end = Op::SCodeEnd.code();
-        while !self.out.len().is_multiple_of(16) {
-            self.out.push(0xbf80_0000 | end << 16);
-        }
-        self.out.extend([0xbf80_0000 | end << 16; 48]);
         Ok(self.out.iter().flat_map(|w| w.to_le_bytes()).collect())
     }
 }
