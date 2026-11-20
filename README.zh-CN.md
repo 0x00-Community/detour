@@ -32,7 +32,7 @@ detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做
 - 🔵 **Intel Xe3**: xe3 方言 (EU 指令、genxml 命令和状态)、SPIR-V 和 GPU kernel 下降到 Xe3 机器码、寄存器分配、
   记分板、一次绘制的镜像.
 - 🔴 **AMD RDNA2** (gfx1036): rdna2 方言 (GFX10 指令、寄存器、PM4)、GPU kernel 下降到 RDNA2 机器码和 IB, 对照 llvm-mc
-  和 Mesa; 下一步是 `amdgpu` 内核接口.
+  和 Mesa; `amdgpu` 内核接口 (buffer object、地址空间、带 syncobj 的命令提交、dma-buf); 下一步是绘制.
 - 🔌 **以插件方式接 mlirformat 和 mlirpass**: `src/dialect` 给 mlirformat 加 GPU 方言 (`MlirOpt::load`), `src/pass`
   给 mlirpass 加下降 (`Passes::with(DetourPasses::add)`), `src/binary` 写出机器码和镜像 (`Binaries`、`Read` / `Write`).
 - 🐧 **内核接口** (`src/kmd`, `xe` 驱动在 `src/kmd/xe`): DRM render node、BO、VM 绑定、执行队列、syncobj, 走 Linux 的 `xe` 驱动.
@@ -55,7 +55,7 @@ detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做
 | GPU | 内核驱动 | 状态 |
 | --- | --- | --- |
 | 🔵 **Intel Xe3** (Panther Lake, PCI 8086:b0a0) | `xe` | 绘制 (见上) |
-| 🔴 **AMD RDNA2** (gfx1036, Granite Ridge Radeon 610M, PCI 1002:13c0) | `amdgpu` | 方言、下降、PM4 已对照 llvm-mc 和 Mesa; 还没有内核接口和绘制 |
+| 🔴 **AMD RDNA2** (gfx1036, Granite Ridge Radeon 610M, PCI 1002:13c0) | `amdgpu` | 方言、下降、PM4 已对照 llvm-mc 和 Mesa; 内核接口能提交 (`examples/amd_info`); 还没有绘制 |
 
 detour 只驱动 x86_64 Linux 上的这两种核显. 没有任何回退: 没有 CPU 光栅, 也不转给系统的驱动.
 
@@ -67,8 +67,8 @@ detour 只驱动 x86_64 Linux 上的这两种核显. 没有任何回退: 没有 
 | `src/pass` | mlirpass 插件: `convert-gpu-to-*`、寄存器分配、等待、命令流、镜像布局、`Xe3Draw`、编 SPIR-V 和 RDNA2 的 `gpu-module-to-binary` |
 | `src/binary` | 机器码和镜像: 各 GPU 的编码器、按布局表打包记录、写出镜像 |
 | `src/shader.rs`、`src/render.rs` | 工具链 (mlirpass + detour 的 pass) 和执行绘制的设备 |
-| `src/kmd` | 内核接口: DRM、`Gpu` trait、`xe` 驱动 (`src/kmd/xe`) |
-| `examples/` | `correct` (正确性对 CPU 参考和 Mesa; `support/glref.c`)、`texture` (采样纹理对 CPU 参考)、`indexed` (索引绘制)、`export` (dma-buf 和扫描输出)、`program` (预编译的程序)、`shapes` 和 `frame` (一帧里的绘制, 计时)、`xe_info` |
+| `src/kmd` | 内核接口: DRM、`Gpu` trait、`xe` 驱动 (`src/kmd/xe`)、`amdgpu` 驱动 (`src/kmd/amdgpu`) |
+| `examples/` | `correct` (正确性对 CPU 参考和 Mesa; `support/glref.c`)、`texture` (采样纹理对 CPU 参考)、`indexed` (索引绘制)、`export` (dma-buf 和扫描输出)、`program` (预编译的程序)、`shapes` 和 `frame` (一帧里的绘制, 计时)、`xe_info`、`amd_info` |
 | `tests/binary`、`tests/pass` | 编码、下降 |
 | `scripts/` | 方言生成器 (`xe3gen`、`rdna2gen`) 和它们读的 Mesa 数据 (`data/{intel,amd}`)、opcode 表, 以及各测试期望值的来源 (`*_oracle.*`) |
 
