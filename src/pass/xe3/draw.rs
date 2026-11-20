@@ -4,12 +4,11 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use mlirformat::{Attribute, Error, Op};
+use mlirformat::{Attribute, Error};
 
 use core::result::Result;
 
 use crate::*;
-use crate::ImageMemType as MemType;
 
 
 
@@ -38,8 +37,6 @@ const VRT_MASK: u32 = 1 << 10;
 /// The drawing rectangle covers every pixel 16-bit coordinates reach
 const DRAWING_MAX: u32 = 0xffff;
 
-/// Bytes the command streamer may read past a stream's end (its prefetch): left mapped after the batch
-const CS_PREFETCH: u64 = 4096;
 /// URB: the 64-byte units the VS's entries share, starting after the push constants (four stages of 8 KB)
 const URB_SPACE: u32 = 5888;
 const URB_START: u32 = 4;
@@ -90,13 +87,11 @@ const VFG_STRIP: u32 = 3;
 const VFG_PATCH: u32 = 1;
 const VFG_PATCH_MULTIPLIER: u32 = 31;
 /// Placement: surface states and the first binding table entry on 64 bytes, the following entries on 4,
-/// viewports on 32 and 64, the fence on a page
+/// viewports on 32 and 64
 const SURFACE_ALIGN: u32 = 64;
 const ENTRY_ALIGN: u32 = 4;
 const CC_VIEWPORT_ALIGN: u32 = 32;
 const STATE_ALIGN: u32 = 64;
-const FENCE_ALIGN: u64 = 4096;
-const FENCE_SIZE: u64 = 64;
 /// Sampler states: their array on 32 bytes, each 16; the border color on 64; the PS's sampler count in fours
 const SAMPLER_ALIGN: u32 = 32;
 const SAMPLER_ENTRY_ALIGN: u32 = 16;
@@ -223,18 +218,184 @@ impl Genxml {
     }
 }
 
-/// A draw's image, where the second-level batches of its `BATCH` stream start, and the commands a device writes
-/// for each draw (`Xe3DrawCommands`)
-pub struct Xe3DrawImage {
-    pub image: Image,
-    pub state: u64,
-    pub flush: u64,
+/// A compiled shader as a draw takes it: its machine code (padded as the GPU prefetches past it) and what the draw
+/// sets up for it
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Xe3Shader {
+    pub stage: ShaderStage,
+    pub inputs: u32,
+    pub varyings: u32,
+    pub targets: u32,
+    pub omask: bool,
+    pub imask: bool,
+    pub bindings: u32,
+    pub buffers: u32,
+    /// the system values the vertex fetcher writes after the attributes: 1 the vertex index, 2 the instance index
+    pub system: u32,
+    pub code: Vec<u8>,
+}
+
+impl Xe3Shader {
+    /// Kernel `op` of `body` (an `xe3.kernel` the shader pipeline left): its head and its code encoded
+    pub fn of(body: &Body<'_>, op: OpId) -> Result<Xe3Shader, Error> {
+        let h = body.head::<Xe3Kernel>(op)?;
+        let stage = h.stage.ok_or_else(|| Error("a kernel with no stage".into()))?;
+        let code = Xe3Code::padded(&body.operation(op))?;
+        Ok(Xe3Shader {
+            stage,
+            inputs: h.inputs.unwrap_or(0),
+            varyings: h.varyings.unwrap_or(0),
+            targets: h.targets.unwrap_or(1),
+            omask: h.omask.unwrap_or(false),
+            imask: h.imask.unwrap_or(false),
+            bindings: h.bindings.unwrap_or(0),
+            buffers: h.buffers.unwrap_or(0),
+            system: h.system.unwrap_or(0),
+            code,
+        })
+    }
+
+    /// Its bytes in a program: the fields as little-endian u32s, the code's length, the code
+    pub fn write(&self, out: &mut Vec<u8>) {
+        let stage = match self.stage {
+            ShaderStage::Vertex => 0,
+            ShaderStage::Fragment => 1,
+            _ => 2,
+        };
+        let fields = [stage, self.inputs, self.varyings, self.targets, u32::from(self.omask), u32::from(self.imask), self.bindings, self.buffers, self.system];
+        for f in fields.into_iter().chain([self.code.len() as u32]) {
+            out.extend(f.to_le_bytes());
+        }
+        out.extend(&self.code);
+    }
+
+    /// One read from `bytes` (`write`'s), which then start after it
+    pub fn read(bytes: &mut &[u8]) -> Result<Xe3Shader, Error> {
+        let short = || Error("a program cut short".into());
+        let mut words = [0u32; 10];
+        for w in &mut words {
+            let (head, rest) = bytes.split_first_chunk::<4>().ok_or_else(short)?;
+            *w = u32::from_le_bytes(*head);
+            *bytes = rest;
+        }
+        let [stage, inputs, varyings, targets, omask, imask, bindings, buffers, system, len] = words;
+        let (code, rest) = bytes.split_at_checked(len as usize).ok_or_else(short)?;
+        *bytes = rest;
+        let stage = match stage {
+            0 => ShaderStage::Vertex,
+            1 => ShaderStage::Fragment,
+            s => return Err(Error(format!("a shader of stage {s}"))),
+        };
+        Ok(Xe3Shader { stage, inputs, varyings, targets, omask: omask != 0, imask: imask != 0, bindings, buffers, system, code: code.to_vec() })
+    }
+}
+
+/// A draw shape on Xe3, not yet in memory (`Xe3Draw::shape`): its states, each on its alignment in the order given
+/// (the named ones pointed at by name), the draw's state as a second-level batch, the flush as another, and the
+/// commands a device writes for each draw. Holes neither names: `vs`, `fs` (the program's code), `surfaces` (the
+/// binding table pool), `surfaces::bt` and `surfaces::bt_null` (a binding table of null surfaces in it, by offset)
+pub struct Xe3Shape {
+    pub states: Vec<(Option<&'static str>, u32, Template)>,
+    pub state: Vec<Template>,
+    pub flush: Vec<Template>,
     pub commands: Xe3DrawCommands,
-    /// the binding table pool (`SURFACES`): its address, and from which offset in it the device may write
-    pub pool: u64,
-    pub pool_free: u64,
-    /// the null surface's address
-    pub null: u64,
+}
+
+impl Xe3Shape {
+    /// Where its states go, its state batch, its flush, and its end, in bytes from its start
+    fn offsets(&self) -> (Vec<usize>, usize, usize, usize) {
+        let mut at = 0usize;
+        let mut offsets = Vec::with_capacity(self.states.len());
+        for (_, align, t) in &self.states {
+            at = at.next_multiple_of(*align as usize);
+            offsets.push(at);
+            at += 4 * t.dw.len();
+        }
+        let len = |ts: &[Template]| ts.iter().map(|t| 4 * t.dw.len()).sum::<usize>();
+        let state = at.next_multiple_of(STATE_ALIGN as usize);
+        let flush = (state + len(&self.state)).next_multiple_of(STATE_ALIGN as usize);
+        (offsets, state, flush, flush + len(&self.flush))
+    }
+
+    /// The bytes it takes
+    pub fn bytes(&self) -> usize {
+        self.offsets().3
+    }
+
+    /// Where its parts go from `base`: its states, then the state batch, then the flush (each on 64 bytes): its
+    /// bytes, and the batches' offsets in them. A hole not its own takes `outer`'s value
+    pub fn lay(&self, base: u64, outer: impl Fn(&str) -> Option<u64>) -> Result<(Vec<u8>, usize, usize), Error> {
+        let (offsets, state, flush, end) = self.offsets();
+        let placed: Vec<(Option<&'static str>, usize)> = self.states.iter().zip(offsets).map(|((n, _, _), at)| (*n, at)).collect();
+        let value = |h: &str| -> Result<u64, Error> {
+            if let Some((_, off)) = placed.iter().find(|(n, _)| *n == Some(h)) {
+                return Ok(base + *off as u64);
+            }
+            outer(h).ok_or_else(|| Error(format!("a hole @{h} nothing fills")))
+        };
+        let mut dw = Vec::with_capacity(end / 4);
+        let fill = |t: &Template, at: usize, dw: &mut Vec<u32>| -> Result<(), Error> {
+            dw.resize(at / 4, 0);
+            let values = t.holes.iter().map(|h| value(&h.name)).collect::<Result<Vec<u64>, _>>()?;
+            t.emit_indexed(dw, |i| values[i]);
+            Ok(())
+        };
+        for ((_, _, t), (_, off)) in self.states.iter().zip(&placed) {
+            fill(t, *off, &mut dw)?;
+        }
+        let mut at = state;
+        for t in &self.state {
+            fill(t, at, &mut dw)?;
+            at += 4 * t.dw.len();
+        }
+        let mut at = flush;
+        for t in &self.flush {
+            fill(t, at, &mut dw)?;
+            at += 4 * t.dw.len();
+        }
+        Ok((dw.iter().flat_map(|d| d.to_le_bytes()).collect(), state, flush))
+    }
+}
+
+/// What a device sets up once for all its draw shapes: the context and the binding table pool's start
+pub struct Xe3Device;
+
+impl Xe3Device {
+    /// Entries of the pool's binding table of null surfaces: more than any draw binds
+    pub const NULL_TABLE: usize = 64;
+    /// Where the binding table of null surfaces is in the pool (the null surface at its start)
+    pub const NULL_TABLE_AT: u64 = SURFACE_ALIGN as u64;
+    /// Bytes the pool's static part takes: what a device writes in it goes after
+    pub const POOL_STATIC: u64 = Xe3Device::NULL_TABLE_AT + 4 * Xe3Device::NULL_TABLE as u64;
+    /// The pool's alignment
+    pub const POOL_ALIGN: u64 = POOL as u64;
+
+    /// The binding table pool's static part, the pool at `pool`: the null surface, then a binding table of it
+    pub fn pool(pool: u64) -> Result<Vec<u8>, Error> {
+        let null = Xe3Draw::template(&xe3!(StateRenderSurfaceState { surface_type: XE3_SURFTYPE_NULL, surface_format: SurfaceFormat::R32_UINT, mocs: MOCS }))?;
+        let entry = Xe3Draw::template(&xe3!(StateBindingTableState { surface_state_pointer: A::sym(Xe3Draw::NULL) }))?;
+        let mut dw = null.dw.clone();
+        dw.resize(Xe3Device::NULL_TABLE_AT as usize / 4, 0);
+        for _ in 0..Xe3Device::NULL_TABLE {
+            entry.emit_indexed(&mut dw, |_| pool);
+        }
+        Ok(dw.iter().flat_map(|d| d.to_le_bytes()).collect())
+    }
+
+    /// The context stream (a first-level batch, ended), its system memory fence at `fence`
+    pub fn context(fence: u64) -> Result<Vec<u8>, Error> {
+        let mut me = Xe3Draw::default();
+        me.context();
+        me.end_batch();
+        let state = core::mem::take(&mut me.cmds);
+        me.finish()?;
+        let mut dw = Vec::new();
+        for t in &state {
+            let values = t.holes.iter().map(|h| if h.name == Xe3Draw::FENCE { Ok(fence) } else { Err(Error(format!("a hole @{} in the context", h.name))) }).collect::<Result<Vec<u64>, _>>()?;
+            t.emit_indexed(&mut dw, |i| values[i]);
+        }
+        Ok(dw.iter().flat_map(|d| d.to_le_bytes()).collect())
+    }
 }
 
 /// What changes from draw to draw of one image, as templates whose holes a device fills in: the primitive (holes
@@ -268,16 +429,15 @@ pub struct Xe3DrawCommands {
     pub barrier: Template,
 }
 
-/// A draw on Xe3: the program's kernels (in the module, as the shader pipeline leaves them), the state, the commands
-/// and the memories, as one image
-pub struct Xe3Draw<'b, 'a> {
-    body: &'b mut Body<'a>,
-    code: BlockId,
-    surfaces: BlockId,
-    batch: BlockId,
+/// A draw shape on Xe3 being built: its states and its batch's commands, as templates; the first error packing one
+#[derive(Default)]
+pub struct Xe3Draw {
+    states: Vec<(Option<&'static str>, u32, Template)>,
+    cmds: Vec<Template>,
+    err: Option<Error>,
 }
 
-impl<'a> Xe3Draw<'_, 'a> {
+impl Xe3Draw {
     /// SPIR-V vertex and fragment shaders (spirv.module ops at the top of the module) to Xe3 kernels
     pub const SHADERS: &'static str = "builtin.module(xevm-attach-target{chip=ptl}, convert-spirv-entry-points, gpu-inline-calls, convert-spirv-cf-to-cf, sroa, mem2reg, gpu-local-arrays, mem2reg, lift-cf-to-scf, canonicalize, cse, convert-gpu-to-xe3, xe3-regalloc, xe3-control, xe3-swsb, xe3-branches, xe3-pad)";
     /// A surface state's alignment, and a binding table's
@@ -285,12 +445,7 @@ impl<'a> Xe3Draw<'_, 'a> {
     /// A scissor rectangle's alignment: 64 bytes. genxml's pointer keeps bits 5 and up, but on Xe3 (Panther Lake) a
     /// rectangle 32 bytes past a 64-byte boundary is not the one the draw uses
     pub const SCISSOR_ALIGN: u64 = 64;
-    const CODE: &'static str = "code";
     const SURFACES: &'static str = "surfaces";
-    /// The stream of the draw: run for every draw
-    pub const BATCH: &'static str = "batch";
-    /// The stream setting up the context (base addresses, modes): run once on a queue, before its first draw
-    pub const INIT: &'static str = "init";
     const FENCE: &'static str = "fence";
     const NULL: &'static str = "null_surface";
     const BT_NULL: &'static str = "bt_null";
@@ -308,7 +463,7 @@ impl<'a> Xe3Draw<'_, 'a> {
 
     /// The module's top-level spirv.module ops moved into a gpu.module (what convert-spirv-entry-points takes),
     /// then `SHADERS` run on it
-    pub fn compile(body: &mut Body<'a>, passes: &Passes) -> Result<(), Error> {
+    pub fn compile(body: &mut Body<'_>, passes: &Passes) -> Result<(), Error> {
         let root = body.root;
         let top = body.top_block(root);
         let modules: Vec<OpId> = body.ops(top).filter(|&m| &*body[m].name == "spirv.module").collect();
@@ -332,7 +487,7 @@ impl<'a> Xe3Draw<'_, 'a> {
 
     /// A spirv.module's stage and the built-in inputs of its entry point, in the order convert-spirv-entry-points
     /// gives them its function's first arguments (they have no location: they sort first, in interface order)
-    fn builtins(body: &Body<'a>, module: OpId) -> Option<(ShaderStage, Vec<String>)> {
+    fn builtins(body: &Body<'_>, module: OpId) -> Option<(ShaderStage, Vec<String>)> {
         let top = body.top_block(module);
         let entry = body.ops(top).find(|&e| &*body[e].name == "spirv.EntryPoint")?;
         let stage = match body[entry].get("execution_model")?.to_string() {
@@ -354,67 +509,25 @@ impl<'a> Xe3Draw<'_, 'a> {
         (!names.is_empty()).then_some((stage, names))
     }
 
-    /// The image of a draw shaped as `d`, built in `body` (a module `compile` left one vertex and one fragment
-    /// kernel in) and laid out from `base` (below 4 GiB): the same for every draw of that program and state,
-    /// whatever its target's memory, vertices, uniforms, counts and scissor. Its stream `INIT` sets the context up;
-    /// `BATCH` is two second-level batches: the draw's state (from its start: the whole target as the scissor, every
-    /// binding table entry the null surface) and the flush (`flush`). A first-level batch runs the state, then for
-    /// each of a run of these draws the commands its target, uniforms, vertices, scissor and counts need
-    /// (`commands`), then a flush
-    pub fn image(body: &'_ mut Body<'a>, d: &Draw<'_>, base: u64) -> Result<Xe3DrawImage, Error> {
-        let root = body.root;
-        let kernels = Kernels::all(body, root, Xe3Kernel::NAME);
-        let code = Xe3Draw::memory(body, &ImageMemory::named(Xe3Draw::CODE, MemType::Streaming))?;
-        let batch_memory = Xe3Draw::memory(body, &ImageMemory::named(Xe3Draw::BATCH, MemType::Streaming))?;
-        let init = Xe3Draw::container(body, batch_memory, OpData::head(&ImageStream::named(Xe3Draw::INIT))?);
-        let batch = Xe3Draw::container(body, batch_memory, OpData::head(&ImageStream::named(Xe3Draw::BATCH))?);
-        let pool = ImageMemory { size: Some(u64::from(POOL)), align: Some(u64::from(POOL)), ..ImageMemory::named(Xe3Draw::SURFACES, MemType::Streaming) };
-        let surfaces = Xe3Draw::memory(body, &pool)?;
-        let (mut vs, mut fs) = (None, None);
-        for k in kernels {
-            let h = body.head::<Xe3Kernel>(k)?;
-            let name = match h.stage {
-                Some(ShaderStage::Vertex) if vs.is_none() => Xe3Draw::VS,
-                Some(ShaderStage::Fragment) if fs.is_none() => Xe3Draw::FS,
-                s => return Err(Error(format!("a draw runs one vertex and one fragment kernel, not {s:?}"))),
-            };
-            *if name == Xe3Draw::VS { &mut vs } else { &mut fs } = Some(h);
-            body[k].set(Symbol::ATTR, Attribute::str(name));
-            body.detach(k);
-            body.insert(k, code, None);
+    /// The shape of draws like `d` of the program `vs` and `fs` are: the same for every draw of that program and
+    /// state, whatever its target's memory, vertices, uniforms, textures, counts and scissor. Its state batch sets the
+    /// whole target as the scissor and every binding table entry the null surface; a first-level batch runs it, then
+    /// for each of a run of these draws the commands its target, uniforms, vertices, scissor and counts need
+    /// (`commands`), then the flush
+    pub fn shape(d: &Draw<'_>, vs: &Xe3Shader, fs: &Xe3Shader) -> Result<Xe3Shape, Error> {
+        if vs.stage != ShaderStage::Vertex || fs.stage != ShaderStage::Fragment {
+            return Err(Error(format!("a draw runs a vertex and a fragment shader, not {:?} and {:?}", vs.stage, fs.stage)));
         }
-        let shader_modules: Vec<OpId> = body.ops(body.top_block(root)).filter(|&o| &*body[o].name == "gpu.module").collect();
-        for s in shader_modules {
-            body.detach(s);
-        }
-        let (Some(vs), Some(fs)) = (vs, fs) else { return Err(Error("a draw needs a vertex and a fragment kernel".into())) };
-        let mut me = Xe3Draw { body, code, surfaces, batch: init };
-        me.put(code, &ImageData { align: Some(FENCE_ALIGN), ..ImageData::zeros(Xe3Draw::FENCE, FENCE_SIZE) });
-        let null = me.null_surface();
-        me.put(batch_memory, &ImageData::zeros("prefetch", CS_PREFETCH));
-        me.context();
-        me.batch = batch;
-        let vs_buffers = me.draw(d, &vs, &fs)?;
-        let flush = me.second_level_end();
+        let mut me = Xe3Draw::default();
+        let vs_buffers = me.draw(d, vs, fs)?;
+        me.end_batch();
+        let state = core::mem::take(&mut me.cmds);
         me.pc_flush();
-        Xe3Batch::end(body, root);
-        ImageLayout(&Xe3Image).run_at(body, root, base)?;
-        let ops = body.block_ops(batch);
-        let flush = 4 * ops[..flush].iter().map(|c| Pack(XE3).template(&body[*c].name, &body[*c].all_attrs()).map_or(0, |t| t.dw.len() as u64)).sum::<u64>();
-        let offset = |o: OpId| body[o].get(ImagePlaced::OFFSET).map(Attrs::as_int).transpose().map(|v| v.unwrap_or(0) as u64);
-        let null = offset(null)?;
-        let mut pool_free = 0;
-        for o in body.block_ops(surfaces) {
-            pool_free = pool_free.max(offset(o)? + Xe3Draw::SURFACE_ALIGN);
-        }
-        let image = XE3_IMAGE.emit(body, root)?;
-        let start = image.stream_named(Xe3Draw::BATCH).ok_or_else(|| Error(format!("no stream {} in the image", Xe3Draw::BATCH)))?;
-        let pool = image.segments.iter().find(|s| s.name == Xe3Draw::SURFACES).map(|s| s.addr).ok_or_else(|| Error(format!("no memory {}", Xe3Draw::SURFACES)))?;
-        if pool_free >= u64::from(POOL) / 2 {
-            return Err(Error(format!("the binding table pool's static part takes {pool_free} bytes")));
-        }
-        let commands = Xe3Draw::commands(d, vs_buffers)?;
-        Ok(Xe3DrawImage { state: start, flush: start + flush, image, commands, pool, pool_free: u64::from(POOL) / 2, null: pool + null })
+        me.end_batch();
+        let flush = core::mem::take(&mut me.cmds);
+        let states = core::mem::take(&mut me.states);
+        me.finish()?;
+        Ok(Xe3Shape { states, state, flush, commands: Xe3Draw::commands(d, vs_buffers)? })
     }
 
     /// An op's dwords, its symbols left as holes
@@ -598,47 +711,35 @@ impl<'a> Xe3Draw<'_, 'a> {
         if sw == 0 || sh == 0 { [1, 1, 0, 0] } else { [sx, sy, sx + sw - 1, sy + sh - 1] }
     }
 
-    /// The batch so far ended as a second-level batch (MI_BATCH_BUFFER_END, a qword's padding): the number of
-    /// commands before the next one
-    fn second_level_end(&mut self) -> usize {
+    /// The batch so far ended (MI_BATCH_BUFFER_END, padded to a qword)
+    fn end_batch(&mut self) {
         self.cmd(&CmdMiBatchBufferEnd::default());
-        let dw: usize = self.body.block_ops(self.batch).iter().map(|c| Pack(XE3).template(&self.body[*c].name, &self.body[*c].all_attrs()).map_or(0, |t| t.dw.len())).sum();
-        if !dw.is_multiple_of(2) {
+        if !self.cmds.iter().map(|t| t.dw.len()).sum::<usize>().is_multiple_of(2) {
             self.cmd(&CmdMiNoop::default());
         }
-        self.body.block_ops(self.batch).len()
     }
 
-    fn container(body: &mut Body<'a>, block: BlockId, data: OpData<'a>) -> BlockId {
-        let op = body.create(data, &[]);
-        let r = body.add_region(op);
-        let inner = body.add_block(r, &[]);
-        body.insert(op, block, None);
-        inner
+    /// The first error packing a command or state, if one did not pack
+    fn finish(self) -> Result<(), Error> {
+        self.err.map_or(Ok(()), Err)
     }
 
-    fn memory(body: &mut Body<'a>, m: &ImageMemory<'_>) -> Result<BlockId, Error> {
-        let top = body.top_block(body.root);
-        Ok(Xe3Draw::container(body, top, OpData::head(m)?))
-    }
-
-    fn put(&mut self, block: BlockId, op: &impl TypedOp) -> OpId {
-        let (data, _) = op.split();
-        let o = self.body.create(data, &[]);
-        self.body.insert(o, block, None);
-        o
+    fn pack(&mut self, op: &impl TypedOp) -> Template {
+        Xe3Draw::template(op).unwrap_or_else(|e| {
+            self.err.get_or_insert(e);
+            Template::default()
+        })
     }
 
     fn cmd(&mut self, op: &impl TypedOp) {
-        self.put(self.batch, op);
+        let t = self.pack(op);
+        self.cmds.push(t);
     }
 
-    /// A state placed under `name`, aligned to `align` bytes, in the pool (`surfaces`) or with the code
-    fn state(&mut self, surfaces: bool, name: &str, align: u32, op: &impl TypedOp) -> OpId {
-        let o = self.put(if surfaces { self.surfaces } else { self.code }, op);
-        self.body[o].set(Symbol::ATTR, Attribute::str(name));
-        self.body[o].set(ImagePlaced::ALIGN, A::from(align).into());
-        o
+    /// A state, under `name` when one points at it, on `align` bytes after the last
+    fn place(&mut self, name: Option<&'static str>, align: u32, op: &impl TypedOp) {
+        let t = self.pack(op);
+        self.states.push((name, align, t));
     }
 
     /// Vertex buffer `i`'s hole in `Xe3DrawCommands::vertex_buffers` (its size's: with `_size`)
@@ -670,7 +771,7 @@ impl<'a> Xe3Draw<'_, 'a> {
         if bindings > SAMPLERS_MAX {
             return Err(Error(format!("a draw on Xe3 samples at most {SAMPLERS_MAX} bindings, the shader {bindings}")));
         }
-        self.state(false, Xe3Draw::BORDER, BORDER_ALIGN, &StateSamplerBorderColorState::default());
+        self.place(Some(Xe3Draw::BORDER), BORDER_ALIGN, &StateSamplerBorderColorState::default());
         for b in 0..bindings {
             let t = d.textures.iter().find(|t| t.binding == b);
             let (filter, wrap) = t.map_or((Filter::Nearest, Wrap::ClampToEdge), |t| (t.filter, t.wrap));
@@ -695,13 +796,8 @@ impl<'a> Xe3Draw<'_, 'a> {
                 sampler_disable: t.is_none(),
             });
             match b {
-                0 => {
-                    self.state(false, Xe3Draw::SAMPLERS, SAMPLER_ALIGN, &state);
-                }
-                _ => {
-                    let o = self.put(self.code, &state);
-                    self.body[o].set(ImagePlaced::ALIGN, A::from(SAMPLER_ENTRY_ALIGN).into());
-                }
+                0 => self.place(Some(Xe3Draw::SAMPLERS), SAMPLER_ALIGN, &state),
+                _ => self.place(None, SAMPLER_ENTRY_ALIGN, &state),
             }
         }
         self.cmd(&xe3!(Cmd3dstateSamplerStatePointersPs { pointer_to_ps_sampler_state: A::sym(Xe3Draw::SAMPLERS) }));
@@ -765,26 +861,6 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.pc_flush();
     }
 
-    /// The null surface, and a binding table of it alone: the null surface's op
-    fn null_surface(&mut self) -> OpId {
-        let null = self.state(true, Xe3Draw::NULL, SURFACE_ALIGN, &xe3!(StateRenderSurfaceState { surface_type: XE3_SURFTYPE_NULL, surface_format: SurfaceFormat::R32_UINT, mocs: MOCS }));
-        self.state(true, Xe3Draw::BT_NULL, SURFACE_ALIGN, &xe3!(StateBindingTableState { surface_state_pointer: A::sym(Xe3Draw::NULL) }));
-        null
-    }
-
-    /// A binding table of `entries` entries, each the null surface (a draw's commands bind its own)
-    fn binding_table(&mut self, entries: usize) {
-        for i in 0..entries {
-            let s = xe3!(StateBindingTableState { surface_state_pointer: A::sym(Xe3Draw::NULL) });
-            if i == 0 {
-                self.state(true, Xe3Draw::BT, SURFACE_ALIGN, &s);
-            } else {
-                let o = self.put(self.surfaces, &s);
-                self.body[o].set(ImagePlaced::ALIGN, A::from(ENTRY_ALIGN).into());
-            }
-        }
-    }
-
     /// A draw's viewport states: CC_VIEWPORT and SF_CLIP_VIEWPORT
     fn viewport_states(d: &Draw<'_>) -> (StateCcViewport, StateSfClipViewport) {
         let [x, y, w, h] = d.viewport;
@@ -819,32 +895,32 @@ impl<'a> Xe3Draw<'_, 'a> {
 
     fn viewport(&mut self, d: &Draw<'_>) {
         let (cc, sf_clip) = Xe3Draw::viewport_states(d);
-        self.state(false, Xe3Draw::CC_VIEWPORT, CC_VIEWPORT_ALIGN, &cc);
-        self.state(false, Xe3Draw::SF_CLIP_VIEWPORT, STATE_ALIGN, &sf_clip);
+        self.place(Some(Xe3Draw::CC_VIEWPORT), CC_VIEWPORT_ALIGN, &cc);
+        self.place(Some(Xe3Draw::SF_CLIP_VIEWPORT), STATE_ALIGN, &sf_clip);
         let (x0, y0, x1, y1) = (0, 0, d.target.width - 1, d.target.height - 1);
-        self.state(false, Xe3Draw::SCISSOR, STATE_ALIGN, &xe3!(StateScissorRect { scissor_rectangle_x_min: x0, scissor_rectangle_y_min: y0, scissor_rectangle_x_max: x1, scissor_rectangle_y_max: y1 }));
+        self.place(Some(Xe3Draw::SCISSOR), STATE_ALIGN, &xe3!(StateScissorRect { scissor_rectangle_x_min: x0, scissor_rectangle_y_min: y0, scissor_rectangle_x_max: x1, scissor_rectangle_y_max: y1 }));
     }
 
     /// The draw's state: whether the vertex shader reads buffers (and its binding table is the draw's)
-    fn draw(&mut self, d: &Draw<'_>, vh: &Xe3Kernel<'_>, fh: &Xe3Kernel<'_>) -> Result<bool, Error> {
-        let inputs = vh.inputs.unwrap_or(0);
-        let system = vh.system.unwrap_or(0);
+    fn draw(&mut self, d: &Draw<'_>, vh: &Xe3Shader, fh: &Xe3Shader) -> Result<bool, Error> {
+        let inputs = vh.inputs;
+        let system = vh.system;
         let fetched = inputs + u32::from(system != 0);
-        let varyings = vh.varyings.unwrap_or(0);
+        let varyings = vh.varyings;
         if inputs as usize != d.elements.len() {
             return Err(Error(format!("the vertex shader reads {inputs} inputs, the draw gives {}", d.elements.len())));
         }
-        if fh.targets.unwrap_or(1) != 1 {
+        if fh.targets != 1 {
             return Err(Error("a draw on Xe3: one color target".into()));
         }
-        let bindings = fh.bindings.unwrap_or(0);
+        let bindings = fh.bindings;
         if bindings > 0 && d.textures.is_empty() {
             return Err(Error(format!("the fragment shader samples bindings below {bindings}, the draw gives no texture")));
         }
         self.viewport(d);
         let blend = d.blend.unwrap_or_default();
         let [red, green, blue, alpha] = blend.color;
-        self.state(false, Xe3Draw::COLOR_CALC, STATE_ALIGN, &xe3!(StateColorCalcState {
+        self.place(Some(Xe3Draw::COLOR_CALC), STATE_ALIGN, &xe3!(StateColorCalcState {
             alpha_test_format: ALPHA_TEST_FLOAT,
             blend_constant_color_red: red,
             blend_constant_color_green: green,
@@ -852,13 +928,13 @@ impl<'a> Xe3Draw<'_, 'a> {
             blend_constant_color_alpha: alpha,
         }));
         let independent = blend.src[0] != blend.src[1] || blend.dst[0] != blend.dst[1] || blend.equation[0] != blend.equation[1];
-        self.state(false, Xe3Draw::BLEND, STATE_ALIGN, &xe3!(StateBlendState {
+        self.place(Some(Xe3Draw::BLEND), STATE_ALIGN, &xe3!(StateBlendState {
             alpha_test_function: ALPHA_TEST_NEVER_USED,
             independent_alpha_blend_enable: independent,
         }));
         let [rgb, alpha] = [XeBlend::factors(&blend, 0), XeBlend::factors(&blend, 1)];
         let [r, g, b, a] = d.color_mask;
-        let entry = self.put(self.code, &xe3!(StateBlendStateEntry {
+        self.place(None, ENTRY_ALIGN, &xe3!(StateBlendStateEntry {
             write_disable_red: !r,
             write_disable_green: !g,
             write_disable_blue: !b,
@@ -875,14 +951,15 @@ impl<'a> Xe3Draw<'_, 'a> {
             color_clamp_range: XE3_COLORCLAMP_RTFORMAT,
             simple_float_blend_enable: true,
         }));
-        self.body[entry].set(ImagePlaced::ALIGN, A::from(ENTRY_ALIGN).into());
 
         let entries = Xe3Draw::entries(d).len();
+        if entries > Xe3Device::NULL_TABLE {
+            return Err(Error(format!("a draw binding {entries} binding table entries, more than {}", Xe3Device::NULL_TABLE)));
+        }
         let table = entries as u32;
-        self.binding_table(entries);
         let bt = || A::within(Xe3Draw::SURFACES, Xe3Draw::BT);
         let null = || A::within(Xe3Draw::SURFACES, Xe3Draw::BT_NULL);
-        let vs_buffers = vh.buffers.unwrap_or(0) > 0;
+        let vs_buffers = vh.buffers > 0;
 
         self.cmd(&xe3!(Cmd3dstateViewportStatePointersCc { cc_viewport_pointer: A::sym(Xe3Draw::CC_VIEWPORT) }));
         self.cmd(&xe3!(Cmd3dstateViewportStatePointersSfClip { sf_clip_viewport_pointer: A::sym(Xe3Draw::SF_CLIP_VIEWPORT) }));
@@ -926,8 +1003,8 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.cmd(&Cmd3dstateTe::default());
         self.cmd(&Cmd3dstateDs::default());
         self.cmd(&Cmd3dstateGs::default());
-        let imask = fh.imask.unwrap_or(false);
-        let fragment_inputs = fh.inputs.unwrap_or(0);
+        let imask = fh.imask;
+        let fragment_inputs = fh.inputs;
         let setup = if fragment_inputs > 0 { Interpolate::setup(imask) } else { 1 + u8::from(imask) };
         self.cmd(&xe3!(Cmd3dstatePs {
             kernel_0_enable: true,
@@ -941,7 +1018,7 @@ impl<'a> Xe3Draw<'_, 'a> {
             kernel_0_poly_packing_policy: XE3_POLY_PACK16_FIXED,
             vector_mask_enable: false,
         }));
-        self.cmd(&xe3!(Cmd3dstatePsExtra { pixel_shader_valid: true, omask_present_to_render_target: fh.omask.unwrap_or(false), input_coverage_mask_state: u32::from(imask) }));
+        self.cmd(&xe3!(Cmd3dstatePsExtra { pixel_shader_valid: true, omask_present_to_render_target: fh.omask, input_coverage_mask_state: u32::from(imask) }));
         self.cmd(&Cmd3dstateStreamout::default());
         self.cmd(&xe3!(Cmd3dstateClip {
             api_mode: XE3_APIMODE_D3D,

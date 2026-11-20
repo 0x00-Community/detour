@@ -12,7 +12,7 @@ const TO_SPIRV: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=v
 pub struct Gpu<'t> {
     pub tools: &'t Toolchain<'t>,
     pub device: Device<'t>,
-    programs: RefCell<HashMap<(String, String), &'t Compiled<'t>>>,
+    programs: RefCell<HashMap<(String, String), &'t Compiled>>,
 }
 
 /// One draw: what `Draw` takes, owned
@@ -66,7 +66,7 @@ impl<'t> Gpu<'t> {
     }
 
     /// The program of these shaders, compiled once
-    pub fn program(&self, vs: &str, fs: &str) -> Result<&'t Compiled<'t>, String> {
+    pub fn program(&self, vs: &str, fs: &str) -> Result<&'t Compiled, String> {
         let key = (vs.to_owned(), fs.to_owned());
         if let Some(p) = self.programs.borrow().get(&key) {
             return Ok(p);
@@ -79,7 +79,7 @@ impl<'t> Gpu<'t> {
         let text = self.tools.show(&body);
         let bin = self.tools.program(&text).map_err(|e| format!("compiling: {}", e.0))?;
         let bin: &'t [u8] = Box::leak(bin.into_boxed_slice());
-        let compiled: &'t Compiled<'t> = Box::leak(Box::new(self.tools.load(bin).map_err(|e| format!("loading: {}", e.0))?));
+        let compiled: &'t Compiled = Box::leak(Box::new(self.tools.load(bin).map_err(|e| format!("loading: {}", e.0))?));
         self.programs.borrow_mut().insert(key, compiled);
         Ok(compiled)
     }

@@ -117,7 +117,7 @@ fn quad([u0, v0, u1, v1]: [f32; 4]) -> Vec<u8> {
 #[allow(clippy::too_many_arguments, reason = "a draw's few knobs")]
 fn draw(
     device: &Device<'_>,
-    program: &Compiled<'_>,
+    program: &Compiled,
     texture: Surface,
     filter: Filter,
     wrap: Wrap,
@@ -163,7 +163,7 @@ fn compare(got: &[u8], want: &[u8], width: u32, tolerance: u8) -> Result<(), Str
     }
 }
 
-fn run(device: &Device<'_>, program: &Compiled<'_>, c: &Case) -> Result<(), String> {
+fn run(device: &Device<'_>, program: &Compiled, c: &Case) -> Result<(), String> {
     let texture = device.surface(&c.texture.target()).map_err(|e| e.0)?;
     let size = [c.width, c.height];
     let surface = target(device, size, Tiling::Tile4)?;
@@ -174,7 +174,7 @@ fn run(device: &Device<'_>, program: &Compiled<'_>, c: &Case) -> Result<(), Stri
 }
 
 /// A texture drawn into surface `b`, `b` sampled into `c`, in one batch: `c` is the texture
-fn render_to_texture(device: &Device<'_>, program: &Compiled<'_>) -> Result<(), String> {
+fn render_to_texture(device: &Device<'_>, program: &Compiled) -> Result<(), String> {
     let t = Texture::new(16, 16, ColorFormat::Rgba8Unorm, Tiling::Linear, 7);
     let a = device.surface(&t.target()).map_err(|e| e.0)?;
     let size = [16, 16];
@@ -189,7 +189,7 @@ fn render_to_texture(device: &Device<'_>, program: &Compiled<'_>) -> Result<(), 
 }
 
 /// Texture `a` sampled into `c`, then `a` drawn over (sampling `d`) in the same batch: `c` holds `a` as it was
-fn sample_then_overwrite(device: &Device<'_>, program: &Compiled<'_>) -> Result<(), String> {
+fn sample_then_overwrite(device: &Device<'_>, program: &Compiled) -> Result<(), String> {
     let (ta, td) = (Texture::new(64, 64, ColorFormat::Rgba8Unorm, Tiling::Tile4, 21), Texture::new(64, 64, ColorFormat::Rgba8Unorm, Tiling::Tile4, 22));
     let (a, d) = (device.surface(&ta.target()).map_err(|e| e.0)?, device.surface(&td.target()).map_err(|e| e.0)?);
     let size = [64, 64];
@@ -204,7 +204,7 @@ fn sample_then_overwrite(device: &Device<'_>, program: &Compiled<'_>) -> Result<
 }
 
 /// A texture's part written, then sampled: the part new, the rest as it was
-fn write_part(device: &Device<'_>, program: &Compiled<'_>) -> Result<(), String> {
+fn write_part(device: &Device<'_>, program: &Compiled) -> Result<(), String> {
     let mut t = Texture::new(32, 16, ColorFormat::R8Unorm, Tiling::Tile4, 3);
     let texture = device.surface(&t.target()).map_err(|e| e.0)?;
     let size = [32, 16];

@@ -2,7 +2,7 @@
 //! with `Device::draw`: each case under examples/cases that sets no uniforms, its GLSL made SPIR-V MLIR text by
 //! detour's front end, compiled twice (the bytes must be the same), loaded, drawn, and compared byte for byte with the
 //! same SPIR-V compiled in place (`Toolchain::compile`) and drawn. A program for another detour or GPU, and bytes that
-//! are not one, must be refused. A case's `resources` has a line per vertex input, `attribute NAME LOCATION N V...`
+//! are not one (cut short, or with bytes past its end), must be refused. A case's `resources` has a line per vertex input, `attribute NAME LOCATION N V...`
 //! (three vertices of N floats); a case with a `uniform` line is left out.
 //!
 //!   cargo run --release --example program [CASE...]      (DETOUR_SPIRV=DIR: the SPIR-V MLIR text of each case there)
@@ -10,7 +10,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use detour::{ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
+use detour::{
+    ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat,
+};
 use mlirpass::{Body, GlslReader, GlslStage};
 
 const SIZE: u32 = 64;
@@ -64,16 +66,16 @@ fn spirv<'t>(dir: &Path, tools: &'t Toolchain<'t>) -> Result<(Body<'t>, String, 
 }
 
 /// The case compiled ahead of time and loaded
-fn loaded<'t>(text: &str, tools: &'t Toolchain<'t>, program: &'t mut Vec<u8>) -> Result<Compiled<'t>, String> {
-    *program = tools.program(text).map_err(|e| e.0)?;
-    if tools.program(text).map_err(|e| e.0)? != *program {
+fn loaded(text: &str, tools: &Toolchain<'_>) -> Result<Compiled, String> {
+    let program = tools.program(text).map_err(|e| e.0)?;
+    if tools.program(text).map_err(|e| e.0)? != program {
         return Err("compiled twice, two different programs".into());
     }
-    tools.load(program).map_err(|e| e.0)
+    tools.load(&program).map_err(|e| e.0)
 }
 
 /// `compiled` drawn with the case's vertex inputs, read back
-fn draw(compiled: &Compiled<'_>, inputs: &[(u32, Vec<f32>)], device: &Device<'_>) -> Result<Vec<u8>, String> {
+fn draw(compiled: &Compiled, inputs: &[(u32, Vec<f32>)], device: &Device<'_>) -> Result<Vec<u8>, String> {
     let bytes: Vec<Vec<u8>> = inputs.iter().map(|(_, v)| v.iter().flat_map(|f| f.to_le_bytes()).collect()).collect();
     let mut elements = Vec::new();
     for (i, (n, _)) in inputs.iter().enumerate() {
@@ -107,11 +109,19 @@ fn draw(compiled: &Compiled<'_>, inputs: &[(u32, Vec<f32>)], device: &Device<'_>
 
 /// What `load` must refuse
 fn refusals(text: &str, tools: &Toolchain<'_>) -> Result<(), String> {
-    let program = String::from_utf8(tools.program(text).map_err(|e| e.0)?).map_err(|e| e.to_string())?;
-    let version = program.lines().nth(1).unwrap_or_default().to_owned();
-    let others = [program.replacen(&format!("\n{version}\n"), "\n0.0.0-other\n", 1), program.replacen("\nxe3\n", "\nrdna2\n", 1), "not a program".into(), program[..program.len() / 2].to_owned()];
-    for (what, bytes) in ["another detour", "another GPU", "not a program", "cut short"].iter().zip(others) {
-        if tools.load(bytes.as_bytes()).is_ok() {
+    let program = tools.program(text).map_err(|e| e.0)?;
+    let lines: Vec<&[u8]> = program.splitn(4, |b| *b == b'\n').collect();
+    let [magic, _, gpu, rest] = lines[..] else { return Err("a program without its three header lines".into()) };
+    let with = |version: &[u8], gpu: &[u8], rest: &[u8]| [magic, version, gpu, rest].join(&b'\n');
+    let others = [
+        with(b"0.0.0-other", gpu, rest),
+        with(env!("CARGO_PKG_VERSION").as_bytes(), b"rdna2", rest),
+        b"not a program".to_vec(),
+        program[..program.len() - 1].to_vec(),
+        [&program[..], b"\0"].concat(),
+    ];
+    for (what, bytes) in ["another detour", "another GPU", "not a program", "cut short", "bytes past its end"].iter().zip(others) {
+        if tools.load(&bytes).is_ok() {
             return Err(format!("{what}: loaded"));
         }
     }
@@ -142,8 +152,7 @@ fn main() {
                 refusals(&text, &tools)?;
                 refused = true;
             }
-            let mut program = Vec::new();
-            let ours = draw(&loaded(&text, &tools, &mut program)?, &inputs, &device)?;
+            let ours = draw(&loaded(&text, &tools)?, &inputs, &device)?;
             let compiled = tools.compile(body).map_err(|e| e.0)?;
             match ours == draw(&compiled, &inputs, &device)? {
                 true => Ok(format!("ok ({} bytes)", ours.len())),

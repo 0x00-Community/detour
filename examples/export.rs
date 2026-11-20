@@ -84,7 +84,7 @@ fn target(tiling: Tiling) -> ColorTarget<'static> {
 }
 
 /// A quad over the whole target, `COLOR`
-fn fill(device: &Device<'_>, program: &Compiled<'_>, s: detour::Surface, tiling: Tiling) -> Result<(), String> {
+fn fill(device: &Device<'_>, program: &Compiled, s: detour::Surface, tiling: Tiling) -> Result<(), String> {
     let mut v = Vec::new();
     for (x, y) in [(-1.0f32, -1.0f32), (1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
         v.extend([x, y].iter().flat_map(|f| f.to_le_bytes()));
@@ -104,7 +104,7 @@ fn fill(device: &Device<'_>, program: &Compiled<'_>, s: detour::Surface, tiling:
     device.draw(program, &d, s).map_err(|e| e.0)
 }
 
-fn run(xe: &Xe, program: &Compiled<'_>, tiling: Tiling, card: Option<&std::path::Path>) -> Result<String, String> {
+fn run(xe: &Xe, program: &Compiled, tiling: Tiling, card: Option<&std::path::Path>) -> Result<String, String> {
     let device = Device::new(xe);
     let s = device.scanout(&target(tiling)).map_err(|e| e.0)?;
     fill(&device, program, s, tiling)?;

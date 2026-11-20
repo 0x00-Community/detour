@@ -63,7 +63,7 @@ fn target(size: u32, load: TargetLoad<'_>) -> ColorTarget<'_> {
 }
 
 /// One frame: the target cleared, a draw a cell
-fn frame(device: &Device<'_>, program: &detour::Compiled<'_>, surface: Surface, size: u32) {
+fn frame(device: &Device<'_>, program: &detour::Compiled, surface: Surface, size: u32) {
     let clear = [0u8; 4];
     let mut floats = Vec::new();
     let mut bytes = Vec::new();
