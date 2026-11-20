@@ -6,11 +6,13 @@
 //!
 //!   cargo run --release --example frame [FRAMES]
 
+#[path = "support/glsl.rs"]
+mod glsl;
+
 use std::os::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd};
 use std::time::{Duration, Instant};
 
 use detour::{Isa, Bo, Caching, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
-use mlirpass::{GlslReader, GlslStage};
 
 const VARYING: [&str; 2] = [
     "#version 300 es\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec4 color;\nout vec4 c;\nvoid main() { c = color; gl_Position = vec4(pos, 0.0, 1.0); }\n",
@@ -20,7 +22,6 @@ const UNIFORM: [&str; 2] = [
     "#version 300 es\nlayout(location = 0) in vec2 pos;\nvoid main() { gl_Position = vec4(pos, 0.0, 1.0); }\n",
     "#version 300 es\nprecision highp float;\nlayout(std140, binding = 0) uniform U { vec4 color; } u;\nout vec4 o;\nvoid main() { o = u.color; }\n",
 ];
-const TO_SPIRV: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=vulkan})";
 /// Cells of a grid, each a draw
 const GRID: u32 = 8;
 const CELL: u32 = 32;
@@ -48,12 +49,7 @@ unsafe extern "C" {
 }
 
 fn program(tools: &Toolchain<'_>, [vert, frag]: [&str; 2]) -> Vec<u8> {
-    let mut body = tools.body();
-    GlslReader::read(&mut body, vert, GlslStage::Vertex).unwrap();
-    GlslReader::read(&mut body, frag, GlslStage::Fragment).unwrap();
-    let root = body.root;
-    tools.pipeline(TO_SPIRV).and_then(|p| p.run(&mut body, root)).unwrap();
-    tools.program(&tools.show(&body)).unwrap()
+    tools.program(&glsl::spirv(vert, frag).unwrap()).unwrap()
 }
 
 /// Cell `k`'s color

@@ -4,26 +4,22 @@
 //!
 //!   cargo run --release --example shapes [FRAMES]
 
+#[path = "support/glsl.rs"]
+mod glsl;
+
 use std::time::Instant;
 
 use detour::{Isa, ColorFormat, ColorTarget, CullMode, Device, Draw, DrawPrimitive, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
-use mlirpass::{GlslReader, GlslStage};
 
 const VERT: &str = "#version 300 es\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec4 color;\nout vec4 c;\nvoid main() { c = color; gl_Position = vec4(pos, 0.0, 1.0); }\n";
 const FRAG: &str = "#version 300 es\nprecision highp float;\nin vec4 c;\nout vec4 o;\nvoid main() { o = c; }\n";
-const TO_SPIRV: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=vulkan})";
 /// Cells of a grid, each a draw
 const GRID: u32 = 8;
 const CELL: u32 = 32;
 const FLOATS: usize = 6;
 
 fn program(tools: &Toolchain<'_>) -> Vec<u8> {
-    let mut body = tools.body();
-    GlslReader::read(&mut body, VERT, GlslStage::Vertex).unwrap();
-    GlslReader::read(&mut body, FRAG, GlslStage::Fragment).unwrap();
-    let root = body.root;
-    tools.pipeline(TO_SPIRV).and_then(|p| p.run(&mut body, root)).unwrap();
-    tools.program(&tools.show(&body)).unwrap()
+    tools.program(&glsl::spirv(VERT, FRAG).unwrap()).unwrap()
 }
 
 /// Cell `k`'s color

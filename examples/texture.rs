@@ -6,14 +6,15 @@
 //!
 //!   cargo run --release --example texture [FILTER...]      (cases whose name contains a filter)
 
+#[path = "support/glsl.rs"]
+mod glsl;
+
 use detour::{Isa, ColorFormat, ColorTarget, Compiled, Device, Draw, Filter, Sampled, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Wrap, Xe};
-use mlirpass::{GlslReader, GlslStage};
 
 const SHADERS: [&str; 2] = [
     "#version 300 es\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec2 uv;\nout vec2 t;\nvoid main() { t = uv; gl_Position = vec4(pos, 0.0, 1.0); }\n",
     "#version 300 es\nprecision highp float;\nlayout(binding = 2) uniform highp sampler2D tex;\nin vec2 t;\nout vec4 o;\nvoid main() { o = texture(tex, t); }\n",
 ];
-const TO_SPIRV: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=vulkan})";
 const BINDING: u32 = 2;
 
 /// A texture: its size, format, tiling and texels (rows)
@@ -247,12 +248,7 @@ fn main() {
     let only: Vec<String> = std::env::args().skip(1).collect();
     let picked = |name: &str| only.is_empty() || only.iter().any(|f| name.contains(f.as_str()));
     let tools = Toolchain::new(Isa::Xe3);
-    let mut body = tools.body();
-    GlslReader::read(&mut body, SHADERS[0], GlslStage::Vertex).unwrap();
-    GlslReader::read(&mut body, SHADERS[1], GlslStage::Fragment).unwrap();
-    let root = body.root;
-    tools.pipeline(TO_SPIRV).and_then(|p| p.run(&mut body, root)).unwrap();
-    let program = tools.compile(body).unwrap_or_else(|e| panic!("{}", e.0));
+    let program = tools.compile(&glsl::spirv(SHADERS[0], SHADERS[1]).unwrap()).unwrap_or_else(|e| panic!("{}", e.0));
     let xe = Xe::open_first().unwrap();
     let device = Device::new(&xe);
     let mut failed = 0;

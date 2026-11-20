@@ -5,7 +5,7 @@ use mlirformat::{Attribute, Const, Error, FloatKind, Op, Scalar, ShapedKind, Typ
 
 use mlirformat::spirv_types::SpirvType;
 
-use crate::{Lanes, A, Attrs, Body, ConversionRewriter, Heads, OpData, OpHead, OpId, Quiet, Rewriter, ShaderStage as Stage, SignatureConversion, TypeConverter, Updates, ValueId, WithAttrs, patterns};
+use crate::{Lanes, Matrices, A, Attrs, Body, ConversionRewriter, Heads, OpData, OpHead, OpId, Quiet, Rewriter, ShaderStage as Stage, SignatureConversion, TypeConverter, Updates, ValueId, WithAttrs, patterns};
 use crate::{AddrSize, AddrSurface, Xe3Sampler as Sampler, CacheStore, DataSize, EuPayload, Grf, Lsc, LscOp, Render, SendInfo, Sfid, VectSize, Xe3Kernel as Kernel};
 
 type Cr<'r, 'a, 'p> = ConversionRewriter<'r, 'a, 'p>;
@@ -18,15 +18,14 @@ use std450::Std450;
 
 pub const XE3_BUFFER_BTI: u8 = 32;
 
-pub const XE3_PUSH_BTI: u8 = XE3_BUFFER_BTI - 1;
-
 pub const XE3_SIMD: u8 = 16;
 
 pub const XE3_VS_ATTR_GRF: u8 = 2;
 
 pub const XE3_MAX_VARYINGS: usize = 16;
 
-pub const XE3_MAX_TARGETS: usize = 8;
+/// The binding table entry of a draw's first texture: its one color target's is 0
+pub const XE3_TEXTURE_BTI: u8 = 1;
 
 pub struct Interpolate;
 
@@ -91,16 +90,12 @@ pub struct GpuToXe3;
 
 impl GpuToXe3 {
     pub const STAGE: &str = "spirv.execution_model";
-    const SAMPLE_MASK: &str = "xe3.sample_mask";
     const BINDINGS: &str = "xe3.bindings";
     const BUFFERS: &str = "xe3.buffers";
-    const PUSH: &str = "xe3.push";
     const BINDING: &str = "xe3.binding";
     const OFFSET: &str = "xe3.offset";
-    const PUSH_AT: &str = "xe3.push_offset";
     const STRIDE: &str = "xe3.matrix_stride";
     const MATRIX_STRIDE: &str = "MatrixStride";
-    const DUAL_SOURCE: &str = "xe3.dual_source";
 
     fn ieee_prologue<'a>() -> [OpData<'a>; 2] {
         let or = vec![("exec", A::from(1u8)), ("dst", A::str("arf128<1>:ud")), ("src0", A::str("arf128<0;1,0>:ud")), ("src1", A::str("0xc0:ud")), ("w", A::Bool(true))];
@@ -119,13 +114,18 @@ impl GpuToXe3 {
                 let Some(abi) = d.iter().find(|n| n.name == "spirv.interface_var_abi").and_then(|n| n.value.as_ref()) else { continue };
                 let text = abi.to_string();
                 let inner = text.split_once("<(").and_then(|(_, r)| r.split_once(')')).ok_or_else(|| Error(format!("{text}: not an interface ABI")))?;
-                let binding = inner.0.split(',').nth(1).and_then(|b| b.trim().parse().ok()).ok_or_else(|| Error(format!("{text}: no binding")))?;
+                let mut numbers = inner.0.split(',').map(|n| n.trim().parse::<i64>());
+                let (Some(Ok(set)), Some(Ok(binding))) = (numbers.next(), numbers.next()) else { return Err(Error(format!("{text}: no set and binding"))) };
                 let class = inner.1.trim_start_matches(',').trim().trim_end_matches('>').to_owned();
+                // what a draw binds: set 0's uniform blocks and sampled images
+                if set != 0 || !matches!(&*class, "Uniform" | "UniformConstant") {
+                    return Err(Error(format!("a {class} resource in set {set}: a draw binds set 0's uniform blocks and sampled images only")));
+                }
                 res.insert(*a, (class, binding));
             }
             let mut ops = Vec::new();
             body.walk(f, &mut |o| ops.push(o));
-            let (mut textures, mut buffers, mut push) = (0i64, 0i64, 0i64);
+            let (mut textures, mut buffers) = (0i64, 0i64);
             let root = |body: &Body<'_>, mut v: ValueId| -> Option<ValueId> {
                 for _ in 0..4 {
                     if res.contains_key(&v) {
@@ -150,21 +150,14 @@ impl GpuToXe3 {
                         continue;
                     }
                     let base = body[chain].operands[0];
-                    let Some((class, b)) = res.get(&base).cloned() else { continue };
+                    let Some(&(_, b)) = res.get(&base) else { continue };
                     let (offset, stride) = Self::member_offset(body, base, &body[chain].operands[1..]).ok_or_else(|| Error("a resource access chain: not constant struct members".into()))?;
                     if let Some(stride) = stride {
                         body[o].set(Self::STRIDE, A::from(stride).into());
                     }
-                    let ty = body[body[o].results[0]].ty.clone();
-                    let bytes = Xe3Types::of(&ty).map_or(4, |(n, _)| 4 * n as i64);
-                    if class == "PushConstant" {
-                        push = push.max(offset + bytes);
-                        body[o].set(Self::PUSH_AT, A::from(offset).into());
-                    } else {
-                        buffers = buffers.max(b + 1);
-                        body[o].set(Self::BINDING, A::from(b).into());
-                        body[o].set(Self::OFFSET, A::from(offset).into());
-                    }
+                    buffers = buffers.max(b + 1);
+                    body[o].set(Self::BINDING, A::from(b).into());
+                    body[o].set(Self::OFFSET, A::from(offset).into());
                     body.set_operand(o, 0, base);
                     if body[p].uses.is_empty() {
                         let indices: Vec<ValueId> = body[chain].operands[1..].to_vec();
@@ -181,7 +174,6 @@ impl GpuToXe3 {
             }
             body[f].set(Self::BINDINGS, A::from(textures).into());
             body[f].set(Self::BUFFERS, A::from(buffers).into());
-            body[f].set(Self::PUSH, A::from(push).into());
         }
         Ok(())
     }
@@ -389,20 +381,6 @@ impl GpuToXe3 {
         (0..n).map(|i| bits(c.at(i))).collect()
     }
 
-    fn targets(body: &Body<'_>, op: OpId) -> Option<u8> {
-        let mut at = body.parent_op(op);
-        while let Some(p) = at {
-            if body[p].name == Kernel::NAME {
-                return body.head::<Kernel>(p).ok()?.targets.and_then(|n| u8::try_from(n).ok());
-            }
-            if let Some(Attribute::Type(Type::Function(fty))) = body[p].get("function_type") {
-                return u8::try_from(fty.results.len()).ok();
-            }
-            at = body.parent_op(p);
-        }
-        None
-    }
-
     pub fn stage_of(body: &Body<'_>, f: OpId) -> Option<Stage> {
         if body[f].name != "func.func" {
             return None;
@@ -601,23 +579,17 @@ impl GpuToXe3 {
         if varyings > XE3_MAX_VARYINGS || (stage == Stage::Fragment && inputs > XE3_MAX_VARYINGS) {
             return false;
         }
-        let flag = |attr: &str| cr.rw.body[op].has_flag(attr);
-        let omask = stage == Stage::Fragment && flag(Self::SAMPLE_MASK) && !fty.results.is_empty();
-        let dual = stage == Stage::Fragment && flag(Self::DUAL_SOURCE) && fty.results.len() == 2;
         let count = |attr: &str| cr.rw.body[op].get(attr).map(Attrs::as_int).transpose().map(|n| n.unwrap_or(0) as u32);
-        let (Ok(bindings), Ok(buffers), Ok(push)) = (count(Self::BINDINGS), count(Self::BUFFERS), count(Self::PUSH)) else { return false };
+        let (Ok(bindings), Ok(buffers)) = (count(Self::BINDINGS), count(Self::BUFFERS)) else { return false };
         let kernel = Kernel {
             simd: Some(u32::from(XE3_SIMD)),
             payload: Some(payload),
             inputs: Some(inputs as u32),
             varyings: Some(varyings as u32),
-            targets: (stage == Stage::Fragment).then_some(fty.results.len() as u32 - u32::from(omask) - u32::from(dual)),
-            omask: omask.then_some(true),
             bindings: Some(bindings),
             buffers: Some(buffers),
-            push: Some(push),
             system: (system != 0).then_some(system),
-            ..Kernel::new(name, Some(stage), None, None, None, None, None, None, None, None, None, None, None, None, mlirformat::Region { blocks: Vec::new() })
+            ..Kernel::new(name, Some(stage), None, None, None, None, None, None, None, None, None, mlirformat::Region { blocks: Vec::new() })
         };
         let Ok(data) = OpData::head(&kernel) else { return false };
         cr.rw.set_before(op);
@@ -726,47 +698,18 @@ impl GpuToXe3 {
         let Ok(values): Result<[ValueId; 4], _> = values.clone().try_into() else { return false };
         match Self::stage(cr.rw.body, op) {
             Some(Stage::Fragment) => {
-                let targets = Self::targets(cr.rw.body, op).map_or(o.len(), usize::from);
-                if targets == 1 && o.len() == 2 && o[1].len() == 4 && o[0].len() == 4 {
-                    let write = Render { bti: 0, msg_ctrl: 2 | 0x10, msg_type: 12, coarse_write: false };
-                    let attrs = vec![
-                        ("sfid", A::str(<&str>::from(Sfid::Render))),
-                        ("desc", A::from(SendInfo::lengths(write.desc(), 8, 0))),
-                        ("src0_len", A::from(8u8)),
-                        ("eot", A::Bool(true)),
-                    ];
-                    Self::send(cr, op, "xe3.eu.sendc", &o.concat(), attrs);
-                    cr.erase(op);
-                    return true;
-                }
-                let (o, mask) = match o.len() - targets {
-                    0 => (o, None),
-                    1 => match &o[targets][..] {
-                        [m] => (&o[..targets], Some(*m)),
-                        _ => return false,
-                    },
-                    _ => return false,
-                };
-                if o.len() > XE3_MAX_TARGETS || o.iter().any(|v| v.len() != 4) {
+                // a draw's one color target
+                if o.len() != 1 {
                     return false;
                 }
-                let mask = mask.map(|m| Self::eu(cr, op, "xe3.eu.mov", &[m], vec![("dst_as", A::str("uw")), ("low0", A::Bool(true))], "i32"));
-                let n = 4 + u32::from(mask.is_some());
-                for (k, values) in o.iter().enumerate() {
-                    let last = k + 1 == o.len();
-                    let write = Render { bti: k as u8, msg_ctrl: if last { 0x10 } else { 0 }, msg_type: 12, coarse_write: false };
-                    let mut attrs = vec![
-                        ("sfid", A::str(<&str>::from(Sfid::Render))),
-                        ("desc", A::from(SendInfo::lengths(write.desc(), n, 0))),
-                        ("ex_desc", A::from((k as u32) << 21 | u32::from(mask.is_some()) << 12)),
-                        ("src0_len", A::from(n as u8)),
-                    ];
-                    if last {
-                        attrs.push(("eot", A::Bool(true)));
-                    }
-                    let payload: Vec<ValueId> = mask.into_iter().chain(values.iter().copied()).collect();
-                    Self::send(cr, op, "xe3.eu.sendc", &payload, attrs);
-                }
+                let write = Render { bti: 0, msg_ctrl: 0x10, msg_type: 12, coarse_write: false };
+                let attrs = vec![
+                    ("sfid", A::str(<&str>::from(Sfid::Render))),
+                    ("desc", A::from(SendInfo::lengths(write.desc(), 4, 0))),
+                    ("src0_len", A::from(4u8)),
+                    ("eot", A::Bool(true)),
+                ];
+                Self::send(cr, op, "xe3.eu.sendc", &values, attrs);
             }
             Some(Stage::Vertex) => {
                 let handle = Self::payload(cr, op, 1, "ui32");
@@ -807,16 +750,13 @@ impl GpuToXe3 {
     fn resource_load(cr: &mut Cr<'_, '_, '_>, op: OpId, _: &[Vec<ValueId>]) -> bool {
         let r = cr.rw.body[op].results[0];
         let int = |cr: &Cr<'_, '_, '_>, n: &str| cr.rw.body[op].get(n).and_then(|a| Attrs::as_int(a).ok());
-        let (push, binding, offset) = (int(cr, Self::PUSH_AT), int(cr, Self::BINDING), int(cr, Self::OFFSET));
+        let (binding, offset) = (int(cr, Self::BINDING), int(cr, Self::OFFSET));
         let Some((n, elem)) = Xe3Types::of(&cr.rw.body[r].ty) else {
             cr.replace(op, vec![Vec::new()]);
             return true;
         };
-        let (offset, bti) = match (push, binding, offset) {
-            (Some(p), _, _) => (p, XE3_PUSH_BTI),
-            (None, Some(b), Some(o)) => (o, XE3_BUFFER_BTI + b as u8),
-            _ => return false,
-        };
+        let (Some(b), Some(offset)) = (binding, offset) else { return false };
+        let bti = XE3_BUFFER_BTI + b as u8;
         let (cols, stride) = match (SpirvType::try_from(&cr.rw.body[r].ty), int(cr, Self::STRIDE)) {
             (Ok(SpirvType::Matrix { cols, .. }), Some(stride)) => (cols as usize, stride),
             (Ok(SpirvType::Matrix { .. }), None) => return false,
@@ -851,32 +791,17 @@ impl GpuToXe3 {
     }
 
     #[convert("spirv.ImageSampleImplicitLod")]
+    /// A sample at coordinates only: image operands (an offset, a bias) are not taken
     fn sample(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
-        let Some(uv) = o.get(1) else { return false };
+        let [_, uv] = o else { return false };
         if !matches!(uv.len(), 2..=4) {
             return false;
         }
-        let (Some(b), Some(targets)) = (Self::binding(cr, op), Self::targets(cr.rw.body, op)) else { return false };
-        let msg = Sampler { msg_type: 0, simd_mode: 1, bti: targets + b, sampler: b, return_hp: false };
+        let Some(b) = Self::binding(cr, op) else { return false };
+        let msg = Sampler { msg_type: 0, simd_mode: 1, bti: XE3_TEXTURE_BTI + b, sampler: b, return_hp: false };
         let n = uv.len() as u32;
         let attrs = vec![("sfid", A::str(<&str>::from(Sfid::Sampler))), ("desc", A::from(SendInfo::lengths(msg.desc(), n, 4))), ("src0_len", A::from(n as u8))];
         let values = Self::create(cr, op, "xe3.eu.send", uv, attrs, &vec![Type::from(Grf("f32")); 4]);
-        cr.replace(op, vec![values]);
-        true
-    }
-
-    #[convert("spirv.ImageFetch")]
-    fn load_sample(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
-        let (Some(xy), Some(s)) = (o.get(1), o.get(2)) else { return false };
-        let ([x, y], [s]) = (&xy[..], &s[..]) else { return false };
-        let (Some(b), Some(targets)) = (Self::binding(cr, op), Self::targets(cr.rw.body, op)) else { return false };
-        let zero = Self::imm(cr, op, 0, "i32");
-        let mut words = |v: ValueId| Self::eu(cr, op, "xe3.eu.mov", &[v], vec![("dst_as", A::str("uw")), ("low0", A::Bool(true))], "i32");
-        let (s, zero, x, y) = (words(*s), words(zero), words(*x), words(*y));
-        let params = [s, zero, zero, zero, zero, x, y];
-        let msg = Sampler { msg_type: 28, simd_mode: 5, bti: targets + b, sampler: b, return_hp: false };
-        let attrs = vec![("sfid", A::str(<&str>::from(Sfid::Sampler))), ("desc", A::from(SendInfo::lengths(msg.desc(), params.len() as u32, 4))), ("src0_len", A::from(params.len() as u8))];
-        let values = Self::create(cr, op, "xe3.eu.send", &params, attrs, &vec![Type::from(Grf("f32")); 4]);
         cr.replace(op, vec![values]);
         true
     }
@@ -1033,11 +958,27 @@ impl GpuToXe3 {
         true
     }
 
-    #[convert("spirv.VectorTimesScalar")]
-    fn vector_times_scalar(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
-        let ([v, s], Some(elem)) = (o, Self::result_elem(cr, op)) else { return false };
-        let [s] = s[..] else { return false };
-        let values = v.iter().map(|x| Self::eu(cr, op, "xe3.eu.mul", &[*x, s], vec![], elem)).collect();
+    /// Each result lane a sum of products: a mul, then a mad for each further term
+    #[convert("spirv.VectorTimesScalar", "spirv.MatrixTimesScalar", "spirv.MatrixTimesVector", "spirv.VectorTimesMatrix", "spirv.MatrixTimesMatrix", "spirv.OuterProduct")]
+    fn products(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
+        let ([a, b], Some(elem)) = (o, Self::result_elem(cr, op)) else { return false };
+        let body = &*cr.rw.body;
+        let Some(terms) = Matrices::products(&body[op].name, &body[body[op].operands[0]].ty, &body[body[op].operands[1]].ty) else { return false };
+        let values = terms
+            .into_iter()
+            .map(|t| {
+                let first = Self::eu(cr, op, "xe3.eu.mul", &[a[t[0].0], b[t[0].1]], vec![], elem);
+                t[1..].iter().fold(first, |acc, &(x, y)| Self::eu(cr, op, "xe3.eu.mad", &[acc, a[x], b[y]], vec![], elem))
+            })
+            .collect();
+        cr.replace(op, vec![values]);
+        true
+    }
+
+    #[convert("spirv.Transpose")]
+    fn transpose(cr: &mut Cr<'_, '_, '_>, op: OpId, o: &[Vec<ValueId>]) -> bool {
+        let Some(order) = Matrices::transpose(&cr.rw.body[cr.rw.body[op].operands[0]].ty) else { return false };
+        let values = order.into_iter().map(|i| o[0][i]).collect();
         cr.replace(op, vec![values]);
         true
     }

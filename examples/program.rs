@@ -1,22 +1,25 @@
 //! Programs compiled ahead of time (`Toolchain::program`) and loaded without compiling (`Toolchain::load`), drawn
 //! with `Device::draw`: each case under examples/cases that sets no uniforms, its GLSL made SPIR-V MLIR text by
-//! detour's front end, compiled twice (the bytes must be the same), loaded, drawn, and compared byte for byte with the
+//! mlirpass's front end, compiled twice (the bytes must be the same), loaded, drawn, and compared byte for byte with the
 //! same SPIR-V compiled in place (`Toolchain::compile`) and drawn. A program for another detour or GPU, and bytes that
 //! are not one (cut short, or with bytes past its end), must be refused. A case's `resources` has a line per vertex input, `attribute NAME LOCATION N V...`
 //! (three vertices of N floats); a case with a `uniform` line is left out.
 //!
 //!   cargo run --release --example program [CASE...]      (DETOUR_SPIRV=DIR: the SPIR-V MLIR text of each case there)
 
+#[path = "support/glsl.rs"]
+mod glsl;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use detour::{Isa, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
-use mlirpass::{Body, GlslReader, GlslStage};
+use mlirformat::MlirOpt;
+use mlirpass::{Body, Ctx, Interfaces};
 
 const SIZE: u32 = 64;
 /// The vertices a case draws
 const VERTICES: u32 = 3;
-const TO_SPIRV: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=vulkan})";
 
 /// A case's vertex inputs in location order: floats a vertex, values
 type Inputs = Vec<(u32, Vec<f32>)>;
@@ -39,15 +42,14 @@ fn attributes(dir: &Path) -> Result<Vec<(String, u32, Vec<f32>)>, String> {
     Ok(out)
 }
 
-/// A case's SPIR-V modules, as a body and as MLIR text, and its vertex inputs
-fn spirv<'t>(dir: &Path, tools: &'t Toolchain<'t>) -> Result<(Body<'t>, String, Inputs), String> {
+/// A case's SPIR-V modules as MLIR text, and its vertex inputs
+fn spirv(dir: &Path) -> Result<(String, Inputs), String> {
     let attributes = attributes(dir)?;
     let read = |f: &str| fs::read_to_string(dir.join(f)).map_err(|e| format!("{f}: {e}"));
-    let mut body = tools.body();
-    GlslReader::read(&mut body, &read("shader.vert")?, GlslStage::Vertex).map_err(|e| e.0)?;
-    GlslReader::read(&mut body, &read("shader.frag")?, GlslStage::Fragment).map_err(|e| e.0)?;
+    let text = glsl::spirv(&read("shader.vert")?, &read("shader.frag")?)?;
+    let (opt, interfaces) = (MlirOpt::upstream(), Interfaces::upstream());
+    let body = Body::parse(Ctx::new(&opt, &interfaces), &text).map_err(|e| e.0)?;
     let root = body.root;
-    tools.pipeline(TO_SPIRV).and_then(|p| p.run(&mut body, root)).map_err(|e| e.0)?;
     let vert = body.ops(body.top_block(root)).find(|&m| &*body[m].name == "spirv.module").ok_or("no spirv.module")?;
     let mut inputs = Vec::new();
     for g in body.ops(body.top_block(vert)).filter(|&g| &*body[g].name == "spirv.GlobalVariable") {
@@ -59,8 +61,8 @@ fn spirv<'t>(dir: &Path, tools: &'t Toolchain<'t>) -> Result<(Body<'t>, String, 
         inputs.push((at, size, values));
     }
     inputs.sort_by_key(|i| i.0);
-    let text = tools.show(&body);
-    Ok((body, text, inputs.into_iter().map(|(_, n, v)| (n, v)).collect()))
+    drop(body);
+    Ok((text, inputs.into_iter().map(|(_, n, v)| (n, v)).collect()))
 }
 
 /// The case compiled ahead of time and loaded
@@ -142,7 +144,7 @@ fn main() {
         if !only.is_empty() && !only.contains(&name) {
             continue;
         }
-        let r = spirv(&dir, &tools).and_then(|(body, text, inputs)| {
+        let r = spirv(&dir).and_then(|(text, inputs)| {
             if let Some(dir) = &save {
                 fs::write(dir.join(format!("{name}.mlir")), &text).map_err(|e| e.to_string())?;
             }
@@ -151,7 +153,7 @@ fn main() {
                 refused = true;
             }
             let ours = draw(&loaded(&text, &tools)?, &inputs, &device)?;
-            let compiled = tools.compile(body).map_err(|e| e.0)?;
+            let compiled = tools.compile(&text).map_err(|e| e.0)?;
             match ours == draw(&compiled, &inputs, &device)? {
                 true => Ok(format!("ok ({} bytes)", ours.len())),
                 false => Err("differs from the same SPIR-V compiled in place".into()),

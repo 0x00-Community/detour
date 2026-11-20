@@ -1,5 +1,5 @@
 //! What the GPU lowerings share: register allocation, a draw described without
-//! the GPU, the lane-by-lane lowering helpers and `gpu-local-arrays`.
+//! the GPU, the lane-by-lane lowering helpers (SPIR-V's matrix arithmetic among them) and `gpu-local-arrays`.
 
 mod draw;
 mod lanes;

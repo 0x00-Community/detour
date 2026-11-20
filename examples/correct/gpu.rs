@@ -5,9 +5,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use detour::{Blend, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement};
-use mlirpass::{GlslReader, GlslStage};
 
-const TO_SPIRV: &str = "builtin.module(glsl-link, convert-glsl-to-spirv{client=vulkan})";
 
 pub struct Gpu<'t> {
     pub tools: &'t Toolchain<'t>,
@@ -71,15 +69,8 @@ impl<'t> Gpu<'t> {
         if let Some(p) = self.programs.borrow().get(&key) {
             return Ok(p);
         }
-        let mut body = self.tools.body();
-        GlslReader::read(&mut body, vs, GlslStage::Vertex).map_err(|e| format!("vertex shader: {}", e.0))?;
-        GlslReader::read(&mut body, fs, GlslStage::Fragment).map_err(|e| format!("fragment shader: {}", e.0))?;
-        let root = body.root;
-        self.tools.pipeline(TO_SPIRV).and_then(|p| p.run(&mut body, root)).map_err(|e| format!("to SPIR-V: {}", e.0))?;
-        let text = self.tools.show(&body);
-        let bin = self.tools.program(&text).map_err(|e| format!("compiling: {}", e.0))?;
-        let bin: &'t [u8] = Box::leak(bin.into_boxed_slice());
-        let compiled: &'t Compiled = Box::leak(Box::new(self.tools.load(bin).map_err(|e| format!("loading: {}", e.0))?));
+        let bin = self.tools.program(&crate::glsl::spirv(vs, fs)?).map_err(|e| format!("compiling: {}", e.0))?;
+        let compiled: &'t Compiled = Box::leak(Box::new(self.tools.load(&bin).map_err(|e| format!("loading: {}", e.0))?));
         self.programs.borrow_mut().insert(key, compiled);
         Ok(compiled)
     }

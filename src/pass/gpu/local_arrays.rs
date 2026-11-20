@@ -5,10 +5,10 @@ use mlirformat::{Attribute, Error, Type};
 
 use crate::{Body, Def, OpData, OpId, Quiet, Rewriter, ValueId, pass};
 
-/// A function's array variable, read and written at computed indices (GLSL ES 3.00 lets every stage index a local
-/// array with any integer): one variable an element, each access a chain of compares and selects over them, which
-/// mem2reg then promotes. An array stored whole from `vector.from_elements` (its initializer) and accessed through
-/// one-index access chains; any other use leaves it as it is
+/// A function's array variable, read and written at indices computed at run time: one variable an element, each
+/// access a chain of compares and selects over them, which mem2reg then promotes. An array stored whole from
+/// `vector.from_elements` (its initializer) and accessed through one-index access chains; any other use leaves it as
+/// it is
 struct LocalArray;
 
 impl LocalArray {

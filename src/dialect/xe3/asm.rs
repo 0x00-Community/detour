@@ -3,7 +3,7 @@ use alloc::{borrow::ToOwned, boxed::Box, format, string::{String, ToString}, vec
 
 use mlirformat::{Attribute, Error, NamedAttr};
 
-use super::{Cond, Dpas, Elem, File, Inst, MathFn, Opcode, Operand, Pipe, Pred, Region, SbidMode, SendInfo, Sfid, Swsb, SyncFn};
+use super::{Cond, Elem, File, Inst, MathFn, Opcode, Operand, Pipe, Pred, Region, SbidMode, SendInfo, Sfid, Swsb, SyncFn};
 
 macro_rules! names {
     ($($ty:ident { $($v:ident $s:literal),* $(,)? })*) => {$(
@@ -225,7 +225,7 @@ impl Read<'_, '_> {
 
 const KNOWN: &[&str] = &[
     "exec", "chan", "dst", "src0", "src1", "src2", "sat", "w", "atomic", "cond", "flag", "pred", "pred_inv", "swsb", "fn",
-    "bfn", "sfid", "desc", "ex_desc", "src1_len", "eot", "ex_bso", "sdepth", "rcount", "src1_subbyte", "src2_subbyte",
+    "bfn", "sfid", "desc", "ex_desc", "src1_len", "eot", "ex_bso",
     "jip", "uip", "branch_ctrl",
 ];
 
@@ -282,17 +282,6 @@ impl Inst {
             }
             a.unit("eot", s.eot);
             a.unit("ex_bso", s.ex_bso);
-        }
-        if self.op == Opcode::Dpas {
-            let p = self.dpas;
-            a.int("sdepth", p.sdepth.into());
-            a.int("rcount", p.rcount.into());
-            if p.src1_subbyte != 0 {
-                a.int("src1_subbyte", p.src1_subbyte.into());
-            }
-            if p.src2_subbyte != 0 {
-                a.int("src2_subbyte", p.src2_subbyte.into());
-            }
         }
         if self.jip != 0 {
             a.int("jip", self.jip.into());
@@ -354,15 +343,6 @@ impl TryFrom<(&str, &[NamedAttr<'_>])> for Inst {
             let sfid = Sfid::try_from(s).map(|f| f as u8).or_else(|e| s.parse::<u8>().map_err(|_| e))?;
             let word = |n: &str| -> Result<u32, Error> { Ok(r.int(n)?.unwrap_or(0) as u32) };
             i.send = SendInfo { sfid, desc: word("desc")?, ex_desc: word("ex_desc")?, src1_len: small("src1_len")?.unwrap_or(0), eot: r.flag("eot"), ex_bso: r.flag("ex_bso") };
-        }
-        if i.op == Opcode::Dpas {
-            let d = Dpas::DEFAULT;
-            i.dpas = Dpas {
-                sdepth: small("sdepth")?.unwrap_or(d.sdepth),
-                rcount: small("rcount")?.unwrap_or(d.rcount),
-                src1_subbyte: small("src1_subbyte")?.unwrap_or(0),
-                src2_subbyte: small("src2_subbyte")?.unwrap_or(0),
-            };
         }
         i.jip = r.int("jip")?.unwrap_or(0) as i32;
         i.uip = r.int("uip")?.unwrap_or(0) as i32;

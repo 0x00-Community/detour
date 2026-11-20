@@ -26,7 +26,7 @@ detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做
 着色器到机器码的编译、命令流都由 detour 自己负责, **经内核 GPU 驱动的 ioctl 直接提交**. 下面没有 Mesa, 没有 libdrm.
 图形 API (Vulkan、WebGPU) 是应用那一层的事, 不归 detour.
 
-- 🧩 **绘制** (`src/render.rs`、`src/shader.rs`): SPIR-V 着色器 (GLSL 经 [mlirpass](https://github.com/Jabberwocky238/mlirpass))
+- 🧩 **绘制** (`src/render.rs`、`src/shader.rs`): SPIR-V 着色器
   编成 Xe3 或 RDNA2 机器码, 可预编译也可现编; 目标、顶点缓冲、uniform、采样纹理 (任何 surface, 所以也能渲染到纹理)、
   混合、scissor、dma-buf.
 - 🔵 **Intel Xe3**: xe3 方言 (EU 指令、genxml 命令和状态)、SPIR-V 着色器下降到 Xe3 机器码、寄存器分配、
@@ -48,7 +48,7 @@ detour 是**我们自己的 GPU 驱动用户态**, 只为少数几种 GPU 而做
 | 🔢 | 索引绘制和字节颜色 (`examples/indexed`): 3000 个重叠的四边形, 每个 4 个顶点加 6 个 u16 / u32 索引, 颜色用 `Unorm8x4`, 从中间的索引开始, 索引和非索引绘制交替 | **5 / 5** 例和非索引绘制**逐字节一致** |
 | 🖼️ | 纹理 (`examples/texture`): 四边形采样一个 surface, 对照 CPU 参考: nearest 和 linear、放大和缩小、clamp / repeat / mirrored repeat、RGBA8 和 R8、linear 和 Tile4; 同一批里先画进再采样、先采样再覆盖; 局部写入 (`Device::write`) | **15 / 15** 例, nearest **逐字节一致**, linear 与 f32 参考差 2 以内 |
 | 🔣 | 编码 (`tests/binary`、`src/pass/rdna2`) | Xe3 EU 对 gentool、genxml 对 Mesa, RDNA2 对 llvm-mc |
-| 🪜 | 下降 (`tests/pass`) | 手写 SPIR-V、GLSL 和 acdes 页面程序的 Xe3、RDNA2 机器码, 对照读过的基准 |
+| 🪜 | 下降 (`tests/pass`) | 每个 SPIR-V 用例的 Xe3、RDNA2 机器码或拒绝原因, 对照仓库里的基准 |
 
 ## 🎮 支持的 GPU
 

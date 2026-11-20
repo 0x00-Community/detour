@@ -100,18 +100,6 @@ xe3.eu.while {exec = 16, pred = "normal", flag = "f0.0", jip = -96}
 xe3.eu.while {exec = 16, pred = "normal", flag = "f1.0", jip = -1024}
 // sync.allwr (1) null<0;1,0>:ub
 xe3.eu.sync {exec = 1, src0 = "null<0;1,0>:ub", fn = "allwr"}
-// dpas.8x8 (16) r10:f r10:f r30:hf r40:hf
-xe3.eu.dpas {exec = 16, dst = "r10<1;1,0>:f", src0 = "r10<1;1,0>:f", src1 = "r30<1;1,0>:hf", src2 = "r40<1;1,0>:hf", sdepth = 8, rcount = 8}
-// dpas.8x8 (16) r10:f r10:f r30:bf r40:bf {$3}
-xe3.eu.dpas {exec = 16, dst = "r10<1;1,0>:f", src0 = "r10<1;1,0>:f", src1 = "r30<1;1,0>:bf", src2 = "r40<1;1,0>:bf", swsb = "$3", sdepth = 8, rcount = 8}
-// dpas.8x8 (16) r10:f r10:f r30:hf r40:hf {$4.dst}
-xe3.eu.dpas {exec = 16, dst = "r10<1;1,0>:f", src0 = "r10<1;1,0>:f", src1 = "r30<1;1,0>:hf", src2 = "r40<1;1,0>:hf", swsb = "$4.dst", sdepth = 8, rcount = 8}
-// dpas.8x4 (16) r20:f null:f r30:hf r40:hf
-xe3.eu.dpas {exec = 16, dst = "r20<1;1,0>:f", src0 = "null<1;1,0>:f", src1 = "r30<1;1,0>:hf", src2 = "r40<1;1,0>:hf", sdepth = 8, rcount = 4}
-// dpas.8x8 (16) r10:d r10:d r30:b r40:b
-xe3.eu.dpas {exec = 16, dst = "r10<1;1,0>:d", src0 = "r10<1;1,0>:d", src1 = "r30<1;1,0>:b", src2 = "r40<1;1,0>:b", sdepth = 8, rcount = 8}
-// dpas.8x8 (16) r10:d r10:d r30:ub r40:b
-xe3.eu.dpas {exec = 16, dst = "r10<1;1,0>:d", src0 = "r10<1;1,0>:d", src1 = "r30<1;1,0>:ub", src2 = "r40<1;1,0>:b", sdepth = 8, rcount = 8}
 // (W) load_block2d.ugm.d16.a64 (1|M0) r10:8 [r80:1]
 xe3.eu.send {exec = 1, dst = "r10<1;1,0>:ud", src0 = "r80<1;1,0>:ud", w, sfid = "ugm", desc = 0x02800203}
 // (W) load_block2d.ugm.d16v.a64 (1|M0) r10:8 [r80:1]
