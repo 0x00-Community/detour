@@ -80,7 +80,7 @@ fn bind<'x>(xe: &'x Xe, vm: &XeVm<'x>, bo: &XeBo<'x>, offset: u64, addr: u64, ra
 fn put(bo: &mut XeBo<'_>, at: usize, words: &[u32]) -> Result<(), Error> {
     let memory = bo.bytes().map_err(io)?;
     let room = memory.get_mut(at..at + 4 * words.len()).ok_or_else(|| Error(format!("{} dwords past a memory's end at {at}", words.len())))?;
-    for (d, w) in room.chunks_exact_mut(4).zip(words) {
+    for (d, w) in room.as_chunks_mut::<4>().0.iter_mut().zip(words) {
         d.copy_from_slice(&w.to_le_bytes());
     }
     Ok(())
