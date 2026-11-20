@@ -46,11 +46,11 @@ pub struct Target {
 
 impl Target {
     pub fn rgba8(width: u32, height: u32, clear: [u8; 4]) -> Target {
-        Target { width, height, format: ColorFormat::Rgba8Unorm, tiling: Tiling::Tile4, clear: clear.to_vec(), pixels: None }
+        Target { width, height, format: ColorFormat::Rgba8Unorm, tiling: crate::card::tiled(), clear: clear.to_vec(), pixels: None }
     }
 
     pub fn rgba32f(width: u32, height: u32) -> Target {
-        Target { width, height, format: ColorFormat::Rgba32Float, tiling: Tiling::Tile4, clear: vec![0; 16], pixels: None }
+        Target { width, height, format: ColorFormat::Rgba32Float, tiling: crate::card::tiled(), clear: vec![0; 16], pixels: None }
     }
 }
 

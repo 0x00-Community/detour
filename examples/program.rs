@@ -7,13 +7,15 @@
 //!
 //!   cargo run --release --example program [CASE...]      (DETOUR_SPIRV=DIR: the SPIR-V MLIR text of each case there)
 
+#[path = "support/card.rs"]
+mod card;
 #[path = "support/glsl.rs"]
 mod glsl;
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use detour::{Isa, ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
+use detour::{ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
 use mlirformat::MlirOpt;
 use mlirpass::{Body, Ctx, Interfaces};
 
@@ -82,7 +84,9 @@ fn draw(compiled: &Compiled, inputs: &[(u32, Vec<f32>)], device: &Device<'_>) ->
         elements.push(VertexElement { buffer: i as u32, format: VertexFormat::try_from(*n).map_err(|e| e.0)?, offset: 0 });
     }
     let clear = [0u8; 16];
-    let target = ColorTarget { width: SIZE, height: SIZE, format: ColorFormat::Rgba32Float, tiling: Tiling::Tile4, load: TargetLoad::Fill(&clear, &[]) };
+    // floats where the GPU draws them (Xe3), else bytes: the two draws compared are of one program either way
+    let format = if card::tiled() == Tiling::Tile4 { ColorFormat::Rgba32Float } else { ColorFormat::Rgba8Unorm };
+    let target = ColorTarget { width: SIZE, height: SIZE, format, tiling: card::tiled(), load: TargetLoad::Fill(&clear, &[]) };
     let surface = device.surface(&target).map_err(|e| e.0)?;
     let draw = Draw {
         buffers: bytes.iter().zip(inputs).map(|(b, (n, _))| VertexBuffer { bytes: b, stride: n * 4 }).collect(),
@@ -104,7 +108,7 @@ fn draw(compiled: &Compiled, inputs: &[(u32, Vec<f32>)], device: &Device<'_>) ->
         target,
     };
     device.draw(compiled, &draw, surface).map_err(|e| e.0)?;
-    device.read(surface, (SIZE * SIZE * 16) as usize).map_err(|e| e.0)
+    device.read(surface, (SIZE * SIZE * format.bytes()) as usize).map_err(|e| e.0)
 }
 
 /// What `load` must refuse
@@ -115,7 +119,7 @@ fn refusals(text: &str, tools: &Toolchain<'_>) -> Result<(), String> {
     let with = |version: &[u8], gpu: &[u8], rest: &[u8]| [magic, version, gpu, rest].join(&b'\n');
     let others = [
         with(b"0.0.0-other", gpu, rest),
-        with(env!("CARGO_PKG_VERSION").as_bytes(), b"rdna2", rest),
+        with(env!("CARGO_PKG_VERSION").as_bytes(), if gpu == b"xe3" { b"rdna2" } else { b"xe3" }, rest),
         b"not a program".to_vec(),
         program[..program.len() - 1].to_vec(),
         [&program[..], b"\0"].concat(),
@@ -134,9 +138,9 @@ fn main() {
     let mut dirs: Vec<PathBuf> = fs::read_dir(root.join("examples/cases")).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()).collect();
     dirs.sort();
     let save = std::env::var_os("DETOUR_SPIRV").map(PathBuf::from);
-    let tools = Toolchain::new(Isa::Xe3);
-    let xe = detour::Xe::open_first().unwrap();
-    let device = Device::new(&xe);
+    let card = card::open();
+    let tools = Toolchain::new(card.isa());
+    let device = Device::new(card);
     let mut failed = 0;
     let mut refused = false;
     for dir in dirs {

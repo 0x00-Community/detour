@@ -242,16 +242,9 @@ impl<'a> State<'a> {
         let addr = SURFACE_ADDR + slot as u64 * SURFACE_SPAN;
         self.vm.bind(&bo, offset, addr, range, MemType::Streaming, &[]).map_err(|e| Error(format!("a surface's memory not mapped: {e}")))?;
         let target = SurfaceMem { bo, slot, addr, offset: offset as usize, range, width: t.width, height: t.height, format: t.format, tiling: t.tiling, pitch, fence: None };
-        match self.surfaces.iter().position(Option::is_none) {
-            Some(i) => {
-                self.surfaces[i] = Some(target);
-                Ok(Surface(i))
-            }
-            None => {
-                self.surfaces.push(Some(target));
-                Ok(Surface(self.surfaces.len() - 1))
-            }
-        }
+        // a new number: a surface freed stays an error to use, as on Xe3
+        self.surfaces.push(Some(target));
+        Ok(Surface(self.surfaces.len() - 1))
     }
 
     /// The batch recorded ended and submitted, after what it waits for
@@ -553,6 +546,9 @@ impl<'a> AmdgpuDevice<'a> {
                 "a draw into a {}x{} {:?} {:?} target, surface {s:?} is {}x{} {:?} {:?}",
                 d.target.width, d.target.height, d.target.format, d.target.tiling, t.width, t.height, t.format, t.tiling
             )));
+        }
+        if d.target.format == ColorFormat::Rgba32Float {
+            return Err(Error("a draw into an Rgba32Float target: RDNA2 exports the color as 16-bit floats, not yet as 32".into()));
         }
         if d.elements.len() != vs.inputs as usize {
             return Err(Error(format!("the vertex shader reads {} inputs, the draw gives {}", vs.inputs, d.elements.len())));
