@@ -3,19 +3,19 @@
 //!
 //! Vertex shader, run as the hardware GS stage (merged ES+GS, `SPI_SHADER_PGM_*_ES`), NGG passthrough
 //! (`GE_CNTL` and `VGT_SHADER_STAGES_EN` as radeonsi sets them for a plain VS). Its user SGPRs start at s8
-//! (`SPI_SHADER_USER_DATA_GS_0`):
-//!   - user 0: the first vertex, added to the vertex index (v5)
-//!   - then each uniform block of `ubos`, in order: its address, low then high dword (2 SGPRs)
-//!   - then each vertex input, in location order: a buffer descriptor (V#, 4 SGPRs) whose base is the input's first
+//! (`SPI_SHADER_USER_DATA_GS_0`), each descriptor on its alignment (a V# on 4 SGPRs, an address on 2):
+//!   - each vertex input, in location order: a buffer descriptor (V#, 4 SGPRs) whose base is the input's first
 //!     byte in the first vertex, its stride the buffer's, its format the input's (fetched with `idxen`)
+//!   - then each uniform block of `ubos`, in order: its address, low then high dword (2 SGPRs)
+//!   - then the first vertex, added to the vertex index (v5)
 //!
 //! It begins with ACO's NGG passthrough prologue (s3: merged wave info; v0: the primitive's export data), exports
 //! `pos0`, then `param0..varyings`.
 //!
 //! Fragment shader: its user SGPRs start at s0 (`SPI_SHADER_USER_DATA_PS_0`):
-//!   - each uniform block of `ubos`, in order: its address, low then high dword (2 SGPRs)
-//!   - then each sampled texture of `textures`, in order: its image descriptor (T#, 8 SGPRs) then its sampler (S#,
-//!     4 SGPRs)
+//!   - each sampled texture of `textures`, in order: its image descriptor (T#, 8 SGPRs) then its sampler (S#, 4
+//!     SGPRs)
+//!   - then each uniform block of `ubos`, in order: its address, low then high dword (2 SGPRs)
 //!
 //! The primitive mask (for `m0`) is the SGPR after them. Its input VGPRs are those `ps_input` enables
 //! (`SPI_PS_INPUT_ENA` and `SPI_PS_INPUT_ADDR` both); it reads `inputs` varyings (`SPI_PS_INPUT_CNTL_0..`, each at
@@ -76,21 +76,34 @@ impl Rdna2Shader {
         }
     }
 
+    /// The user SGPR (from the stage's first) the first uniform block's address is in
+    fn ubos_sgpr(&self) -> u32 {
+        match self.stage {
+            ShaderStage::Vertex => RDNA2_INPUT_SGPRS * self.inputs,
+            _ => RDNA2_TEXTURE_SGPRS * self.textures.len() as u32,
+        }
+    }
+
     /// The user SGPR (from the stage's first) a uniform block's address is in
     pub fn ubo_sgpr(&self, binding: u32) -> Option<u32> {
         let k = self.ubos.iter().position(|b| *b == binding)? as u32;
-        Some(u32::from(self.stage == ShaderStage::Vertex) + RDNA2_UBO_SGPRS * k)
+        Some(self.ubos_sgpr() + RDNA2_UBO_SGPRS * k)
     }
 
     /// The user SGPR a vertex input's V# is in
     pub fn input_sgpr(&self, location: u32) -> u32 {
-        1 + RDNA2_UBO_SGPRS * self.ubos.len() as u32 + RDNA2_INPUT_SGPRS * location
+        RDNA2_INPUT_SGPRS * location
+    }
+
+    /// The user SGPR of a vertex shader the first vertex is in
+    pub fn first_vertex_sgpr(&self) -> u32 {
+        self.ubos_sgpr() + RDNA2_UBO_SGPRS * self.ubos.len() as u32
     }
 
     /// The user SGPR a texture's T# is in (its S# 8 after)
     pub fn texture_sgpr(&self, binding: u32) -> Option<u32> {
         let k = self.textures.iter().position(|b| *b == binding)? as u32;
-        Some(RDNA2_UBO_SGPRS * self.ubos.len() as u32 + RDNA2_TEXTURE_SGPRS * k)
+        Some(RDNA2_TEXTURE_SGPRS * k)
     }
 
     /// Its bytes in a program: the fields as little-endian u32s (each list its length, then its items), the code's
