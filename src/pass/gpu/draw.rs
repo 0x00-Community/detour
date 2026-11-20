@@ -71,6 +71,8 @@ pub enum VertexFormat {
     Float32x2,
     Float32x3,
     Float32x4,
+    /// four bytes, each 0..255 as 0.0..1.0 (a color)
+    Unorm8x4,
 }
 
 impl VertexFormat {
@@ -79,7 +81,7 @@ impl VertexFormat {
             VertexFormat::Float32 => 1,
             VertexFormat::Float32x2 => 2,
             VertexFormat::Float32x3 => 3,
-            VertexFormat::Float32x4 => 4,
+            VertexFormat::Float32x4 | VertexFormat::Unorm8x4 => 4,
         }
     }
 }
@@ -117,6 +119,20 @@ impl ColorFormat {
             ColorFormat::R8Unorm => 1,
         }
     }
+}
+
+/// An index buffer's index size
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum IndexFormat {
+    U16,
+    U32,
+}
+
+/// A draw's indices (little-endian, `format`): its `first` and `count` count indices, each the vertex it takes
+#[derive(Clone, Copy, Debug)]
+pub struct IndexBuffer<'d> {
+    pub bytes: &'d [u8],
+    pub format: IndexFormat,
 }
 
 /// A vertex shader input, in location order: which vertex buffer, its format, where in a vertex
@@ -292,6 +308,8 @@ pub struct Draw<'d> {
     /// surfaces the fragment shader samples
     pub textures: Vec<Sampled>,
     pub primitive: DrawPrimitive,
+    /// None: the vertices in order from `first`; else `first` and `count` count the indices
+    pub indices: Option<IndexBuffer<'d>>,
     pub first: u32,
     pub count: u32,
     pub instances: u32,
@@ -319,6 +337,7 @@ impl Default for Draw<'_> {
             uniforms: Vec::new(),
             textures: Vec::new(),
             primitive: DrawPrimitive::Triangles,
+            indices: None,
             first: 0,
             count: 0,
             instances: 1,

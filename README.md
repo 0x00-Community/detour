@@ -47,6 +47,7 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | ✔️ | What | Result |
 | --- | --- | --- |
 | ✅ | Correctness (`examples/correct`): draws through `Device::draw` against a CPU reference (pixel centres, 8-bit sub-pixel snapping, the top-left rule, GL ES blending, Vulkan's precision for shader math) and against Mesa on the same GPU: coverage, shared edges, thin, degenerate and huge triangles, strips, first / count, culling, scissors, viewports, instancing, every blend factor and equation, the color mask, vertex formats and strides, interpolation, std140 blocks, built-ins, 15 varyings, local arrays, 20 math functions with NaN, infinities and denormals | **752 / 752** cases: fixed function **byte for byte as Mesa**; the f32 reference ±1 only where Xe3 blends or rounds to unorm8 (Mesa the same) |
+| 🔢 | Indexed draws and byte colors (`examples/indexed`): 3000 overlapping quads as four vertices and six u16 / u32 indices each, colors as `Unorm8x4`, from a middle index, indexed and plain draws taking turns | **5 / 5** cases **byte for byte** as the plain draw |
 | 🖼️ | Textures (`examples/texture`): a quad sampling a surface against a CPU reference: nearest and linear, magnified and minified, clamp / repeat / mirrored repeat, RGBA8 and R8, linear and Tile4; drawn into then sampled, and sampled then drawn over, in one batch; a part written (`Device::write`) | **15 / 15** cases, nearest **byte for byte**, linear within 2 of the f32 reference |
 | 🔣 | Encodings (`tests/binary`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc and Mesa's registers: **4 / 4** |
 | 🪜 | Lowerings (`tests/pass`) | kernels as acgpu compiled them (Xe3, RDNA2), GLSL reaching Xe3, an RDNA2 IB as Mesa writes it: **4 / 4** |
@@ -70,7 +71,7 @@ rasterizer and no hand-off to the system's drivers.
 | `src/binary` | machine code and images: each GPU's encoder, records packed by layout tables, image writing |
 | `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + detour's passes) and the device a draw runs on |
 | `src/kmd` | the kernel interface: DRM, the `Gpu` trait, and the `xe` driver (`src/kmd/xe`) |
-| `examples/` | `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `texture` (sampled textures vs a CPU reference), `program` (programs compiled ahead of time), `shapes` and `frame` (draws in a frame, timed), `xe_info` |
+| `examples/` | `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `texture` (sampled textures vs a CPU reference), `indexed` (indexed draws), `program` (programs compiled ahead of time), `shapes` and `frame` (draws in a frame, timed), `xe_info` |
 | `tests/binary`, `tests/pass` | encodings, and lowerings |
 | `scripts/` | the dialects' generators (`xe3gen`, `rdna2gen`) and the Mesa data they read (`data/{intel,amd}`), opcode tables, and the oracles each test's expected bytes come from (`*_oracle.*`) |
 
