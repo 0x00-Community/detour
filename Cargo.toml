@@ -1,7 +1,7 @@
 [package]
 # detour is taken on crates.io (a function-hooking library): the package is detour-gpu, the library is still detour
 name = "detour-gpu"
-version = "0.7.1"
+version = "0.7.2"
 edition = "2024"
 # mlirformat's (0.6 onwards) `if let` guards (rust-toolchain.toml pins it here; a git dependent like acde-base reads this)
 rust-version = "1.96"

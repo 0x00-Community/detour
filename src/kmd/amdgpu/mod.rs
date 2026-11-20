@@ -7,7 +7,7 @@ use std::path::Path;
 
 use crate::{BoDesc, Caching, DeviceInfo, Engine, Gpu, Map, MemType, Node, Result, Syncobj};
 
-pub use sys::drm_amdgpu_info_device as AmdgpuInfo;
+pub use sys::{AMDGPU_FAMILY_GC_10_3_6, drm_amdgpu_info_device as AmdgpuInfo};
 
 /// AMD's vendor id
 const AMD: u16 = 0x1002;
