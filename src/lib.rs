@@ -1,5 +1,5 @@
 //! detour: a user-mode driver for Intel Xe3 and AMD RDNA2 integrated graphics over mlirpass: the kernel interface, shaders to
-//! machine code, OpenGL (gl) and Vulkan (vk). Its GPU dialects are mlirformat plugins (`dialect`), its lowerings mlirpass plugins
+//! machine code and OpenGL (gl). Its GPU dialects are mlirformat plugins (`dialect`), its lowerings mlirpass plugins
 //! (`pass`), and their machine code and images what it writes (`binary`).
 
 extern crate alloc;
@@ -12,7 +12,6 @@ mod pass;
 mod render;
 mod shader;
 mod tiling;
-mod vk;
 
 pub use binary::*;
 pub use dialect::*;
