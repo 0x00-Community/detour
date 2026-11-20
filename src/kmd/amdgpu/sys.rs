@@ -32,6 +32,8 @@ pub const AMDGPU_CHUNK_ID_SYNCOBJ_OUT: u32 = 0x05;
 pub const AMDGPU_CHUNK_ID_BO_HANDLES: u32 = 0x06;
 
 pub const AMDGPU_INFO_DEV_INFO: u32 = 0x16;
+/// `drm_amdgpu_info_device.family` of GFX 10.3.6 (gfx1036: Raphael, Granite Ridge; the Radeon 610M)
+pub const AMDGPU_FAMILY_GC_10_3_6: u32 = 149;
 
 #[repr(C)]
 #[derive(Clone, Copy, Default)]

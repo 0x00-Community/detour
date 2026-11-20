@@ -157,16 +157,17 @@ impl Node {
 
     /// The first render node in /dev/dri whose driver is one of `drivers`
     pub fn open_any(drivers: &[&str]) -> Result<Node> {
+        Node::all(drivers)?.into_iter().next().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no {} render node in /dev/dri", drivers.join(" or "))))
+    }
+
+    /// Every render node in /dev/dri whose driver is one of `drivers`, in order
+    pub fn all(drivers: &[&str]) -> Result<Vec<Node>> {
         let mut nodes: Vec<PathBuf> = std::fs::read_dir("/dev/dri")?
             .filter_map(|e| e.ok().map(|e| e.path()))
             .filter(|p| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("renderD")))
             .collect();
         nodes.sort();
-        nodes
-            .iter()
-            .filter_map(|p| Node::open(p).ok())
-            .find(|n| n.driver().is_ok_and(|d| drivers.contains(&d.as_str())))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no {} render node in /dev/dri", drivers.join(" or "))))
+        Ok(nodes.iter().filter_map(|p| Node::open(p).ok()).filter(|n| n.driver().is_ok_and(|d| drivers.contains(&d.as_str()))).collect())
     }
 
     pub fn open_checked(path: &Path, driver: &str) -> Result<Node> {

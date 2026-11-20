@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use mlirformat::Error;
 
-use crate::{Amdgpu, ColorTarget, Compiled, Draw, Fence, Isa, Node, Surface, Syncobj, Xe};
+use crate::{AMDGPU_FAMILY_GC_10_3_6, Amdgpu, ColorTarget, Compiled, Draw, Fence, Gpu, Isa, Node, Surface, Syncobj, Xe};
 pub(crate) use target::SurfaceMem;
 
 /// How long a submission may take before the GPU is called hung
@@ -52,12 +52,19 @@ pub enum Card {
 }
 
 impl Card {
-    /// The first render node in /dev/dri whose driver detour draws with
+    /// The first render node in /dev/dri of a GPU detour draws on (`Card::try_from`)
     pub fn open_first() -> io::Result<Card> {
-        Card::try_from(Node::open_any(&["xe", "amdgpu"])?)
+        let mut why = io::Error::new(io::ErrorKind::NotFound, "no xe or amdgpu render node in /dev/dri");
+        for node in Node::all(&["xe", "amdgpu"])? {
+            match Card::try_from(node) {
+                Ok(card) => return Ok(card),
+                Err(e) => why = e,
+            }
+        }
+        Err(why)
     }
 
-    /// Render node `path`, by its driver
+    /// Render node `path`, if detour draws on its GPU (`Card::try_from`)
     pub fn open(path: &Path) -> io::Result<Card> {
         Card::try_from(Node::open(path)?)
     }
@@ -81,11 +88,28 @@ impl Card {
 impl TryFrom<Node> for Card {
     type Error = io::Error;
 
+    /// The card on render node `node`, if detour draws on its GPU: Xe3 (graphics IP 30) on xe, RDNA2 gfx1036 (the
+    /// Radeon 610M) on amdgpu. Its programs are those GPUs' machine code and its draws their register state: another
+    /// generation would draw wrong or hang
     fn try_from(node: Node) -> io::Result<Card> {
+        let unsupported = |path: &Path, what: String| io::Error::new(io::ErrorKind::Unsupported, format!("{}: {what}", path.display()));
         match node.driver()?.as_str() {
-            "xe" => Xe::try_from(node).map(Card::Xe),
-            "amdgpu" => Amdgpu::try_from(node).map(Card::Amdgpu),
-            d => Err(io::Error::new(io::ErrorKind::Unsupported, format!("{}: driver {d}, not xe or amdgpu", node.path().display()))),
+            "xe" => {
+                let xe = Xe::try_from(node)?;
+                match xe.driver_info().gts.iter().find(|g| !g.media).map(|g| g.ip_version) {
+                    Some((30, ..)) => Ok(Card::Xe(xe)),
+                    ip => Err(unsupported(xe.path(), format!("graphics IP {ip:?}: detour draws on Xe3 (graphics IP 30) only"))),
+                }
+            }
+            "amdgpu" => {
+                let amd = Amdgpu::try_from(node)?;
+                let i = amd.driver_info();
+                match i.family {
+                    AMDGPU_FAMILY_GC_10_3_6 => Ok(Card::Amdgpu(amd)),
+                    f => Err(unsupported(amd.path(), format!("family {f} (device {:#x}): detour draws on RDNA2 gfx1036 (family {AMDGPU_FAMILY_GC_10_3_6}, the Radeon 610M) only", i.device_id))),
+                }
+            }
+            d => Err(unsupported(node.path(), format!("driver {d}, not xe or amdgpu"))),
         }
     }
 }
