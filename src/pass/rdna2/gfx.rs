@@ -105,7 +105,6 @@ type Memo = BTreeMap<(Op, Vec<Opnd>, bool), Src>;
 
 struct Lower<'b, 'a> {
     body: &'b Body<'a>,
-    wave64: bool,
     regs: Vec<VReg>,
     code: Vec<Inst>,
     vals: BTreeMap<ValueId, Vec<Val>>,
@@ -122,7 +121,7 @@ impl<'b, 'a> Lower<'b, 'a> {
             return Err(Error(format!("RDNA2: built-in inputs ({names}) not yet")));
         }
         let vertex = stage == ShaderStage::Vertex;
-        let mut l = Lower { body, wave64: false, regs: Vec::new(), code: Vec::new(), vals: BTreeMap::new(), memo: vec![Memo::new()], labels: 0, ubo: BTreeMap::new() };
+        let mut l = Lower { body, regs: Vec::new(), code: Vec::new(), vals: BTreeMap::new(), memo: vec![Memo::new()], labels: 0, ubo: BTreeMap::new() };
         let block = body.top_block(f);
         let args: Vec<ValueId> = body[block].args.to_vec();
         let inputs: Vec<ValueId> = args.iter().copied().filter(|a| SpirvType::try_from(&body[*a].ty).is_err()).collect();
@@ -203,7 +202,7 @@ impl<'b, 'a> Lower<'b, 'a> {
         l.code.push(Inst::Sopp { op: Op::SEndpgm, imm: 0 });
         let reserved = user + shader.user_sgprs() + (!vertex) as u32;
         let alloc = allocate(&l.code, &l.regs, reserved)?;
-        let mut enc = Encoder::new(&alloc.base, &l.regs, l.wave64);
+        let mut enc = Encoder::new(&alloc.base, &l.regs);
         for i in &l.code {
             enc.emit(i)?;
         }
@@ -230,7 +229,7 @@ impl<'b, 'a> Lower<'b, 'a> {
     }
 
     fn mask_reg(&mut self, uniform: bool) -> u32 {
-        self.reg(Class::S, if self.wave64 { 2 } else { 1 }, true, uniform)
+        self.reg(Class::S, 1, true, uniform)
     }
 
     /// The components of a value its users read (all, unless only extracted from)
@@ -239,11 +238,11 @@ impl<'b, 'a> Lower<'b, 'a> {
         let mut set = BTreeSet::new();
         for u in self.body[v].uses.iter() {
             let o = u.op;
-            if &*self.body[o].name == "vector.extract" {
-                if let Some(p) = self.body.dense_i64(o, "static_position").first() {
-                    set.insert(*p as u32);
-                    continue;
-                }
+            if &*self.body[o].name == "vector.extract"
+                && let Some(p) = self.body.dense_i64(o, "static_position").first()
+            {
+                set.insert(*p as u32);
+                continue;
             }
             return (0..lanes).collect();
         }
@@ -353,15 +352,15 @@ impl<'b, 'a> Lower<'b, 'a> {
         }
         let mut lit = None;
         let mut sgprs: Vec<Src> = Vec::new();
-        for i in 0..src.len() {
-            match src[i].src {
+        for o in src.iter_mut() {
+            match o.src {
                 Src::K(b) if konst(b) == 255 => match lit {
-                    Some(l) if l != b => src[i] = Opnd { src: self.mov(Opnd::of(src[i].src)), ..src[i] },
+                    Some(l) if l != b => o.src = self.mov(Opnd::of(o.src)),
                     _ => lit = Some(b),
                 },
                 s @ (Src::R(..) | Src::Phys(_)) if !self.vgpr(s) && !sgprs.contains(&s) => {
                     if sgprs.len() + lit.is_some() as usize >= 2 {
-                        src[i] = Opnd { src: self.mov(Opnd::of(s)), ..src[i] };
+                        o.src = self.mov(Opnd::of(s));
                     } else {
                         sgprs.push(s);
                     }
@@ -465,8 +464,8 @@ impl<'b, 'a> Lower<'b, 'a> {
         let (a, b) = (self.x(a)?, self.x(b)?);
         Ok(Val::X(match (konst_of(a), konst_of(b)) {
             (Some(p), Some(q)) => k(p + q),
-            (Some(z), _) if z == 0.0 => b,
-            (_, Some(z)) if z == 0.0 => a,
+            (Some(0.0), _) => b,
+            (_, Some(0.0)) => a,
             _ => self.alu(Op::VAddF32, vec![a, b], false),
         }))
     }
@@ -491,10 +490,10 @@ impl<'b, 'a> Lower<'b, 'a> {
     fn mul(&mut self, a: Opnd, b: Opnd, lazy: bool) -> Val {
         match (konst_of(a), konst_of(b)) {
             (Some(p), Some(q)) => Val::X(k(p * q)),
-            (Some(o), _) if o == 1.0 => Val::X(b),
-            (_, Some(o)) if o == 1.0 => Val::X(a),
-            (Some(o), _) if o == -1.0 => Val::X(neg(b)),
-            (_, Some(o)) if o == -1.0 => Val::X(neg(a)),
+            (Some(1.0), _) => Val::X(b),
+            (_, Some(1.0)) => Val::X(a),
+            (Some(-1.0), _) => Val::X(neg(b)),
+            (_, Some(-1.0)) => Val::X(neg(a)),
             _ if lazy => Val::Lazy(Op::VMulF32, a, b),
             _ => Val::X(self.alu(Op::VMulF32, vec![a, b], false)),
         }
@@ -529,15 +528,10 @@ impl<'b, 'a> Lower<'b, 'a> {
     }
 
     fn unary(&mut self, op: Op, a: Opnd) -> Opnd {
-        if let Some(c) = konst_of(a) {
-            let r = match op {
-                Op::VRcpF32 => Some(1.0 / c),
-                Op::VSqrtF32 => Some(libm_sqrt(c)),
-                _ => None,
-            };
-            if let Some(r) = r {
-                return k(r);
-            }
+        if op == Op::VRcpF32
+            && let Some(c) = konst_of(a)
+        {
+            return k(1.0 / c);
         }
         self.alu(op, vec![a], false)
     }
@@ -548,7 +542,7 @@ impl<'b, 'a> Lower<'b, 'a> {
             let name = self.body[o].name.to_string();
             if name == "scf.yield" || name == "func.return" {
                 let mut out = Vec::new();
-                for v in self.body[o].operands.to_vec() {
+                for &v in self.body[o].operands.iter() {
                     out.extend(self.vals(v)?);
                 }
                 return Ok(Some(out));
@@ -762,10 +756,9 @@ impl<'b, 'a> Lower<'b, 'a> {
                             Val::X(self.unary(Op::VExpF32, m))
                         }
                         "spirv.Dot" => {
-                            let n = args[0].len();
                             let mut acc: Option<Val> = None;
-                            for j in 0..n {
-                                let (x, y) = (self.x(args[0][j])?, self.x(args[1][j])?);
+                            for (&x, &y) in args[0].iter().zip(&args[1]) {
+                                let (x, y) = (self.x(x)?, self.x(y)?);
                                 let p = self.mul(x, y, true);
                                 acc = Some(match acc {
                                     None => p,
@@ -839,14 +832,13 @@ impl<'b, 'a> Lower<'b, 'a> {
         let n: usize = results.iter().map(|r| self.lanes(*r)).sum();
         let rs: Vec<u32> = (0..n).map(|_| self.reg(Class::V, 1, false, false)).collect();
         let (else_label, end) = (self.label(), self.label());
-        let (and_save, andn2, or) = if self.wave64 { (Op::SAndSaveexecB64, Op::SAndn2B64, Op::SOrB64) } else { (Op::SAndSaveexecB32, Op::SAndn2B32, Op::SOrB32) };
         let mut save = None;
         if uniform {
             self.code.push(Inst::BranchZero { mask: m, label: else_label });
         } else {
             let s = self.mask_reg(true);
             self.regs[s as usize].mask = false;
-            self.code.push(Inst::Alu { op: and_save, dst: Src::R(s, 0), src: vec![Opnd::of(m)], clamp: false });
+            self.code.push(Inst::Alu { op: Op::SAndSaveexecB32, dst: Src::R(s, 0), src: vec![Opnd::of(m)], clamp: false });
             self.code.push(Inst::Branch { op: Op::SCbranchExecz, label: else_label });
             save = Some(s);
         }
@@ -858,14 +850,14 @@ impl<'b, 'a> Lower<'b, 'a> {
         self.code.push(Inst::Label(else_label));
         if let Some(s) = save {
             let exec = Opnd::of(Src::Phys(EXEC));
-            self.code.push(Inst::Alu { op: andn2, dst: Src::Phys(EXEC), src: vec![Opnd::of(Src::R(s, 0)), exec], clamp: false });
+            self.code.push(Inst::Alu { op: Op::SAndn2B32, dst: Src::Phys(EXEC), src: vec![Opnd::of(Src::R(s, 0)), exec], clamp: false });
             self.code.push(Inst::Branch { op: Op::SCbranchExecz, label: end });
         }
         all_uniform &= self.arm(els, &rs, shader)?;
         self.code.push(Inst::Label(end));
         if let Some(s) = save {
             let exec = Opnd::of(Src::Phys(EXEC));
-            self.code.push(Inst::Alu { op: or, dst: Src::Phys(EXEC), src: vec![exec, Opnd::of(Src::R(s, 0))], clamp: false });
+            self.code.push(Inst::Alu { op: Op::SOrB32, dst: Src::Phys(EXEC), src: vec![exec, Opnd::of(Src::R(s, 0))], clamp: false });
         }
         for r in &rs {
             self.regs[*r as usize].uniform = all_uniform;
@@ -949,15 +941,4 @@ fn rename(inst: &mut Inst, from: u32, to: u32) {
         Inst::BranchZero { mask, .. } => f(mask),
         _ => {}
     }
-}
-
-fn libm_sqrt(x: f32) -> f32 {
-    if x < 0.0 {
-        return f32::NAN;
-    }
-    let mut r = if x > 1.0 { x / 2.0 } else { 1.0 };
-    for _ in 0..32 {
-        r = 0.5 * (r + x / r);
-    }
-    r
 }

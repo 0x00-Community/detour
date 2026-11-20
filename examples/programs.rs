@@ -4,6 +4,9 @@
 
 use detour::{Card, ColorFormat, ColorTarget, Device, Draw, Filter, Sampled, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Wrap};
 
+/// A ramp draw: its rectangle, geometry, kind, extend, stop offsets, stop count
+type Ramp = ([f32; 4], [f32; 4], f32, f32, [f32; 4], usize);
+
 const W: u32 = 256;
 const H: u32 = 128;
 
@@ -61,7 +64,7 @@ fn main() {
 
     // ramps: linear pad, radial reflect, conic repeat, linear with 4 stops
     let colors: [[f32; 4]; 4] = [[1.0, 0.0, 0.0, 1.0], [0.0, 0.8, 0.0, 0.8], [0.0, 0.0, 1.0, 1.0], [0.3, 0.3, 0.0, 0.6]];
-    let ramps: [([f32; 4], [f32; 4], f32, f32, [f32; 4], usize); 4] = [
+    let ramps: [Ramp; 4] = [
         ([64.0, 0.0, 128.0, 64.0], [70.0, 10.0, 120.0, 50.0], 0.0, 0.0, [0.0, 0.5, 1.0, 1.0], 3),
         ([128.0, 0.0, 192.0, 64.0], [160.0, 32.0, 14.0, 0.0], 1.0, 2.0, [0.0, 0.3, 1.0, 1.0], 3),
         ([192.0, 0.0, 256.0, 64.0], [224.0, 32.0, 0.5, 3.5], 2.0, 1.0, [0.0, 0.5, 1.0, 1.0], 3),
