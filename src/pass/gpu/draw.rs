@@ -76,6 +76,14 @@ pub enum VertexFormat {
 }
 
 impl VertexFormat {
+    /// The bytes it takes in its buffer
+    pub const fn bytes(self) -> u32 {
+        match self {
+            VertexFormat::Unorm8x4 => 4,
+            f => 4 * f.components(),
+        }
+    }
+
     pub const fn components(self) -> u32 {
         match self {
             VertexFormat::Float32 => 1,
@@ -126,6 +134,16 @@ impl ColorFormat {
 pub enum IndexFormat {
     U16,
     U32,
+}
+
+impl IndexFormat {
+    /// An index's bytes
+    pub const fn bytes(self) -> usize {
+        match self {
+            IndexFormat::U16 => 2,
+            IndexFormat::U32 => 4,
+        }
+    }
 }
 
 /// A draw's indices (little-endian, `format`): its `first` and `count` count indices, each the vertex it takes
@@ -325,6 +343,43 @@ pub struct Draw<'d> {
     /// red, green, blue, alpha: written or kept
     pub color_mask: [bool; 4],
     pub target: ColorTarget<'d>,
+}
+
+impl Draw<'_> {
+    /// What it reads lies in what it gives: its indices in their buffer, and every vertex they (or `first` and the
+    /// `count` after it) take in each element's buffer
+    pub fn check(&self) -> Result<(), mlirformat::Error> {
+        let err = |m: alloc::string::String| Err(mlirformat::Error(m));
+        if self.count == 0 || self.instances == 0 {
+            return Ok(());
+        }
+        let last = match self.indices {
+            None => self.first.checked_add(self.count - 1),
+            Some(ib) => {
+                let size = ib.format.bytes();
+                let (from, to) = (self.first as usize * size, (self.first as usize + self.count as usize) * size);
+                if !ib.bytes.len().is_multiple_of(size) || to > ib.bytes.len() {
+                    return err(alloc::format!("indices {}..{} of {} bytes of {:?} indices", self.first, self.first + self.count, ib.bytes.len(), ib.format));
+                }
+                let used = &ib.bytes[from..to];
+                match ib.format {
+                    IndexFormat::U16 => used.as_chunks::<2>().0.iter().map(|c| u32::from(u16::from_le_bytes(*c))).max(),
+                    IndexFormat::U32 => used.as_chunks::<4>().0.iter().map(|c| u32::from_le_bytes(*c)).max(),
+                }
+            }
+        };
+        let Some(last) = last else { return err(alloc::format!("vertices {}.. and {} more: past 2^32", self.first, self.count)) };
+        for (k, e) in self.elements.iter().enumerate() {
+            let Some(b) = self.buffers.get(e.buffer as usize) else {
+                return err(alloc::format!("vertex input {k} reads buffer {}, the draw gives {}", e.buffer, self.buffers.len()));
+            };
+            let end = u64::from(last) * u64::from(b.stride) + u64::from(e.offset) + u64::from(e.format.bytes());
+            if end > b.bytes.len() as u64 {
+                return err(alloc::format!("vertex {last}'s input {k} ends at byte {end} of buffer {}, of {} bytes", e.buffer, b.bytes.len()));
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Default for Draw<'_> {

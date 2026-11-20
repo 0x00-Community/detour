@@ -708,10 +708,7 @@ impl Rdna2Draw {
         match indices {
             None => out.extend([Rdna2Packet::header(Rdna2Packet::DRAW_INDEX_AUTO, 2), count, 2]),
             Some((addr, format, n)) => {
-                let size = match format {
-                    IndexFormat::U16 => 2,
-                    IndexFormat::U32 => 4,
-                };
+                let size = format.bytes() as u64;
                 let at = addr + u64::from(first) * size;
                 out.extend([
                     Rdna2Packet::header(Rdna2Packet::DRAW_INDEX_2, 5),

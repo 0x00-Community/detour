@@ -1,14 +1,11 @@
 use std::cell::{RefCell, RefMut};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::mem::discriminant;
 use std::os::fd::{BorrowedFd, OwnedFd};
 use std::rc::Rc;
 
 use mlirformat::Error;
 
 use super::{DRM_FORMAT_ABGR8888, DRM_FORMAT_MOD_LINEAR, DRM_FORMAT_R8, Exported, I915_FORMAT_MOD_4_TILED, Surface, io, wait};
-use crate::{Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Host, IndexFormat, MemType, Native, Shaders, Syncobj, TargetLoad, Template, Tiling, Xe, Xe3Device, Xe3Draw, Xe3DrawCommands, Xe3Shader, XeBo, XeQueue, XeVm};
+use crate::{Blend, Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, CullMode, Draw, DrawPrimitive, Filter, Host, IndexFormat, MemType, Native, Shaders, Syncobj, TargetLoad, Template, Tiling, VertexFormat, Wrap, Xe, Xe3Device, Xe3Draw, Xe3DrawCommands, Xe3Shader, XeBo, XeQueue, XeVm};
 
 /// Draw shapes kept resident
 const RESIDENT: usize = 64;
@@ -268,7 +265,9 @@ impl<'x> Arena<'x> {
 
 /// One draw shape resident: its states and batches in the arena
 struct Shape {
-    key: u64,
+    /// its number among the shapes lowered
+    id: usize,
+    key: ShapeKey,
     /// when it was last drawn (the device's clock)
     used: u64,
     /// its piece of the arena
@@ -284,7 +283,7 @@ struct Shape {
 }
 
 impl Shape {
-    fn new(key: u64, piece: (u64, usize), state: u64, flush: u64, c: &Xe3DrawCommands, d: &Draw<'_>) -> Result<Shape, Error> {
+    fn new(id: usize, key: ShapeKey, piece: (u64, usize), state: u64, flush: u64, c: &Xe3DrawCommands, d: &Draw<'_>) -> Result<Shape, Error> {
         let vb: Vec<String> = (0..d.buffers.len()).flat_map(|i| [Xe3Draw::vertex_buffer(i), format!("{}_size", Xe3Draw::vertex_buffer(i))]).collect();
         let bindings: Vec<u32> = d.uniforms.iter().map(|(b, _)| *b).collect();
         let textures: Vec<u32> = d.textures.iter().map(|t| t.binding).collect();
@@ -310,7 +309,7 @@ impl Shape {
             viewport_cc: Command::new(&c.viewport_cc, &names(&["cc"]))?,
             viewport_sf_clip: Command::new(&c.viewport_sf_clip, &names(&["sf_clip"]))?,
         };
-        Ok(Shape { key, used: 0, piece, state, flush, commands, bindings, textures })
+        Ok(Shape { id, key, used: 0, piece, state, flush, commands, bindings, textures })
     }
 
     /// The bytes a draw's binding table and its surface states take in the pool at most
@@ -319,30 +318,65 @@ impl Shape {
     }
 }
 
-/// What a draw's key holds: everything of it its image depends on (a hash: one per draw, no allocation)
-fn key(program: u64, d: &Draw<'_>) -> u64 {
-    let mut h = DefaultHasher::new();
-    program.hash(&mut h);
-    for b in &d.buffers {
-        b.stride.hash(&mut h);
+/// A blend as compared: its factors, equations and constant color's bits
+type BlendKey = ([crate::BlendFactor; 2], [crate::BlendFactor; 2], [crate::BlendEquation; 2], [u32; 4]);
+
+fn blend_key(b: &Blend) -> BlendKey {
+    (b.src, b.dst, b.equation, b.color.map(f32::to_bits))
+}
+
+/// Everything of a draw its shape's image depends on, and the program's id: a resident shape draws only draws it
+/// holds
+#[derive(PartialEq)]
+struct ShapeKey {
+    program: u64,
+    strides: Vec<u32>,
+    elements: Vec<(u32, VertexFormat, u32)>,
+    uniforms: Vec<u32>,
+    textures: Vec<(u32, Filter, Wrap)>,
+    primitive: DrawPrimitive,
+    indices: Option<IndexFormat>,
+    raster: (CullMode, bool, [bool; 4]),
+    blend: Option<BlendKey>,
+    target: (ColorFormat, Tiling),
+}
+
+impl ShapeKey {
+    fn new(program: u64, d: &Draw<'_>) -> ShapeKey {
+        ShapeKey {
+            program,
+            strides: d.buffers.iter().map(|b| b.stride).collect(),
+            elements: d.elements.iter().map(|e| (e.buffer, e.format, e.offset)).collect(),
+            uniforms: d.uniforms.iter().map(|u| u.0).collect(),
+            textures: d.textures.iter().map(|t| (t.binding, t.filter, t.wrap)).collect(),
+            primitive: d.primitive,
+            indices: d.indices.map(|i| i.format),
+            raster: (d.cull, d.front_ccw, d.color_mask),
+            blend: d.blend.as_ref().map(blend_key),
+            target: (d.target.format, d.target.tiling),
+        }
     }
-    for e in &d.elements {
-        (e.buffer, discriminant(&e.format), e.offset).hash(&mut h);
+
+    /// Whether it is program `program` and `d`'s (compared as they are: nothing allocated)
+    fn holds(&self, program: u64, d: &Draw<'_>) -> bool {
+        self.program == program
+            && self.strides.iter().copied().eq(d.buffers.iter().map(|b| b.stride))
+            && self.elements.iter().copied().eq(d.elements.iter().map(|e| (e.buffer, e.format, e.offset)))
+            && self.uniforms.iter().copied().eq(d.uniforms.iter().map(|u| u.0))
+            && self.textures.iter().copied().eq(d.textures.iter().map(|t| (t.binding, t.filter, t.wrap)))
+            && self.primitive == d.primitive
+            && self.indices == d.indices.map(|i| i.format)
+            && self.raster == (d.cull, d.front_ccw, d.color_mask)
+            && self.blend == d.blend.as_ref().map(blend_key)
+            && self.target == (d.target.format, d.target.tiling)
     }
-    for (binding, _) in &d.uniforms {
-        binding.hash(&mut h);
-    }
-    for t in &d.textures {
-        (t.binding, t.filter, t.wrap).hash(&mut h);
-    }
-    discriminant(&d.primitive).hash(&mut h);
-    d.indices.map(|i| i.format).hash(&mut h);
-    (discriminant(&d.cull), d.front_ccw, d.color_mask, d.blend.is_some()).hash(&mut h);
-    if let Some(b) = &d.blend {
-        (b.src.map(|f| f as u8), b.dst.map(|f| f as u8), b.equation.map(|e| e as u8), b.color.map(f32::to_bits)).hash(&mut h);
-    }
-    (discriminant(&d.target.format), d.target.tiling).hash(&mut h);
-    h.finish()
+}
+
+/// A draw's viewport, depth range and target size, as compared: their bits
+fn viewport_key(d: &Draw<'_>) -> [u32; 8] {
+    let [x, y, w, h] = d.viewport.map(f32::to_bits);
+    let [near, far] = d.depth_range.map(f32::to_bits);
+    [x, y, w, h, near, far, d.target.width, d.target.height]
 }
 
 type SurfaceMem<'x> = super::SurfaceMem<'x, XeBo<'x>>;
@@ -350,12 +384,13 @@ type SurfaceMem<'x> = super::SurfaceMem<'x, XeBo<'x>>;
 /// What the batch being recorded has set since its last shape's state: its vertex buffers, binding table (the
 /// surface, the uniforms' addresses and the textures), viewport and scissor
 struct Current {
-    shape: u64,
+    /// its shape's id
+    shape: usize,
     flush: u64,
     vertices: Vec<u64>,
     indices: Option<[u64; 2]>,
     table: Option<(usize, Vec<u64>, Vec<usize>)>,
-    viewport: Option<u64>,
+    viewport: Option<[u32; 8]>,
     scissor: Option<[u32; 4]>,
 }
 
@@ -398,7 +433,7 @@ struct State<'x> {
     sampled_since: Vec<usize>,
     current: Option<Current>,
     /// the viewports written into the dynamic memory since it started over: each one's key, CC and SF_CLIP state
-    viewports: Vec<(u64, u64, u64)>,
+    viewports: Vec<([u32; 8], u64, u64)>,
     words: Vec<u32>,
     lowered: usize,
 }
@@ -605,9 +640,8 @@ impl<'x> State<'x> {
     /// The resident shape of `program` and `d`: packed into the arena when it is not (the least recently drawn one
     /// put away when they are `RESIDENT`)
     fn shape(&mut self, program: &Compiled, d: &Draw<'_>) -> Result<usize, Error> {
-        let k = key(program.id, d);
         self.clock += 1;
-        if let Some(i) = self.shapes.iter().position(|s| s.key == k) {
+        if let Some(i) = self.shapes.iter().position(|s| s.key.holds(program.id, d)) {
             self.shapes[i].used = self.clock;
             return Ok(i);
         }
@@ -630,7 +664,7 @@ impl<'x> State<'x> {
         let (bytes, state, flush) = shape.lay(piece.0, outer)?;
         self.arena.write(piece.0, &bytes)?;
         self.lowered += 1;
-        let mut shape = Shape::new(k, piece, piece.0 + state as u64, piece.0 + flush as u64, &shape.commands, d)?;
+        let mut shape = Shape::new(self.lowered, ShapeKey::new(program.id, d), piece, piece.0 + state as u64, piece.0 + flush as u64, &shape.commands, d)?;
         shape.used = self.clock;
         self.shapes.push(shape);
         Ok(self.shapes.len() - 1)
@@ -711,15 +745,13 @@ impl<'x> State<'x> {
         if self.start.is_none() {
             self.start = Some(self.at);
         }
-        let (key, state, flush) = (self.shapes[i].key, self.shapes[i].state, self.shapes[i].flush);
-        if self.current.as_ref().is_none_or(|c| c.shape != key) {
+        let (id, state, flush) = (self.shapes[i].id, self.shapes[i].state, self.shapes[i].flush);
+        if self.current.as_ref().is_none_or(|c| c.shape != id) {
             self.words.extend([MI_BATCH_BUFFER_START_2ND, state as u32, (state >> 32) as u32]);
             self.write()?;
-            self.current = Some(Current { shape: key, flush, vertices: Vec::new(), indices: None, table: None, viewport: None, scissor: None });
+            self.current = Some(Current { shape: id, flush, vertices: Vec::new(), indices: None, table: None, viewport: None, scissor: None });
         }
-        let mut h = DefaultHasher::new();
-        (d.viewport.map(f32::to_bits), d.depth_range.map(f32::to_bits), d.target.width, d.target.height).hash(&mut h);
-        let viewport = h.finish();
+        let viewport = viewport_key(d);
         if self.current.as_ref().is_some_and(|c| c.viewport != Some(viewport)) {
             let (cc, sf_clip) = match self.viewports.iter().find(|v| v.0 == viewport) {
                 Some(&(_, cc, sf_clip)) => (cc, sf_clip),
@@ -1004,15 +1036,7 @@ impl<'x> XeDevice<'x> {
                 d.target.width, d.target.height, d.target.format, d.target.tiling, t.width, t.height, t.format, t.tiling
             )));
         }
-        if let Some(ib) = d.indices {
-            let size = match ib.format {
-                IndexFormat::U16 => 2,
-                IndexFormat::U32 => 4,
-            };
-            if !ib.bytes.len().is_multiple_of(size) || (d.first as usize + d.count as usize) * size > ib.bytes.len() {
-                return Err(Error(format!("indices {}..{} of {} bytes of {:?} indices", d.first, d.first + d.count, ib.bytes.len(), ib.format)));
-            }
-        }
+        d.check()?;
         for x in &d.textures {
             if x.surface == s {
                 return Err(Error(format!("a draw into surface {s:?} sampling it")));

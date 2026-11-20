@@ -350,11 +350,7 @@ impl<'a> State<'a> {
         }
         let indices = match d.indices {
             Some(ib) => {
-                let size = match ib.format {
-                    IndexFormat::U16 => 2,
-                    IndexFormat::U32 => 4,
-                };
-                Some((self.ring.put(ib.bytes)?, ib.format, (ib.bytes.len() / size) as u32))
+                Some((self.ring.put(ib.bytes)?, ib.format, (ib.bytes.len() / ib.format.bytes()) as u32))
             }
             None => None,
         };
@@ -562,14 +558,8 @@ impl<'a> AmdgpuDevice<'a> {
             return Err(Error(format!("the vertex shader reads {} inputs, the draw gives {}", vs.inputs, d.elements.len())));
         }
         let mut data: usize = d.buffers.iter().map(|b| b.bytes.len()).sum::<usize>() + d.uniforms.iter().map(|(_, u)| u.len()).sum::<usize>();
+        d.check()?;
         if let Some(ib) = d.indices {
-            let size = match ib.format {
-                IndexFormat::U16 => 2,
-                IndexFormat::U32 => 4,
-            };
-            if !ib.bytes.len().is_multiple_of(size) || (d.first as usize + d.count as usize) * size > ib.bytes.len() {
-                return Err(Error(format!("indices {}..{} of {} bytes of {:?} indices", d.first, d.first + d.count, ib.bytes.len(), ib.format)));
-            }
             data += ib.bytes.len();
         }
         for x in &d.textures {
