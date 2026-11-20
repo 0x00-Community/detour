@@ -144,13 +144,17 @@ pub(crate) fn allocate(code: &[Inst], regs: &[VReg], reserved_sgprs: u32) -> Res
             _ => {}
         });
     }
+    // per instruction: the registers first defined there, the components last used there, those defined there and
+    // never used
     let mut starts: Vec<Vec<u32>> = vec![Vec::new(); n];
     let mut ends: Vec<Vec<(u32, u8)>> = vec![Vec::new(); n];
+    let mut unused: Vec<Vec<(u32, u8)>> = vec![Vec::new(); n];
     for (v, f) in first.iter().enumerate() {
         let Some(f) = *f else { continue };
         starts[f].push(v as u32);
         for (c, l) in last[v].iter().enumerate() {
-            ends[(*l).max(f)].push((v as u32, c as u8));
+            let at = if *l > f { &mut ends[*l] } else { &mut unused[f] };
+            at.push((v as u32, c as u8));
         }
     }
     let mut sfree = [true; SGPRS + 2];
@@ -159,11 +163,8 @@ pub(crate) fn allocate(code: &[Inst], regs: &[VReg], reserved_sgprs: u32) -> Res
     let mut base = vec![0u16; regs.len()];
     let (mut sgprs, mut vgprs) = (reserved_sgprs, 0u32);
     for i in 0..n {
-        let release = |ends: &[(u32, u8)], sfree: &mut [bool; SGPRS + 2], vfree: &mut [bool; VGPRS], base: &[u16], dead: bool| {
-            for &(v, c) in ends {
-                if (first[v as usize] == Some(i)) != dead {
-                    continue;
-                }
+        let release = |comps: &[(u32, u8)], sfree: &mut [bool; SGPRS + 2], vfree: &mut [bool; VGPRS], base: &[u16]| {
+            for &(v, c) in comps {
                 let r = base[v as usize] + c as u16;
                 match regs[v as usize].class {
                     Class::S => sfree[r as usize] = true,
@@ -173,7 +174,7 @@ pub(crate) fn allocate(code: &[Inst], regs: &[VReg], reserved_sgprs: u32) -> Res
         };
         let early = code[i].overlaps();
         if early {
-            release(&ends[i], &mut sfree, &mut vfree, &base, false);
+            release(&ends[i], &mut sfree, &mut vfree, &base);
         }
         for &v in &starts[i] {
             let r = regs[v as usize];
@@ -206,9 +207,9 @@ pub(crate) fn allocate(code: &[Inst], regs: &[VReg], reserved_sgprs: u32) -> Res
             }
         }
         if !early {
-            release(&ends[i], &mut sfree, &mut vfree, &base, false);
+            release(&ends[i], &mut sfree, &mut vfree, &base);
         }
-        release(&ends[i], &mut sfree, &mut vfree, &base, true);
+        release(&unused[i], &mut sfree, &mut vfree, &base);
     }
     Ok(Allocation { base, sgprs, vgprs: vgprs.max(phys_max) })
 }
@@ -279,7 +280,6 @@ impl Pending {
 pub(crate) struct Encoder<'c> {
     base: &'c [u16],
     regs: &'c [VReg],
-    wave64: bool,
     out: Vec<u32>,
     labels: BTreeMap<u32, usize>,
     fixups: Vec<(usize, u32)>,
@@ -289,8 +289,8 @@ pub(crate) struct Encoder<'c> {
 }
 
 impl<'c> Encoder<'c> {
-    pub fn new(base: &'c [u16], regs: &'c [VReg], wave64: bool) -> Self {
-        Encoder { base, regs, wave64, out: Vec::new(), labels: BTreeMap::new(), fixups: Vec::new(), pending: Pending::default(), at_label: BTreeMap::new(), live: true }
+    pub fn new(base: &'c [u16], regs: &'c [VReg]) -> Self {
+        Encoder { base, regs, out: Vec::new(), labels: BTreeMap::new(), fixups: Vec::new(), pending: Pending::default(), at_label: BTreeMap::new(), live: true }
     }
 
     fn reg(&self, s: Src) -> u16 {
@@ -393,7 +393,7 @@ impl<'c> Encoder<'c> {
         for x in &w {
             exp |= self.pending.exp.contains_key(x);
         }
-        if matches!(inst, Inst::Alu { op: Op::SAndSaveexecB32 | Op::SAndSaveexecB64 | Op::SAndn2B32 | Op::SAndn2B64 | Op::SOrB32 | Op::SOrB64 | Op::SMovB32, dst: Src::Phys(EXEC), .. }) {
+        if matches!(inst, Inst::Alu { op: Op::SAndSaveexecB32 | Op::SAndn2B32 | Op::SOrB32 | Op::SMovB32, dst: Src::Phys(EXEC), .. }) {
             exp |= !self.pending.exp.is_empty();
         }
         self.waitcnt(vm, lgkm, exp);
@@ -418,7 +418,8 @@ impl<'c> Encoder<'c> {
 
     fn vop3(&mut self, code: u32, dst: u16, src: &[Opnd], clamp: bool) {
         let (mut abs, mut neg) = (0u32, 0u32);
-        let mut s = [0u32; 3];
+        // an unused source reads inline 0, as LLVM writes it (no SGPR read)
+        let mut s = [128u32; 3];
         for (k, o) in src.iter().enumerate() {
             s[k] = self.src(o);
             abs |= (o.abs as u32) << k;
@@ -520,8 +521,7 @@ impl<'c> Encoder<'c> {
                         if m == VCC {
                             self.branch(Op::SCbranchVccz, *label);
                         } else {
-                            let cmp = if self.wave64 { Op::SCmpLgU64 } else { Op::SCmpLgU32 };
-                            self.out.push(0xbf00_0000 | cmp.code() << 16 | 128 << 8 | m as u32);
+                            self.out.push(0xbf00_0000 | Op::SCmpLgU32.code() << 16 | 128 << 8 | m as u32);
                             self.branch(Op::SCbranchScc0, *label);
                         }
                     }
@@ -584,10 +584,112 @@ impl<'c> Encoder<'c> {
             self.out[*at] |= (off as i16 as u16) as u32;
         }
         let end = Op::SCodeEnd.code();
-        while self.out.len() % 16 != 0 {
+        while !self.out.len().is_multiple_of(16) {
             self.out.push(0xbf80_0000 | end << 16);
         }
         self.out.extend([0xbf80_0000 | end << 16; 48]);
         Ok(self.out.iter().flat_map(|w| w.to_le_bytes()).collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const V: u16 = VGPR;
+
+    fn v(n: u16) -> Src {
+        Src::Phys(V + n)
+    }
+
+    fn s(n: u16) -> Src {
+        Src::Phys(n)
+    }
+
+    fn o(src: Src) -> Opnd {
+        Opnd::of(src)
+    }
+
+    /// One instruction's words; tuples are virtual registers 0.. of `tuples` (class, size, first register)
+    fn words(inst: Inst, tuples: &[(Class, u8, u16)]) -> Vec<u32> {
+        let regs: Vec<VReg> = tuples.iter().map(|&(class, size, _)| VReg { class, size, align: 1, mask: false, uniform: false }).collect();
+        let base: Vec<u16> = tuples.iter().map(|t| t.2).collect();
+        let mut e = Encoder::new(&base, &regs);
+        e.emit(&inst).unwrap();
+        e.out
+    }
+
+    fn alu(op: Op, dst: Src, src: Vec<Opnd>, clamp: bool) -> Vec<u32> {
+        words(Inst::Alu { op, dst, src, clamp }, &[])
+    }
+
+    // the encodings llvm-mc gives for gfx1036
+    #[test]
+    fn vector_alu() {
+        assert_eq!(alu(Op::VRcpF32, v(1), vec![o(v(2))], false), [0x7e02_5502]);
+        assert_eq!(alu(Op::VCvtPkrtzF16F32, v(0), vec![o(v(0)), o(v(1))], false), [0x5e00_0300]);
+        assert_eq!(alu(Op::VAddU32, v(5), vec![o(s(13)), o(v(5))], false), [0x4a0a_0a0d]);
+        assert_eq!(alu(Op::VMulF32, v(1), vec![o(v(2)), o(v(3))], true), [0xd508_8001, 0x0202_0702]);
+        assert_eq!(alu(Op::VCndmaskB32, v(1), vec![o(v(2)), o(v(3)), o(s(4))], false), [0xd501_0001, 0x0012_0702]);
+        let neg = Opnd { neg: true, ..o(v(2)) };
+        let abs = Opnd { abs: true, ..o(v(3)) };
+        assert_eq!(alu(Op::VFmaF32, v(1), vec![neg, abs, o(s(4))], false), [0xd54b_0201, 0x2012_0702]);
+        let (minus_one, hundred) = (o(Src::K((-1.0f32).to_bits())), o(Src::K(100.0f32.to_bits())));
+        assert_eq!(alu(Op::VMed3F32, v(1), vec![o(v(2)), minus_one, hundred], false), [0xd557_0001, 0x03fd_e702, 0x42c8_0000]);
+        assert_eq!(alu(Op::VCmpLtF32, s(4), vec![o(v(1)), o(s(2))], false), [0xd401_0004, 0x0200_0501]);
+    }
+
+    #[test]
+    fn scalar_alu() {
+        assert_eq!(alu(Op::SAndSaveexecB32, s(4), vec![o(s(5))], false), [0xbe84_3c05]);
+        assert_eq!(alu(Op::SAndn2B32, s(EXEC), vec![o(s(4)), o(s(EXEC))], false), [0x8a7e_7e04]);
+        assert_eq!(alu(Op::SOrB32, s(EXEC), vec![o(s(EXEC)), o(s(4))], false), [0x887e_047e]);
+        assert_eq!(alu(Op::SMovB32, s(M0), vec![o(s(7))], false), [0xbefc_0307]);
+    }
+
+    #[test]
+    fn memory() {
+        let smem = Inst::Smem { op: Op::SLoadDwordx4, dst: Src::R(0, 0), base: 2, offset: 0x210 };
+        assert_eq!(words(smem, &[(Class::S, 4, 8)]), [0xf408_0201, 0xfa00_0210]);
+        let mubuf = Inst::Mubuf { op: Op::BufferLoadFormatXy, dst: Src::R(0, 0), vindex: v(5), rsrc: 20 };
+        assert_eq!(words(mubuf, &[(Class::V, 2, V + 4)]), [0xe004_2000, 0x8005_0405]);
+        let nsa = Inst::Mimg { op: Op::ImageSampleLz, dst: Src::R(0, 0), addr: vec![v(4), v(7)], rsrc: 0, samp: 8, dmask: 0xf };
+        assert_eq!(words(nsa, &[(Class::V, 4, V)]), [0xf09c_0f0a, 0x0040_0004, 0x0000_0007]);
+        let packed = Inst::Mimg { op: Op::ImageSampleLz, dst: Src::R(0, 0), addr: vec![v(4), v(5)], rsrc: 0, samp: 8, dmask: 0xf };
+        assert_eq!(words(packed, &[(Class::V, 4, V)]), [0xf09c_0f08, 0x0040_0004]);
+    }
+
+    #[test]
+    fn interpolation_and_export() {
+        assert_eq!(words(Inst::Interp { p2: false, dst: v(0), ij: v(2), attr: 1, chan: 0 }, &[]), [0xc800_0402]);
+        assert_eq!(words(Inst::Interp { p2: true, dst: v(0), ij: v(3), attr: 1, chan: 3 }, &[]), [0xc801_0703]);
+        let pos = Inst::Exp { target: 12, src: [Some(v(4)), Some(v(5)), Some(v(6)), Some(v(7))], done: true, compr: false, vm: false };
+        assert_eq!(words(pos, &[]), [0xf800_08cf, 0x0706_0504]);
+        let param = Inst::Exp { target: 35, src: [Some(v(8)), Some(v(9)), None, None], done: false, compr: false, vm: false };
+        assert_eq!(words(param, &[]), [0xf800_0233, 0x8080_0908]);
+        let mrt = Inst::Exp { target: 0, src: [Some(v(0)), Some(v(2)), None, None], done: true, compr: true, vm: true };
+        assert_eq!(words(mrt, &[]), [0xf800_1c0f, 0x8080_0200]);
+    }
+
+    #[test]
+    fn branches_and_waits() {
+        // a uniform branch on VCC, then one on another SGPR (s_cmp_lg_u32 first)
+        for (mask, want) in [(VCC, vec![0xbf87_0001]), (4, vec![0xbf07_8004, 0xbf84_0001])] {
+            let regs = [VReg { class: Class::S, size: 1, align: 1, mask: true, uniform: true }];
+            let base = [mask];
+            let mut e = Encoder::new(&base, &regs);
+            e.emit(&Inst::BranchZero { mask: Src::R(0, 0), label: 1 }).unwrap();
+            e.emit(&Inst::Sopp { op: Op::SSetprio, imm: 0 }).unwrap();
+            e.emit(&Inst::Label(1)).unwrap();
+            let n = want.len();
+            assert_eq!(e.finish().unwrap()[..4 * n].chunks(4).map(|w| u32::from_le_bytes(w.try_into().unwrap())).collect::<Vec<_>>(), want);
+        }
+        // a load's result read: vmcnt(0) before the reader
+        let regs = [VReg { class: Class::V, size: 2, align: 1, mask: false, uniform: false }];
+        let base = [V + 4];
+        let mut e = Encoder::new(&base, &regs);
+        e.emit(&Inst::Mubuf { op: Op::BufferLoadFormatXy, dst: Src::R(0, 0), vindex: v(5), rsrc: 20 }).unwrap();
+        e.emit(&Inst::Alu { op: Op::VRcpF32, dst: v(1), src: vec![o(Src::R(0, 1))], clamp: false }).unwrap();
+        assert_eq!(e.out[2], 0xbf8c_3f70);
     }
 }
