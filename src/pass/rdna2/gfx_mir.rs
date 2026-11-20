@@ -81,14 +81,14 @@ pub(crate) enum Inst {
 }
 
 impl Inst {
-    fn defs(&self, mut f: impl FnMut(Src)) {
+    pub fn defs(&self, mut f: impl FnMut(Src)) {
         match self {
             Inst::Alu { dst, .. } | Inst::Smem { dst, .. } | Inst::Mubuf { dst, .. } | Inst::Mimg { dst, .. } | Inst::Interp { dst, .. } => f(*dst),
             _ => {}
         }
     }
 
-    fn uses(&self, mut f: impl FnMut(Src)) {
+    pub fn uses(&self, mut f: impl FnMut(Src)) {
         match self {
             Inst::Alu { src, .. } => src.iter().for_each(|s| f(s.src)),
             Inst::Mubuf { vindex, .. } => f(*vindex),
@@ -412,7 +412,7 @@ impl<'c> Encoder<'c> {
         }
     }
 
-    fn src(&mut self, o: &Opnd) -> u32 {
+    fn src(&self, o: &Opnd) -> u32 {
         self.reg(o.src) as u32
     }
 
