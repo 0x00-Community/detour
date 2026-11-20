@@ -24,9 +24,8 @@ const FENCE_SIZE: u64 = 4096;
 /// What the device writes between draws below 4 GiB (scissor rectangles, viewports), and its size
 const DYNAMIC_ADDR: u64 = 0xf000_0000;
 const DYNAMIC_SIZE: usize = 1 << 20;
-/// Where the first-level batches go, and their ring's size
+/// The first-level batches' ring
 const CALLS_ADDR: u64 = 1 << 32;
-const CALLS_SIZE: u64 = 1 << 20;
 /// Mapped past a ring's end: the command streamer prefetches beyond the batch end it reads (a GPU fault at batch +
 /// 0x1000 otherwise), the VF beyond a buffer's
 const GUARD: u64 = 1 << 16;
@@ -34,10 +33,8 @@ const GUARD: u64 = 1 << 16;
 const MI_BATCH_BUFFER_START_2ND: u32 = 49 << 23 | 1 << 22 | 1 << 8 | 1;
 const MI_BATCH_BUFFER_END: u32 = 10 << 23;
 const CALL_BYTES: usize = 12;
-/// A first-level batch's start: the CS reads it from a 64-byte boundary
-const BATCH_ALIGN: usize = 64;
 /// The uniforms' ring, vertex buffer i's (`VERTEX_ADDR + i * VERTEX_SPAN`), a ring's least size and where each
-/// draw's bytes start in it
+/// piece starts in it (the CS reads a first-level batch from a 64-byte boundary)
 const UNIFORM_ADDR: u64 = 1 << 35;
 /// The indices' ring
 const INDEX_ADDR: u64 = 1 << 34;
@@ -45,8 +42,6 @@ const VERTEX_ADDR: u64 = 1 << 36;
 const VERTEX_SPAN: u64 = 1 << 32;
 const RING_MIN: usize = 1 << 20;
 const RING_ALIGN: usize = 64;
-/// Bytes a ring compares with the last it was given (more: written again, not compared nor kept)
-const RING_HELD: usize = 64 << 10;
 /// Where surface slot i is mapped (`SURFACE_ADDR + i * SURFACE_SPAN`): a surface takes at most a span
 const SURFACE_ADDR: u64 = 1 << 40;
 const SURFACE_SPAN: u64 = 1 << 30;
@@ -97,91 +92,17 @@ fn names(n: &[&str]) -> Vec<String> {
     n.iter().map(|s| s.to_string()).collect()
 }
 
-/// Bytes the GPU reads, written into a ring from its start once what read them before finished, each draw's after
-/// the last's (the same bytes again: where they are)
-struct Ring<'x> {
-    bo: Option<XeBo<'x>>,
-    addr: u64,
-    /// the bytes the ring holds (its memory past them mapped too: `GUARD`)
-    size: usize,
-    at: usize,
-    /// where the batch being recorded started writing, and the room the next start wants: twice what a batch
-    /// that did not fit asked for, so a frame's draws fit and it starts over at most once a frame
-    mark: usize,
-    want: usize,
-    /// where writing stops: `size`, or below a batch maybe still running after the ring started over at a frame's
-    /// end (`State::submit`)
-    limit: usize,
-    /// where the last bytes written start, and them (`RING_HELD` at most)
-    last: Option<(usize, Vec<u8>)>,
-}
+type Ring<'x> = super::Ring<'x, XeBo<'x>>;
 
-impl<'x> Ring<'x> {
-    fn new(addr: u64) -> Ring<'x> {
-        Ring { bo: None, addr, size: 0, at: 0, mark: 0, want: 0, limit: 0, last: None }
+/// A ring's memory at `addr` of `size` bytes and a guard past it (`old`, the ring's memory before, unmapped)
+fn ring_memory<'x>(xe: &'x Xe, vm: &XeVm<'x>, addr: u64, old: Option<XeBo<'x>>, size: usize) -> Result<XeBo<'x>, Error> {
+    if let Some(old) = old {
+        vm.unbind(addr, old.size(), &[]).map_err(io)?;
     }
-
-    /// The batch being recorded did not fit, `len` more bytes asked for: the next start makes room for twice it
-    fn outgrown(&mut self, len: usize) {
-        self.want = self.want.max(2 * (self.at - self.mark.min(self.at) + len + RING_ALIGN));
-    }
-
-    fn held(&self, bytes: &[u8]) -> Option<usize> {
-        self.last.as_ref().filter(|(_, b)| b == bytes).map(|(at, _)| *at)
-    }
-
-    /// Where the ring is after `lens` more bytes from `at` (each on `RING_ALIGN`)
-    fn after(at: usize, lens: impl Iterator<Item = usize>) -> usize {
-        lens.fold(at, |at, n| if n == 0 { at } else { at.next_multiple_of(RING_ALIGN) + n })
-    }
-
-    /// Whether `bytes` are in place already, or fit after the last
-    fn fits(&self, bytes: &[u8]) -> bool {
-        self.held(bytes).is_some() || Ring::after(self.at, [bytes.len()].into_iter()) <= self.limit
-    }
-
-    /// The ring from its start, with room for `len` bytes and what it wants (nothing reading it)
-    fn restart(&mut self, xe: &'x Xe, vm: &XeVm<'x>, len: usize) -> Result<(), Error> {
-        let len = len.max(self.want);
-        (self.at, self.mark, self.want, self.last) = (0, 0, 0, None);
-        self.limit = self.size;
-        if len <= self.size {
-            return Ok(());
-        }
-        let size = len.next_power_of_two().max(RING_MIN);
-        let bytes = size as u64 + GUARD;
-        if let Some(old) = self.bo.take() {
-            vm.unbind(self.addr, old.size(), &[]).map_err(io)?;
-        }
-        let bo = xe.bo((bytes, Caching::WriteCombined).into()).map_err(io)?;
-        bind(xe, vm, &bo, 0, self.addr, bytes, MemType::Streaming)?;
-        (self.bo, self.size, self.limit) = (Some(bo), size, size);
-        Ok(())
-    }
-
-    /// `bytes` in the ring (they fit): their address
-    fn put(&mut self, bytes: &[u8]) -> Result<u64, Error> {
-        if bytes.is_empty() {
-            return Ok(self.addr);
-        }
-        if let Some(at) = self.held(bytes) {
-            return Ok(self.addr + at as u64);
-        }
-        let at = self.at.next_multiple_of(RING_ALIGN);
-        let bo = self.bo.as_mut().ok_or_else(|| Error("a ring with no memory".into()))?;
-        bo.bytes().map_err(io)?[at..at + bytes.len()].copy_from_slice(bytes);
-        self.at = at + bytes.len();
-        match &mut self.last {
-            _ if bytes.len() > RING_HELD => self.last = None,
-            Some((held, b)) => {
-                *held = at;
-                b.clear();
-                b.extend_from_slice(bytes);
-            }
-            None => self.last = Some((at, bytes.to_vec())),
-        }
-        Ok(self.addr + at as u64)
-    }
+    let bytes = size as u64 + GUARD;
+    let bo = xe.bo((bytes, Caching::WriteCombined).into()).map_err(io)?;
+    bind(xe, vm, &bo, 0, addr, bytes, MemType::Streaming)?;
+    Ok(bo)
 }
 
 /// What a draw writes, from its image (`Xe3DrawCommands`)
@@ -399,17 +320,16 @@ struct State<'x> {
     xe: &'x Xe,
     vm: XeVm<'x>,
     queue: XeQueue<'x>,
-    calls: XeBo<'x>,
-    /// where the next dword goes in `calls`, and where the batch being recorded starts
-    at: usize,
-    start: Option<usize>,
+    /// the first-level batches, and the one being recorded (empty: none)
+    calls: Ring<'x>,
+    batch: Vec<u32>,
     dynamic: XeBo<'x>,
     dynamic_at: usize,
     vertices: Vec<Ring<'x>>,
     uniforms: Ring<'x>,
     indices: Ring<'x>,
-    /// each binding's uniform bytes last written into the ring, and where
-    held: Vec<(u32, u64, Vec<u8>)>,
+    /// each binding's uniform bytes last written into the ring: the ring's head before, where, the bytes
+    held: Vec<(u32, u64, u64, Vec<u8>)>,
     shapes: Vec<Shape>,
     clock: u64,
     /// the programs' code and the shapes' states and batches
@@ -434,7 +354,6 @@ struct State<'x> {
     current: Option<Current>,
     /// the viewports written into the dynamic memory since it started over: each one's key, CC and SF_CLIP state
     viewports: Vec<([u32; 8], u64, u64)>,
-    words: Vec<u32>,
     lowered: usize,
 }
 
@@ -442,8 +361,8 @@ impl<'x> State<'x> {
     fn new(xe: &'x Xe) -> Result<State<'x>, Error> {
         let vm = xe.vm().map_err(io)?;
         let queue = xe.queue(&vm).map_err(io)?;
-        let calls = xe.bo((CALLS_SIZE + GUARD, Caching::WriteCombined).into()).map_err(io)?;
-        bind(xe, &vm, &calls, 0, CALLS_ADDR, CALLS_SIZE + GUARD, MemType::Streaming)?;
+        let mut calls = Ring::new(CALLS_ADDR, RING_ALIGN, RING_MIN);
+        calls.restart(0, |old, size| ring_memory(xe, &vm, CALLS_ADDR, old, size))?;
         let dynamic = xe.bo((DYNAMIC_SIZE as u64, Caching::WriteCombined).into()).map_err(io)?;
         bind(xe, &vm, &dynamic, 0, DYNAMIC_ADDR, DYNAMIC_SIZE as u64, MemType::Streaming)?;
         let mut pool = xe.bo((POOL_SIZE as u64, Caching::WriteCombined).into()).map_err(io)?;
@@ -462,13 +381,12 @@ impl<'x> State<'x> {
             vm,
             queue,
             calls,
-            at: 0,
-            start: None,
+            batch: Vec::new(),
             dynamic,
             dynamic_at: 0,
             vertices: Vec::new(),
-            uniforms: Ring::new(UNIFORM_ADDR),
-            indices: Ring::new(INDEX_ADDR),
+            uniforms: Ring::new(UNIFORM_ADDR, RING_ALIGN, RING_MIN),
+            indices: Ring::new(INDEX_ADDR, RING_ALIGN, RING_MIN),
             held: Vec::new(),
             shapes: Vec::new(),
             clock: 0,
@@ -486,7 +404,6 @@ impl<'x> State<'x> {
             sampled_since: Vec::new(),
             current: None,
             viewports: Vec::new(),
-            words: Vec::new(),
             lowered: 0,
         })
     }
@@ -537,53 +454,33 @@ impl<'x> State<'x> {
         Ok(Surface(self.surfaces.len() - 1))
     }
 
-    /// The batch recorded ended (the flush, MI_BATCH_BUFFER_END) and submitted, after what it waits for
+    /// The batch recorded ended (the flush, MI_BATCH_BUFFER_END), put in its ring and submitted, after what it waits
+    /// for
     fn submit(&mut self) -> Result<(), Error> {
-        let Some(start) = self.start.take() else { return Ok(()) };
+        if self.batch.is_empty() {
+            return Ok(());
+        }
         let flush = self.current.take().map_or(0, |c| c.flush);
-        self.words.extend([MI_BATCH_BUFFER_START_2ND, flush as u32, (flush >> 32) as u32, MI_BATCH_BUFFER_END]);
-        self.write()?;
-        self.at = self.at.next_multiple_of(BATCH_ALIGN);
+        self.batch.extend([MI_BATCH_BUFFER_START_2ND, flush as u32, (flush >> 32) as u32, MI_BATCH_BUFFER_END]);
+        let batch = &self.batch;
+        let addr = self.calls.put_with(4 * batch.len(), |to| to.as_chunks_mut::<4>().0.iter_mut().zip(batch).for_each(|(to, w)| *to = w.to_le_bytes()))?;
         Native::fence();
         let done = Rc::new(self.xe.fence(false).map_err(io)?);
         let waits: Vec<&Syncobj<'x>> = self.waits.iter().collect();
-        self.queue.submit(CALLS_ADDR + start as u64, &waits, &[&done]).map_err(io)?;
+        self.queue.submit(addr, &waits, &[&done]).map_err(io)?;
         self.waits.clear();
+        self.batch.clear();
         self.drawn_since.clear();
         self.sampled_since.clear();
-        let used: Vec<usize> = self.written.drain(..).chain(self.sampled.drain(..)).collect();
-        for s in used {
+        for s in self.written.drain(..).chain(self.sampled.drain(..)) {
             if let Some(Some(t)) = self.surfaces.get_mut(s) {
                 t.fence = Some(done.clone());
             }
         }
-        let previous = self.last.replace(done);
-        self.wrap(previous)
-    }
-
-    /// After a batch went to the GPU, the vertex and uniform rings: when one has less room left than the batch took,
-    /// each starts over below where the batch began (what the batches before it read, done once the last of them
-    /// is), so the next frame's draws need not wait; a ring that started over so lets its writes past that again
-    /// once the batch before this one is done
-    fn wrap(&mut self, previous: Option<Rc<Syncobj<'x>>>) -> Result<(), Error> {
-        let rings = || self.vertices.iter().chain([&self.uniforms, &self.indices]);
-        let limited = rings().any(|r| r.limit < r.size);
-        let short = rings().any(|r| r.at - r.mark > r.limit.max(r.at) - r.at);
-        if (limited || short)
-            && let Some(p) = &previous
-        {
-            wait(p, "a draw")?;
+        for r in self.vertices.iter_mut().chain([&mut self.uniforms, &mut self.indices, &mut self.calls]) {
+            r.submitted(done.clone())?;
         }
-        for r in self.vertices.iter_mut().chain([&mut self.uniforms, &mut self.indices]) {
-            r.limit = r.size;
-            if short {
-                (r.limit, r.at, r.last) = (r.mark, 0, None);
-            }
-            r.mark = r.at;
-        }
-        if short {
-            self.held.clear();
-        }
+        self.last = Some(done);
         Ok(())
     }
 
@@ -670,54 +567,48 @@ impl<'x> State<'x> {
         Ok(self.shapes.len() - 1)
     }
 
-    /// Whether draw `d` of shape `i` fits in what the batch being recorded has room for
-    fn fits(&self, i: usize, d: &Draw<'_>) -> bool {
-        let sh = &self.shapes[i];
-        let calls = self.at + 2 * CALL_BYTES + sh.commands.bytes() + 4 <= CALLS_SIZE as usize;
+    /// Room for draw `d` of shape `i` in the batch being recorded: the batch submitted first when a ring has no room
+    /// for the draw; everything done and started over (a ring larger) when one has none for it alone, or the dynamic
+    /// memory or the pool is full
+    fn room(&mut self, i: usize, d: &Draw<'_>) -> Result<(), Error> {
+        let (draw, table) = (self.shapes[i].commands.bytes() + 3 * CALL_BYTES + 4, self.shapes[i].table_bytes());
+        let uniforms: usize = d.uniforms.iter().map(|(_, b)| b.len() + RING_ALIGN).sum();
+        let rings = |st: &State<'x>| {
+            st.calls.fits(4 * st.batch.len() + draw)
+                && d.buffers.iter().enumerate().all(|(k, b)| st.vertices.get(k).is_some_and(|r| r.fits(b.bytes.len())))
+                && st.uniforms.fits(uniforms)
+                && d.indices.is_none_or(|ib| st.indices.fits(ib.bytes.len()))
+        };
+        if !rings(self) {
+            self.submit()?;
+        }
         let dynamic = self.dynamic_at.next_multiple_of(STATE_ALIGN) + 3 * STATE_ALIGN <= DYNAMIC_SIZE;
-        let pool = self.pool_at.next_multiple_of(STATE_ALIGN) + sh.table_bytes() <= POOL_SIZE;
-        let vertices = d.buffers.iter().enumerate().all(|(i, b)| self.vertices.get(i).is_some_and(|r| r.fits(b.bytes)) || b.bytes.is_empty());
-        let fresh = d.uniforms.iter().filter(|(b, bytes)| !self.held.iter().any(|(h, _, held)| h == b && held == bytes)).map(|(_, bytes)| bytes.len());
-        let uniforms = Ring::after(self.uniforms.at, fresh) <= self.uniforms.size;
-        let indices = d.indices.is_none_or(|i| self.indices.fits(i.bytes));
-        calls && dynamic && pool && vertices && uniforms && indices
+        let pool = self.pool_at.next_multiple_of(STATE_ALIGN) + table <= POOL_SIZE;
+        if !rings(self) || !dynamic || !pool {
+            self.settle()?;
+            self.restart(d, draw, uniforms)?;
+        }
+        Ok(())
     }
 
-    /// Draw `d` did not fit in the batch being recorded: each ring wants room for twice the batch with it
-    fn outgrown(&mut self, d: &Draw<'_>) {
-        for (r, b) in self.vertices.iter_mut().zip(&d.buffers) {
-            r.outgrown(b.bytes.len());
-        }
-        let uniforms = Ring::after(0, d.uniforms.iter().map(|(_, b)| b.len()));
-        self.uniforms.outgrown(uniforms);
-        if let Some(i) = d.indices {
-            self.indices.outgrown(i.bytes.len());
-        }
-    }
-
-    /// Every ring from its start, with room for draw `d` (nothing running)
-    fn restart(&mut self, d: &Draw<'_>) -> Result<(), Error> {
-        (self.at, self.dynamic_at) = (0, 0);
+    /// Everything from its start, the rings with room for draw `d` (`draw` bytes of commands, `uniforms` of
+    /// uniforms): nothing running
+    fn restart(&mut self, d: &Draw<'_>, draw: usize, uniforms: usize) -> Result<(), Error> {
+        self.dynamic_at = 0;
         self.held.clear();
         self.viewports.clear();
         self.pool_at = Xe3Device::POOL_STATIC as usize;
         while self.vertices.len() < d.buffers.len() {
-            self.vertices.push(Ring::new(VERTEX_ADDR + self.vertices.len() as u64 * VERTEX_SPAN));
+            self.vertices.push(Ring::new(VERTEX_ADDR + self.vertices.len() as u64 * VERTEX_SPAN, RING_ALIGN, RING_MIN));
         }
-        for (i, r) in self.vertices.iter_mut().enumerate() {
-            r.restart(self.xe, &self.vm, d.buffers.get(i).map_or(0, |b| b.bytes.len()))?;
+        let (xe, vm) = (self.xe, &self.vm);
+        for (k, r) in self.vertices.iter_mut().enumerate() {
+            let addr = VERTEX_ADDR + k as u64 * VERTEX_SPAN;
+            r.restart(d.buffers.get(k).map_or(0, |b| b.bytes.len()), |old, size| ring_memory(xe, vm, addr, old, size))?;
         }
-        let uniforms = Ring::after(0, d.uniforms.iter().map(|(_, b)| b.len()));
-        self.uniforms.restart(self.xe, &self.vm, uniforms)?;
-        self.indices.restart(self.xe, &self.vm, d.indices.map_or(0, |i| i.bytes.len()))
-    }
-
-    /// `words` written at the batch's end
-    fn write(&mut self) -> Result<(), Error> {
-        put(&mut self.calls, self.at, &self.words)?;
-        self.at += 4 * self.words.len();
-        self.words.clear();
-        Ok(())
+        self.uniforms.restart(uniforms, |old, size| ring_memory(xe, vm, UNIFORM_ADDR, old, size))?;
+        self.indices.restart(d.indices.map_or(0, |i| i.bytes.len()), |old, size| ring_memory(xe, vm, INDEX_ADDR, old, size))?;
+        self.calls.restart(draw, |old, size| ring_memory(xe, vm, CALLS_ADDR, old, size))
     }
 
     /// `words` written into the dynamic memory on `align`: their address
@@ -728,27 +619,25 @@ impl<'x> State<'x> {
         Ok(DYNAMIC_ADDR + at as u64)
     }
 
-    /// Uniform block `binding`'s bytes in the ring: their address
+    /// Uniform block `binding`'s bytes in the ring (where the batch has them already, or anew): their address
     fn uniform(&mut self, binding: u32, bytes: &[u8]) -> Result<u64, Error> {
-        if let Some((_, addr, _)) = self.held.iter().find(|(b, _, held)| *b == binding && held == bytes) {
-            return Ok(*addr);
+        let ring = &self.uniforms;
+        if let Some(&(_, _, addr, _)) = self.held.iter().find(|(b, since, _, held)| *b == binding && ring.recorded(*since) && held == bytes) {
+            return Ok(addr);
         }
+        let since = self.uniforms.head();
         let addr = self.uniforms.put(bytes)?;
-        self.held.retain(|(b, _, _)| *b != binding);
-        self.held.push((binding, addr, bytes.to_vec()));
+        self.held.retain(|h| h.0 != binding);
+        self.held.push((binding, since, addr, bytes.to_vec()));
         Ok(addr)
     }
 
     /// Draw `d` of shape `i` into `s` recorded (it fits): its shape's state when the batch has another's, then its
     /// viewport, binding table, vertex buffers and scissor where the batch does not have them, and its primitive
     fn record(&mut self, i: usize, d: &Draw<'_>, s: Surface) -> Result<(), Error> {
-        if self.start.is_none() {
-            self.start = Some(self.at);
-        }
         let (id, state, flush) = (self.shapes[i].id, self.shapes[i].state, self.shapes[i].flush);
         if self.current.as_ref().is_none_or(|c| c.shape != id) {
-            self.words.extend([MI_BATCH_BUFFER_START_2ND, state as u32, (state >> 32) as u32]);
-            self.write()?;
+            self.batch.extend([MI_BATCH_BUFFER_START_2ND, state as u32, (state >> 32) as u32]);
             self.current = Some(Current { shape: id, flush, vertices: Vec::new(), indices: None, table: None, viewport: None, scissor: None });
         }
         let viewport = viewport_key(d);
@@ -763,15 +652,13 @@ impl<'x> State<'x> {
                 }
             };
             let c = &self.shapes[i].commands;
-            c.viewport_cc.emit(&mut self.words, &[cc]);
-            c.viewport_sf_clip.emit(&mut self.words, &[sf_clip]);
-            self.write()?;
+            c.viewport_cc.emit(&mut self.batch, &[cc]);
+            c.viewport_sf_clip.emit(&mut self.batch, &[sf_clip]);
             self.current.as_mut().unwrap().viewport = Some(viewport);
         }
         let textures: Vec<usize> = d.textures.iter().map(|t| t.surface.0).collect();
         if textures.iter().any(|t| self.drawn_since.contains(t)) || self.sampled_since.contains(&s.0) {
-            self.shapes[i].commands.barrier.emit(&mut self.words, &[]);
-            self.write()?;
+            self.shapes[i].commands.barrier.emit(&mut self.batch, &[]);
             self.drawn_since.clear();
             self.sampled_since.clear();
         }
@@ -789,16 +676,14 @@ impl<'x> State<'x> {
             values.extend([r.put(b.bytes)?, b.bytes.len() as u64]);
         }
         if !values.is_empty() && self.current.as_ref().is_some_and(|c| c.vertices != values) {
-            self.shapes[i].commands.vertex_buffers.emit(&mut self.words, &values);
-            self.write()?;
+            self.shapes[i].commands.vertex_buffers.emit(&mut self.batch, &values);
             self.current.as_mut().unwrap().vertices = values;
         }
         if let Some(ib) = d.indices {
             let indices = [self.indices.put(ib.bytes)?, ib.bytes.len() as u64];
             if self.current.as_ref().is_some_and(|c| c.indices != Some(indices)) {
-                self.shapes[i].commands.index_buffer.emit(&mut self.words, &indices);
-                self.write()?;
-                self.current.as_mut().unwrap().indices = Some(indices);
+                self.shapes[i].commands.index_buffer.emit(&mut self.batch, &indices);
+                    self.current.as_mut().unwrap().indices = Some(indices);
             }
         }
         let rect = Xe3Draw::scissor(d);
@@ -806,12 +691,10 @@ impl<'x> State<'x> {
             let mut words = Vec::new();
             self.shapes[i].commands.scissor_rect.emit(&mut words, &rect.map(u64::from));
             let at = self.dynamic(&words)?;
-            self.shapes[i].commands.scissor_pointer.emit(&mut self.words, &[at]);
-            self.write()?;
+            self.shapes[i].commands.scissor_pointer.emit(&mut self.batch, &[at]);
             self.current.as_mut().unwrap().scissor = Some(rect);
         }
-        self.shapes[i].commands.primitive.emit(&mut self.words, &[d.count, d.first, d.instances].map(u64::from));
-        self.write()?;
+        self.shapes[i].commands.primitive.emit(&mut self.batch, &[d.count, d.first, d.instances].map(u64::from));
         if !self.written.contains(&s.0) {
             self.written.push(s.0);
         }
@@ -868,9 +751,9 @@ impl<'x> State<'x> {
         put(pool, at, &words)?;
         let bt = at as u64;
         self.pool_at = at + 4 * words.len();
-        sh.commands.table_vs.emit(&mut self.words, &[bt]);
-        sh.commands.table_ps.emit(&mut self.words, &[bt]);
-        self.write()
+        sh.commands.table_vs.emit(&mut self.batch, &[bt]);
+        sh.commands.table_ps.emit(&mut self.batch, &[bt]);
+        Ok(())
     }
 }
 
@@ -1045,11 +928,7 @@ impl<'x> XeDevice<'x> {
         }
         let i = st.shape(program, d)?;
         st.load(s, &d.target.load)?;
-        if !st.fits(i, d) {
-            st.outgrown(d);
-            st.settle()?;
-            st.restart(d)?;
-        }
+        st.room(i, d)?;
         st.record(i, d, s)
     }
 }

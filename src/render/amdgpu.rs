@@ -3,7 +3,6 @@
 //! ring; the command buffer copied into a ring of its own, uncached, and submitted as one IB.
 
 use std::cell::{RefCell, RefMut};
-use std::collections::VecDeque;
 use std::os::fd::{BorrowedFd, OwnedFd};
 use std::rc::Rc;
 
@@ -29,8 +28,6 @@ const RING_ADDR: u64 = 1 << 36;
 const CMDS_ADDR: u64 = 1 << 37;
 const RING_MIN: usize = 4 << 20;
 const RING_ALIGN: usize = 256;
-/// Batches submitted the ring keeps the fences of (the oldest waited for past them: done long ago)
-const INFLIGHT: usize = 64;
 /// Where surface slot i is mapped (`SURFACE_ADDR + i * SURFACE_SPAN`): a surface takes at most a span
 const SURFACE_ADDR: u64 = 1 << 40;
 const SURFACE_SPAN: u64 = 1 << 30;
@@ -74,91 +71,18 @@ impl<'a> Code<'a> {
     }
 }
 
-/// Bytes the GPU reads (vertices, indices, uniforms, command buffers), each batch's after the last's around one
-/// buffer: a place is written once the batches that read what it held are done. Positions count bytes ever written
-/// (a place is a position modulo the size)
-struct Ring<'a> {
-    addr: u64,
-    mem: MemType,
-    bo: Option<AmdgpuBo<'a>>,
-    size: usize,
-    head: u64,
-    /// where the batch being recorded started
-    start: u64,
-    /// each batch submitted: where it started, its fence
-    inflight: VecDeque<(u64, Rc<Syncobj<'a>>)>,
+/// A ring's memory at `addr` of `size` bytes, mapped as `mem` (`old`, the ring's memory before, unmapped)
+fn ring_memory<'a>(amd: &'a Amdgpu, vm: &AmdgpuVm<'a>, addr: u64, mem: MemType, old: Option<AmdgpuBo<'a>>, size: usize) -> Result<AmdgpuBo<'a>, Error> {
+    if let Some(old) = old {
+        vm.unbind(addr, old.size(), &[]).map_err(io)?;
+    }
+    let bo = amd.bo((size as u64, Caching::WriteCombined).into()).map_err(io)?;
+    vm.bind(&bo, 0, addr, size as u64, mem, &[]).map_err(io)?;
+    Ok(bo)
 }
 
-impl<'a> Ring<'a> {
-    fn new(addr: u64, mem: MemType) -> Ring<'a> {
-        Ring { addr, mem, bo: None, size: 0, head: 0, start: 0, inflight: VecDeque::new() }
-    }
+type Ring<'a> = super::Ring<'a, AmdgpuBo<'a>>;
 
-    /// Whether `len` more bytes of the batch being recorded fit (the batch never laps itself; a piece that would
-    /// cross the end skips to the start)
-    fn fits(&self, len: usize) -> bool {
-        (self.head - self.start) as usize + 2 * len <= self.size
-    }
-
-    /// `bytes` placed: their address
-    fn put(&mut self, bytes: &[u8]) -> Result<u64, Error> {
-        self.put_with(bytes.len(), |to| to.copy_from_slice(bytes))
-    }
-
-    /// `len` bytes placed, `fill` writing them: their address
-    fn put_with(&mut self, len: usize, fill: impl FnOnce(&mut [u8])) -> Result<u64, Error> {
-        let size = self.size as u64;
-        let mut at = self.head.next_multiple_of(RING_ALIGN as u64);
-        if at % size + len as u64 > size {
-            at = at.next_multiple_of(size);
-        }
-        let end = at + len as u64;
-        // the batches that read what was here
-        let mut last = None;
-        while self.inflight.front().is_some_and(|(start, _)| *start + size < end) {
-            last = self.inflight.pop_front();
-        }
-        if let Some((_, f)) = last {
-            wait(&f, "a draw")?;
-        }
-        let place = (at % size) as usize;
-        let bo = self.bo.as_mut().ok_or_else(|| Error("a ring with no memory".into()))?;
-        fill(&mut bo.bytes().map_err(io)?[place..place + len]);
-        self.head = end;
-        Ok(self.addr + place as u64)
-    }
-
-    /// The batch recorded went to the GPU, `done` once it is
-    fn submitted(&mut self, done: Rc<Syncobj<'a>>) -> Result<(), Error> {
-        self.inflight.push_back((self.start, done));
-        self.start = self.head;
-        if self.inflight.len() > INFLIGHT
-            && let Some((_, f)) = self.inflight.pop_front()
-        {
-            wait(&f, "a draw")?;
-        }
-        Ok(())
-    }
-
-    /// Room for a batch of `len` bytes (nothing running): the ring from its start, larger when it was too small
-    fn restart(&mut self, amd: &'a Amdgpu, vm: &AmdgpuVm<'a>, len: usize) -> Result<(), Error> {
-        self.inflight.clear();
-        (self.head, self.start) = (0, 0);
-        if 2 * len <= self.size {
-            return Ok(());
-        }
-        let size = (4 * len).next_power_of_two().max(RING_MIN);
-        if let Some(old) = self.bo.take() {
-            vm.unbind(self.addr, old.size(), &[]).map_err(io)?;
-        }
-        let bo = amd.bo((size as u64, Caching::WriteCombined).into()).map_err(io)?;
-        vm.bind(&bo, 0, self.addr, size as u64, self.mem, &[]).map_err(io)?;
-        (self.bo, self.size) = (Some(bo), size);
-        Ok(())
-    }
-}
-
-/// The device's address space and what is in it
 struct State<'a> {
     amd: &'a Amdgpu,
     vm: AmdgpuVm<'a>,
@@ -187,9 +111,9 @@ impl<'a> State<'a> {
     fn new(amd: &'a Amdgpu) -> Result<State<'a>, Error> {
         let vm = amd.vm().map_err(io)?;
         let queue = amd.queue(&vm).map_err(io)?;
-        let (mut ring, mut cmds) = (Ring::new(RING_ADDR, MemType::Streaming), Ring::new(CMDS_ADDR, MemType::Scanout));
-        ring.restart(amd, &vm, RING_MIN / 4)?;
-        cmds.restart(amd, &vm, RING_MIN / 4)?;
+        let (mut ring, mut cmds) = (Ring::new(RING_ADDR, RING_ALIGN, RING_MIN), Ring::new(CMDS_ADDR, RING_ALIGN, RING_MIN));
+        ring.restart(0, |old, size| ring_memory(amd, &vm, RING_ADDR, MemType::Streaming, old, size))?;
+        cmds.restart(0, |old, size| ring_memory(amd, &vm, CMDS_ADDR, MemType::Scanout, old, size))?;
         Ok(State {
             amd,
             vm,
@@ -324,8 +248,9 @@ impl<'a> State<'a> {
         }
         if !self.ring.fits(data) || !self.cmds.fits(cmds(self.ib.len())) {
             self.settle()?;
-            self.ring.restart(self.amd, &self.vm, data)?;
-            self.cmds.restart(self.amd, &self.vm, cmds(0))?;
+            let (amd, vm) = (self.amd, &self.vm);
+            self.ring.restart(data, |old, size| ring_memory(amd, vm, RING_ADDR, MemType::Streaming, old, size))?;
+            self.cmds.restart(cmds(0), |old, size| ring_memory(amd, vm, CMDS_ADDR, MemType::Scanout, old, size))?;
         }
         Ok(())
     }
