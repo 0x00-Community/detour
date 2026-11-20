@@ -129,14 +129,22 @@ fn main() {
     let pixels = device.read(surface, (size * size * 4) as usize).unwrap();
     let first = started.elapsed();
     check(&pixels, size).unwrap();
-    let started = Instant::now();
+    let (started, mut recording) = (Instant::now(), 0.0);
     for _ in 0..frames {
+        let at = Instant::now();
         frame(&device, &compiled, surface, size, tiling);
+        recording += at.elapsed().as_secs_f64();
         device.read(surface, (size * size * 4) as usize).unwrap();
     }
     let each = started.elapsed().as_secs_f64() * 1e3 / f64::from(frames);
+    let draw = recording * 1e6 / f64::from(frames * GRID * GRID);
     check(&device.read(surface, (size * size * 4) as usize).unwrap(), size).unwrap();
-    println!("{} draws a frame: {} shape(s) lowered; the first frame {:.1} ms, then {each:.2} ms a frame ({frames} frames, read back)", GRID * GRID, device.lowered(), first.as_secs_f64() * 1e3);
+    println!(
+        "{} draws a frame: {} shape(s) lowered; the first frame {:.1} ms, then {each:.2} ms a frame ({frames} frames, read back), {draw:.2} us recording a draw",
+        GRID * GRID,
+        device.lowered(),
+        first.as_secs_f64() * 1e3
+    );
 
     device.free(surface).unwrap();
     assert!(device.read(surface, 4).is_err(), "a freed surface read");
