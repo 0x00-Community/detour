@@ -3,6 +3,7 @@
 mod build;
 mod convert;
 mod dispatch;
+mod draw;
 mod emit;
 mod lower;
 mod pass_layout;
@@ -11,10 +12,12 @@ mod pass_pm4;
 mod pass_regalloc;
 mod pass_waitcnt;
 mod pm4;
+mod shader;
 
 pub use build::*;
 pub use convert::*;
 pub use dispatch::*;
+pub use draw::*;
 pub use emit::*;
 pub use lower::*;
 pub use pass_layout::*;
@@ -23,6 +26,7 @@ pub use pass_pm4::*;
 pub use pass_regalloc::*;
 pub use pass_waitcnt::*;
 pub use pm4::*;
+pub use shader::*;
 
 use pass_regalloc::Alloc;
 

@@ -464,6 +464,14 @@ impl Xe3Draw {
     /// The module's top-level spirv.module ops moved into a gpu.module (what convert-spirv-entry-points takes),
     /// then `SHADERS` run on it
     pub fn compile(body: &mut Body<'_>, passes: &Passes) -> Result<(), Error> {
+        Xe3Draw::wrap(body);
+        let root = body.root;
+        PassManager::parse(passes, Xe3Draw::SHADERS)?.run(body, root)
+    }
+
+    /// The module's top-level spirv.module ops moved into a gpu.module, what convert-spirv-entry-points takes (any
+    /// GPU's: each stage's built-in inputs listed on it, `GpuToXe3::builtins_attr`)
+    pub fn wrap(body: &mut Body<'_>) {
         let root = body.root;
         let top = body.top_block(root);
         let modules: Vec<OpId> = body.ops(top).filter(|&m| &*body[m].name == "spirv.module").collect();
@@ -482,7 +490,6 @@ impl Xe3Draw {
             body.detach(m);
             body.insert(m, block, None);
         }
-        PassManager::parse(passes, Xe3Draw::SHADERS)?.run(body, root)
     }
 
     /// A spirv.module's stage and the built-in inputs of its entry point, in the order convert-spirv-entry-points

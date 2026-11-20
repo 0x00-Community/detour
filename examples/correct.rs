@@ -20,7 +20,7 @@ mod reference;
 #[path = "correct/shaders.rs"]
 mod shaders;
 
-use detour::{Device, Toolchain};
+use detour::{Isa, Device, Toolchain};
 use gpu::Gpu;
 use reference::FillRule;
 
@@ -149,7 +149,7 @@ fn math(gpu: &Gpu<'_>, t: &mut Tally) {
 
 fn main() {
     let filters: Vec<String> = std::env::args().skip(1).collect();
-    let tools = Toolchain::new();
+    let tools = Toolchain::new(Isa::Xe3);
     let xe = <detour::Xe as detour::Gpu>::open_first().expect("an Xe3 render node");
     let gpu = Gpu::new(&tools, Device::new(&xe));
     let mut t = Tally { filters, failed: Vec::new(), passed: 0 };

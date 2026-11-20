@@ -6,7 +6,7 @@
 
 use std::time::Instant;
 
-use detour::{ColorFormat, ColorTarget, CullMode, Device, Draw, DrawPrimitive, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
+use detour::{Isa, ColorFormat, ColorTarget, CullMode, Device, Draw, DrawPrimitive, Surface, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat};
 use mlirpass::{GlslReader, GlslStage};
 
 const VERT: &str = "#version 300 es\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec4 color;\nout vec4 c;\nvoid main() { c = color; gl_Position = vec4(pos, 0.0, 1.0); }\n";
@@ -116,7 +116,7 @@ fn check(pixels: &[u8], size: u32) -> Result<(), String> {
 
 fn main() {
     let frames: u32 = std::env::args().nth(1).map_or(50, |n| n.parse().unwrap());
-    let tools = Toolchain::new();
+    let tools = Toolchain::new(Isa::Xe3);
     let bytes = program(&tools);
     let compiled = tools.load(&bytes).unwrap();
     let xe = <detour::Xe as detour::Gpu>::open_first().unwrap();

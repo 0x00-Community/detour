@@ -10,7 +10,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use detour::{
+use detour::{Isa, 
     ColorFormat, ColorTarget, Compiled, CullMode, Device, Draw, DrawPrimitive, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat,
 };
 use mlirpass::{Body, GlslReader, GlslStage};
@@ -134,7 +134,7 @@ fn main() {
     let mut dirs: Vec<PathBuf> = fs::read_dir(root.join("examples/cases")).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()).collect();
     dirs.sort();
     let save = std::env::var_os("DETOUR_SPIRV").map(PathBuf::from);
-    let tools = Toolchain::new();
+    let tools = Toolchain::new(Isa::Xe3);
     let xe = <detour::Xe as detour::Gpu>::open_first().unwrap();
     let device = Device::new(&xe);
     let mut failed = 0;

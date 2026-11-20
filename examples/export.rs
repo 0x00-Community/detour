@@ -8,7 +8,7 @@
 use std::fs::OpenOptions;
 use std::os::fd::{AsFd, AsRawFd};
 
-use detour::{ColorFormat, ColorTarget, Compiled, Device, Draw, Exported, Gpu, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
+use detour::{Isa, ColorFormat, ColorTarget, Compiled, Device, Draw, Exported, Gpu, TargetLoad, Tiling, Toolchain, VertexBuffer, VertexElement, VertexFormat, Xe};
 use mlirpass::{GlslReader, GlslStage};
 
 const SHADERS: [&str; 2] = [
@@ -125,7 +125,7 @@ fn run(xe: &Xe, program: &Compiled, tiling: Tiling, card: Option<&std::path::Pat
 }
 
 fn main() {
-    let tools = Toolchain::new();
+    let tools = Toolchain::new(Isa::Xe3);
     let mut body = tools.body();
     GlslReader::read(&mut body, SHADERS[0], GlslStage::Vertex).unwrap();
     GlslReader::read(&mut body, SHADERS[1], GlslStage::Fragment).unwrap();
