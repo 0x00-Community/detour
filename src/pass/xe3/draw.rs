@@ -52,7 +52,7 @@ const VS_THREADS: u32 = 545;
 const PS_THREADS: u32 = 127;
 /// GRF blocks of 32 registers a thread takes (3: 128 registers)
 const REGISTERS_PER_THREAD: u32 = 3;
-/// The clip's and the SF's provoking vertices: GL's and Vulkan's last vertex
+/// The clip's and the SF's provoking vertices: GL's last vertex
 const TRIANGLE_PROVOKING: u32 = 2;
 const LINE_PROVOKING: u32 = 1;
 const POINT_WIDTH_MAX: f32 = 255.875;

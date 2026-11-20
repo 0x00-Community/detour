@@ -4,7 +4,7 @@
 # detour
 
 ### Skip Mesa. Skip libdrm.
-**OpenGL, Vulkan, Direct3D 11 and Direct3D 12 on our own GPU backend: a GPU userspace driver in Rust, compiled through MLIR.**
+**OpenGL, Direct3D 11 and Direct3D 12 on our own GPU backend: a GPU userspace driver in Rust, compiled through MLIR.**
 
 [![Rust](https://img.shields.io/badge/Rust-100%25-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org)
 [![MLIR](https://img.shields.io/badge/IR-MLIR-262D3A?style=for-the-badge&logo=llvm)](https://mlir.llvm.org)
@@ -27,8 +27,7 @@ builds the command streams and submits them **through the kernel driver's ioctls
 
 - 🧩 **GL ES 3.0** (`src/gl`): objects, bindings and state; GLSL compiled by [mlirpass](https://github.com/Jabberwocky238/mlirpass)
   to SPIR-V, then by detour to Xe3.
-- 🌋 **Vulkan** (`src/vk`): next.
-- 🪟 **Direct3D 11 and 12**: to come, on the same backend (shaders through SPIR-V like GL's and Vulkan's).
+- 🪟 **Direct3D 11 and 12**: to come, on the same backend (shaders through SPIR-V like GL's).
 - 🔵 **Intel Xe3**: the xe3 dialect (EU instructions, genxml commands and states), SPIR-V and GPU kernels lowered to
   Xe3 machine code, register allocation, scoreboard, a draw's image.
 - 🔴 **AMD RDNA2** (gfx1036): the rdna2 dialect (GFX10 instructions, registers, PM4), GPU kernels lowered to RDNA2
@@ -50,7 +49,7 @@ Deploying is not success: every result is compared with the local Mesa (iris, 25
 | ✅ | Correctness (`examples/correct`): draws through `Device::draw` against a CPU reference (pixel centres, 8-bit sub-pixel snapping, the top-left rule, GL ES blending, Vulkan's precision for shader math) and against Mesa on the same GPU: coverage, shared edges, thin, degenerate and huge triangles, strips, first / count, culling, scissors, viewports, instancing, every blend factor and equation, the color mask, vertex formats and strides, interpolation, std140 blocks, built-ins, 15 varyings, local arrays, 20 math functions with NaN, infinities and denormals | **752 / 752** cases: fixed function **byte for byte as Mesa**; the f32 reference ±1 only where Xe3 blends or rounds to unorm8 (Mesa the same) |
 | 🔣 | Encodings (`tests/binary`) | Xe3 EU vs gentool and genxml vs Mesa, RDNA2 vs llvm-mc and Mesa's registers: **4 / 4** |
 | 🪜 | Lowerings (`tests/pass`) | kernels as acgpu compiled them (Xe3, RDNA2), GLSL reaching Xe3, an RDNA2 IB as Mesa writes it: **4 / 4** |
-| 🏁 | Speed against the official drivers (`examples/bench_opengl`, `examples/bench_vulkan`): the same cases on detour and on Mesa (iris for GL ES, ANV for Vulkan with the same SPIR-V), 100 frames of 256×256 a case | a frame takes **~2×** Mesa's (GL ~0.24 ms against ~0.11 ms, Vulkan path ~0.22 against ~0.10: images resident, the framebuffer on the GPU, the context set up once); GL compile + link about as fast (~5 ms against ~5) |
+| 🏁 | Speed against the official drivers (`examples/bench_opengl`): the same cases on detour and on Mesa's iris, 100 frames of 256×256 a case | a frame takes **~2×** Mesa's (~0.24 ms against ~0.11 ms: images resident, the framebuffer on the GPU, the context set up once); GL compile + link about as fast (~5 ms against ~5) |
 
 ## 🎮 GPUs
 
@@ -67,14 +66,13 @@ rasterizer and no hand-off to the system's Vulkan or GL driver.
 | Path | What |
 | --- | --- |
 | `src/gl` | GL ES 3.0: context, buffers, vertex arrays, shaders and programs (default uniform block), textures, renderbuffers, framebuffers, GLenums (`enums.gen.rs` from `GLES3/gl3.h`) |
-| `src/vk` | Vulkan (to come) |
 | — | Direct3D 11 and 12 (to come) |
 | `src/dialect` | mlirformat plugins: the `xe3`, `rdna2` and `image` dialects |
 | `src/pass` | mlirpass plugins: `convert-gpu-to-*`, register allocation, waits, command streams, image layout, `Xe3Draw`, `gpu-module-to-binary` for SPIR-V and RDNA2 |
 | `src/binary` | machine code and images: each GPU's encoder, records packed by layout tables, image writing |
 | `src/shader.rs`, `src/render.rs` | the toolchain (mlirpass + detour's passes) and the device a draw runs on |
 | `src/kmd` | the kernel interface: DRM, the `Gpu` trait, and the `xe` driver (`src/kmd/xe`) |
-| `examples/` | `compare` (draws vs Mesa), `glcalls` (GL calls vs Mesa), `bench_opengl` / `bench_vulkan` (speed vs Mesa's GL ES / Vulkan; `support/glbench.c`, `support/vkbench.c`), `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `gl_link`, `xe_info` |
+| `examples/` | `compare` (draws vs Mesa), `glcalls` (GL calls vs Mesa), `bench_opengl` (speed vs Mesa's GL ES; `support/glbench.c`), `correct` (correctness vs a CPU reference and Mesa; `support/glref.c`), `gl_link`, `xe_info` |
 | `tests/binary`, `tests/pass` | encodings, and lowerings |
 | `scripts/` | the dialects' generators (`xe3gen`, `rdna2gen`) and the Mesa data they read (`data/{intel,amd}`), `gl_enums.py`, opcode tables, and the oracles each test's expected bytes come from (`*_oracle.*`) |
 
@@ -91,11 +89,9 @@ cargo test --test binary --test pass
 cc -O1 -o glrun path/to/mlirpass/tests/support/glrun.c -lEGL -lGL
 cargo run --example compare -- ./glrun
 
-# 🏁 speed vs Mesa (GL ES, Vulkan)
+# 🏁 speed vs Mesa (GL ES)
 cc -O2 -o glbench examples/support/glbench.c -lEGL -lGLESv2
 cargo run --release --example bench_opengl -- ./glbench
-cc -O2 -o vkbench examples/support/vkbench.c -lvulkan
-cargo run --release --example bench_vulkan -- ./vkbench
 
 # ✅ correctness vs a CPU reference and Mesa
 cc -O1 -o glref examples/support/glref.c -lEGL -lGLESv2
