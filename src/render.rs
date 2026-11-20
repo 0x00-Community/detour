@@ -9,7 +9,7 @@ use std::time::Duration;
 use mlirformat::Error;
 
 use crate::{
-    Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Syncobj, TargetLoad, Template, Tiling, Vm, Xe, Xe3Draw, Xe3DrawImage, XeBo, XeQueue,
+    Bo, BoDesc, Caching, ColorFormat, ColorTarget, Compiled, Draw, Engine, Fence, Gpu, Host, IndexFormat, MemType, Native, Queue, Syncobj, TargetLoad, Template, Tiling, Vm, Xe, Xe3Device, Xe3Draw, Xe3DrawCommands, XeBo, XeQueue,
     XeVm,
 };
 
@@ -17,10 +17,18 @@ use crate::{
 const TIMEOUT: Duration = Duration::from_secs(5);
 /// Draw shapes kept resident
 const RESIDENT: usize = 64;
-/// Where shape slot i's image is laid out (`SLOT_BASE + i * SLOT_SPAN`), all below 4 GiB: its states are pointed at
-/// with 32 bits
-const SLOT_BASE: u64 = 1 << 24;
-const SLOT_SPAN: u64 = 1 << 24;
+/// The arena the programs' code and the shapes' states and batches go in: chunks from `ARENA_ADDR`, `ARENA_SPAN`
+/// apart, all below 4 GiB (states are pointed at with 32 bits), each `ARENA_CHUNK` bytes or what one piece takes
+const ARENA_ADDR: u64 = 1 << 24;
+const ARENA_SPAN: u64 = 1 << 24;
+const ARENA_CHUNK: usize = 1 << 20;
+const ARENA_ALIGN: usize = 64;
+/// The binding table pool all shapes share (its static part first), below 4 GiB on its alignment
+const POOL_ADDR: u64 = 0xe000_0000;
+const POOL_SIZE: usize = 1 << 20;
+/// The context's system memory fence
+const FENCE_ADDR: u64 = 0xef00_0000;
+const FENCE_SIZE: u64 = 4096;
 /// What the device writes between draws below 4 GiB (scissor rectangles, viewports), and its size
 const DYNAMIC_ADDR: u64 = 0xf000_0000;
 const DYNAMIC_SIZE: usize = 1 << 20;
@@ -239,35 +247,79 @@ impl Commands {
     }
 }
 
-/// One draw shape resident: its image's memories bound at its slot, its context set up (`INIT`)
-struct Shape<'x> {
+/// Memory for the programs' code and the shapes: chunks mapped once, pieces taken and given back
+struct Arena<'x> {
+    chunks: Vec<(XeBo<'x>, u64, usize)>,
+    /// pieces given back: address and bytes
+    free: Vec<(u64, usize)>,
+    /// where the last chunk's untaken bytes start
+    at: usize,
+}
+
+impl<'x> Arena<'x> {
+    /// A piece of `len` bytes (made a multiple of `ARENA_ALIGN`): its address and bytes
+    fn take(&mut self, xe: &'x Xe, vm: &XeVm<'x>, len: usize) -> Result<(u64, usize), Error> {
+        let len = len.next_multiple_of(ARENA_ALIGN);
+        if let Some(f) = self.free.iter().position(|(_, n)| *n >= len) {
+            let (addr, n) = self.free.swap_remove(f);
+            if n > len {
+                self.free.push((addr + len as u64, n - len));
+            }
+            return Ok((addr, len));
+        }
+        if self.chunks.last().is_none_or(|(_, _, size)| self.at + len > *size) {
+            let size = len.max(ARENA_CHUNK);
+            let addr = ARENA_ADDR + self.chunks.len() as u64 * ARENA_SPAN;
+            if size as u64 + GUARD > ARENA_SPAN || addr + ARENA_SPAN > POOL_ADDR {
+                return Err(Error(format!("no room for {len} bytes of shapes and programs")));
+            }
+            let bo = xe.bo((size as u64 + GUARD, Caching::WriteCombined).into()).map_err(io)?;
+            bind(xe, vm, &bo, 0, addr, size as u64 + GUARD, MemType::Streaming)?;
+            self.chunks.push((bo, addr, size));
+            self.at = 0;
+        }
+        let (_, base, _) = self.chunks.last().unwrap();
+        let addr = base + self.at as u64;
+        self.at += len;
+        Ok((addr, len))
+    }
+
+    /// `bytes` written at `addr`, in a piece taken
+    fn write(&mut self, addr: u64, bytes: &[u8]) -> Result<(), Error> {
+        let chunk = self.chunks.iter_mut().find(|(_, base, size)| (*base..*base + *size as u64).contains(&addr));
+        let (bo, base, _) = chunk.ok_or_else(|| Error(format!("{addr:#x}: not in the arena")))?;
+        let at = (addr - *base) as usize;
+        bo.bytes().map_err(io)?[at..at + bytes.len()].copy_from_slice(bytes);
+        Ok(())
+    }
+
+    /// A piece holding `bytes`: its address
+    fn put(&mut self, xe: &'x Xe, vm: &XeVm<'x>, bytes: &[u8]) -> Result<u64, Error> {
+        let (addr, _) = self.take(xe, vm, bytes.len())?;
+        self.write(addr, bytes)?;
+        Ok(addr)
+    }
+}
+
+/// One draw shape resident: its states and batches in the arena
+struct Shape {
     key: u64,
-    slot: usize,
     /// when it was last drawn (the device's clock)
     used: u64,
-    /// its memories: each one's buffer object, address and mapped bytes
-    bos: Vec<(XeBo<'x>, u64, u64)>,
-    /// its stream's second-level batches: the draw's state, the flush
+    /// its piece of the arena
+    piece: (u64, usize),
+    /// its second-level batches: the draw's state, the flush
     state: u64,
     flush: u64,
     commands: Commands,
-    /// the binding table pool: its buffer object (in `bos`), address, where the device writes in it, up to where
-    pool: usize,
-    pool_addr: u64,
-    pool_free: usize,
-    pool_at: usize,
-    pool_end: usize,
-    null: u64,
     /// the uniform blocks' bindings, in the draw's order
     bindings: Vec<u32>,
     /// the sampled textures' bindings, in the draw's order
     textures: Vec<u32>,
 }
 
-impl<'x> Shape<'x> {
-    fn new(xe: &'x Xe, vm: &XeVm<'x>, queue: &XeQueue<'x>, key: u64, slot: usize, parts: Xe3DrawImage, d: &Draw<'_>) -> Result<Shape<'x>, Error> {
-        let end = SLOT_BASE + (slot as u64 + 1) * SLOT_SPAN;
-        let c = &parts.commands;
+impl Shape {
+    fn new(key: u64, piece: (u64, usize), state: u64, flush: u64, c: &Xe3DrawCommands, d: &Draw<'_>) -> Result<Shape, Error> {
         let vb: Vec<String> = (0..d.buffers.len()).flat_map(|i| [Xe3Draw::vertex_buffer(i), format!("{}_size", Xe3Draw::vertex_buffer(i))]).collect();
         let bindings: Vec<u32> = d.uniforms.iter().map(|(b, _)| *b).collect();
         let textures: Vec<u32> = d.textures.iter().map(|t| t.binding).collect();
@@ -293,61 +345,12 @@ impl<'x> Shape<'x> {
             viewport_cc: Command::new(&c.viewport_cc, &names(&["cc"]))?,
             viewport_sf_clip: Command::new(&c.viewport_sf_clip, &names(&["sf_clip"]))?,
         };
-        let image = &parts.image;
-        let mut bos = Vec::new();
-        let mut pool = None;
-        for s in &image.segments {
-            let size = (s.bytes.len() as u64).next_multiple_of(xe.info().min_alignment.max(4096));
-            if s.addr + size > end {
-                return Err(Error(format!("a draw's image of {:#x} bytes does not fit its slot", s.addr + size - (end - SLOT_SPAN))));
-            }
-            let mem = MemType::from(s.mem);
-            let caching = if mem == MemType::Coherent { Caching::WriteBack } else { Caching::WriteCombined };
-            let mut bo = xe.bo((size, caching).into()).map_err(io)?;
-            bo.bytes().map_err(io)?[..s.bytes.len()].copy_from_slice(&s.bytes);
-            bind(xe, vm, &bo, 0, s.addr, size, mem)?;
-            if s.addr == parts.pool {
-                pool = Some((bos.len(), s.bytes.len()));
-            }
-            bos.push((bo, s.addr, size));
-        }
-        let (pool, pool_end) = pool.ok_or_else(|| Error("no binding table pool in the image".into()))?;
-        let init = image.stream_named(Xe3Draw::INIT).ok_or_else(|| Error(format!("no stream {} in the image", Xe3Draw::INIT)))?;
-        Native::fence();
-        let done = xe.fence(false).map_err(io)?;
-        queue.submit(&init, &[], &[&done]).map_err(io)?;
-        wait(&done, "setting the context up")?;
-        let pool_free = parts.pool_free as usize;
-        Ok(Shape {
-            key,
-            slot,
-            used: 0,
-            bos,
-            state: parts.state,
-            flush: parts.flush,
-            commands,
-            pool,
-            pool_addr: parts.pool,
-            pool_free,
-            pool_at: pool_free,
-            pool_end,
-            null: parts.null,
-            bindings,
-            textures,
-        })
+        Ok(Shape { key, used: 0, piece, state, flush, commands, bindings, textures })
     }
 
     /// The bytes a draw's binding table and its surface states take in the pool at most
     fn table_bytes(&self) -> usize {
         STATE_ALIGN * (1 + self.bindings.len() + self.textures.len()) + self.commands.binding_table.bytes().next_multiple_of(STATE_ALIGN)
-    }
-
-    /// Its memories unmapped (nothing of it running)
-    fn release(self, vm: &XeVm<'x>) -> Result<(), Error> {
-        for (_, addr, size) in &self.bos {
-            vm.unbind(*addr, *size, &[]).map_err(io)?;
-        }
-        Ok(())
     }
 }
 
@@ -505,8 +508,16 @@ struct State<'x> {
     indices: Ring<'x>,
     /// each binding's uniform bytes last written into the ring, and where
     held: Vec<(u32, u64, Vec<u8>)>,
-    shapes: Vec<Shape<'x>>,
+    shapes: Vec<Shape>,
     clock: u64,
+    /// the programs' code and the shapes' states and batches
+    arena: Arena<'x>,
+    /// each program's code in the arena: its id, the vertex and the fragment shader's addresses
+    programs: Vec<(u64, u64, u64)>,
+    /// the binding table pool, and where the device writes next in it
+    pool: XeBo<'x>,
+    pool_at: usize,
+    _fence: XeBo<'x>,
     surfaces: Vec<Option<Target<'x>>>,
     /// what the next submission waits for, the last submission, the surfaces the batch being recorded draws into and
     /// samples
@@ -533,6 +544,17 @@ impl<'x> State<'x> {
         bind(xe, &vm, &calls, 0, CALLS_ADDR, CALLS_SIZE + GUARD, MemType::Streaming)?;
         let dynamic = xe.bo((DYNAMIC_SIZE as u64, Caching::WriteCombined).into()).map_err(io)?;
         bind(xe, &vm, &dynamic, 0, DYNAMIC_ADDR, DYNAMIC_SIZE as u64, MemType::Streaming)?;
+        let mut pool = xe.bo((POOL_SIZE as u64, Caching::WriteCombined).into()).map_err(io)?;
+        let fixed = Xe3Device::pool(POOL_ADDR)?;
+        pool.bytes().map_err(io)?[..fixed.len()].copy_from_slice(&fixed);
+        bind(xe, &vm, &pool, 0, POOL_ADDR, POOL_SIZE as u64, MemType::Streaming)?;
+        let fence = xe.bo((FENCE_SIZE, Caching::WriteCombined).into()).map_err(io)?;
+        bind(xe, &vm, &fence, 0, FENCE_ADDR, FENCE_SIZE, MemType::Streaming)?;
+        let mut arena = Arena { chunks: Vec::new(), free: Vec::new(), at: 0 };
+        let context = arena.put(xe, &vm, &Xe3Device::context(FENCE_ADDR)?)?;
+        Native::fence();
+        let done = xe.fence(false).map_err(io)?;
+        queue.submit(&context, &[], &[&done]).map_err(io)?;
         Ok(State {
             xe,
             vm,
@@ -548,9 +570,14 @@ impl<'x> State<'x> {
             held: Vec::new(),
             shapes: Vec::new(),
             clock: 0,
+            arena,
+            programs: Vec::new(),
+            pool,
+            pool_at: Xe3Device::POOL_STATIC as usize,
+            _fence: fence,
             surfaces: Vec::new(),
             waits: Vec::new(),
-            last: None,
+            last: Some(Rc::new(done)),
             written: Vec::new(),
             sampled: Vec::new(),
             drawn_since: Vec::new(),
@@ -704,9 +731,20 @@ impl<'x> State<'x> {
         Ok(())
     }
 
-    /// The resident shape of `program` and `d`: lowered and made resident when it is not (the least recently drawn
-    /// one put away when they are `RESIDENT`)
-    fn shape(&mut self, program: &Compiled<'_>, d: &Draw<'_>) -> Result<usize, Error> {
+    /// Program `p`'s code in the arena: its vertex and fragment shader's addresses
+    fn program(&mut self, p: &Compiled) -> Result<(u64, u64), Error> {
+        if let Some(&(_, vs, fs)) = self.programs.iter().find(|(id, _, _)| *id == p.id) {
+            return Ok((vs, fs));
+        }
+        let vs = self.arena.put(self.xe, &self.vm, &p.vs.code)?;
+        let fs = self.arena.put(self.xe, &self.vm, &p.fs.code)?;
+        self.programs.push((p.id, vs, fs));
+        Ok((vs, fs))
+    }
+
+    /// The resident shape of `program` and `d`: packed into the arena when it is not (the least recently drawn one
+    /// put away when they are `RESIDENT`)
+    fn shape(&mut self, program: &Compiled, d: &Draw<'_>) -> Result<usize, Error> {
         let k = key(program.id, d);
         self.clock += 1;
         if let Some(i) = self.shapes.iter().position(|s| s.key == k) {
@@ -716,13 +754,23 @@ impl<'x> State<'x> {
         if self.shapes.len() == RESIDENT {
             self.settle()?;
             let oldest = (0..self.shapes.len()).min_by_key(|&i| self.shapes[i].used).unwrap_or(0);
-            self.shapes.swap_remove(oldest).release(&self.vm)?;
+            let gone = self.shapes.swap_remove(oldest);
+            self.arena.free.push(gone.piece);
         }
-        let slot = (0..RESIDENT).find(|i| !self.shapes.iter().any(|s| s.slot == *i)).unwrap_or(0);
-        let mut body = program.body.clone();
-        let image = Xe3Draw::image(&mut body, d, SLOT_BASE + slot as u64 * SLOT_SPAN)?;
+        let (vs, fs) = self.program(program)?;
+        let shape = Xe3Draw::shape(d, &program.vs, &program.fs)?;
+        let outer = |h: &str| match h {
+            "vs" => Some(vs),
+            "fs" => Some(fs),
+            "surfaces" => Some(POOL_ADDR),
+            "surfaces::bt" | "surfaces::bt_null" => Some(Xe3Device::NULL_TABLE_AT),
+            _ => None,
+        };
+        let piece = self.arena.take(self.xe, &self.vm, shape.bytes())?;
+        let (bytes, state, flush) = shape.lay(piece.0, outer)?;
+        self.arena.write(piece.0, &bytes)?;
         self.lowered += 1;
-        let mut shape = Shape::new(self.xe, &self.vm, &self.queue, k, slot, image, d)?;
+        let mut shape = Shape::new(k, piece, piece.0 + state as u64, piece.0 + flush as u64, &shape.commands, d)?;
         shape.used = self.clock;
         self.shapes.push(shape);
         Ok(self.shapes.len() - 1)
@@ -733,7 +781,7 @@ impl<'x> State<'x> {
         let sh = &self.shapes[i];
         let calls = self.at + 2 * CALL_BYTES + sh.commands.bytes() + 4 <= CALLS_SIZE as usize;
         let dynamic = self.dynamic_at.next_multiple_of(STATE_ALIGN) + 3 * STATE_ALIGN <= DYNAMIC_SIZE;
-        let pool = sh.pool_at.next_multiple_of(STATE_ALIGN) + sh.table_bytes() <= sh.pool_end;
+        let pool = self.pool_at.next_multiple_of(STATE_ALIGN) + sh.table_bytes() <= POOL_SIZE;
         let vertices = d.buffers.iter().enumerate().all(|(i, b)| self.vertices.get(i).is_some_and(|r| r.fits(b.bytes)) || b.bytes.is_empty());
         let fresh = d.uniforms.iter().filter(|(b, bytes)| !self.held.iter().any(|(h, _, held)| h == b && held == bytes)).map(|(_, bytes)| bytes.len());
         let uniforms = Ring::after(self.uniforms.at, fresh) <= self.uniforms.size;
@@ -758,9 +806,7 @@ impl<'x> State<'x> {
         (self.at, self.dynamic_at) = (0, 0);
         self.held.clear();
         self.viewports.clear();
-        for s in &mut self.shapes {
-            s.pool_at = s.pool_free;
-        }
+        self.pool_at = Xe3Device::POOL_STATIC as usize;
         while self.vertices.len() < d.buffers.len() {
             self.vertices.push(Ring::new(VERTEX_ADDR + self.vertices.len() as u64 * VERTEX_SPAN));
         }
@@ -902,34 +948,34 @@ impl<'x> State<'x> {
             let [format, tile] = Xe3Draw::texture(t.format, t.tiling);
             sampled.push([t.addr, u64::from(format), u64::from(tile), u64::from(t.width) - 1, u64::from(t.height) - 1, u64::from(t.pitch) - 1]);
         }
-        let sh = &mut self.shapes[i];
-        let (pool, pool_addr) = (sh.pool, sh.pool_addr);
-        let mut at = sh.pool_at.next_multiple_of(STATE_ALIGN);
+        let sh = &self.shapes[i];
+        let pool = &mut self.pool;
+        let mut at = self.pool_at.next_multiple_of(STATE_ALIGN);
         let mut words = Vec::new();
         sh.commands.target_surface.emit(&mut words, &rt);
-        put(&mut sh.bos[pool].0, at, &words)?;
-        let mut table = vec![pool_addr + at as u64, sh.null];
+        put(pool, at, &words)?;
+        let mut table = vec![POOL_ADDR + at as u64, POOL_ADDR];
         at += STATE_ALIGN;
         for (addr, len) in uniforms.iter().zip(lens) {
             words.clear();
             let [w, h, dd] = Xe3Draw::buffer_size(*len as u32);
             sh.commands.uniform_surface.emit(&mut words, &[*addr, u64::from(w), u64::from(h), u64::from(dd)]);
-            put(&mut sh.bos[pool].0, at, &words)?;
-            table.push(pool_addr + at as u64);
+            put(pool, at, &words)?;
+            table.push(POOL_ADDR + at as u64);
             at += STATE_ALIGN;
         }
         for values in &sampled {
             words.clear();
             sh.commands.texture_surface.emit(&mut words, values);
-            put(&mut sh.bos[pool].0, at, &words)?;
-            table.push(pool_addr + at as u64);
+            put(pool, at, &words)?;
+            table.push(POOL_ADDR + at as u64);
             at += STATE_ALIGN;
         }
         words.clear();
         sh.commands.binding_table.emit(&mut words, &table);
-        put(&mut sh.bos[pool].0, at, &words)?;
+        put(pool, at, &words)?;
         let bt = at as u64;
-        sh.pool_at = at + 4 * words.len();
+        self.pool_at = at + 4 * words.len();
         sh.commands.table_vs.emit(&mut self.words, &[bt]);
         sh.commands.table_ps.emit(&mut self.words, &[bt]);
         self.write()
@@ -1089,7 +1135,7 @@ impl<'x> Device<'x> {
     /// One draw into surface `s` (`d.target` its size, format and tiling), recorded: the first of its program and
     /// shape lowers it with the program's kernels into an image and makes it resident; the surface is loaded as
     /// `d.target.load` says. The draws go to the GPU together (`Device`)
-    pub fn draw(&self, program: &Compiled<'_>, d: &Draw<'_>, s: Surface) -> Result<(), Error> {
+    pub fn draw(&self, program: &Compiled, d: &Draw<'_>, s: Surface) -> Result<(), Error> {
         let mut st = self.state()?;
         let t = st.target(s)?;
         if !t.holds(&d.target) {

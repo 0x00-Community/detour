@@ -101,7 +101,7 @@ fn target(tiling: Tiling, load: TargetLoad<'_>) -> ColorTarget<'_> {
 }
 
 /// One frame into `surface`: cleared first when `clear`, a draw a cell
-fn frame(device: &Device<'_>, programs: &[Compiled<'_>; 2], surface: Surface, tiling: Tiling, clear: bool) {
+fn frame(device: &Device<'_>, programs: &[Compiled; 2], surface: Surface, tiling: Tiling, clear: bool) {
     let zero = [0u8; 4];
     let mut floats = Vec::new();
     let mut bytes = Vec::new();
@@ -186,7 +186,7 @@ fn udmabuf(size: usize) -> Option<(OwnedFd, &'static mut [u8])> {
 
 /// Draws of `HEAVY` bytes of vertices each (a cell's quad over and over), `HEAVY_DRAWS` a frame, into `surface`:
 /// the time recording a frame takes and the time its fence then takes, a frame
-fn heavy(xe: &Xe, device: &Device<'_>, program: &Compiled<'_>, surface: Surface, frames: u32) -> (f64, f64) {
+fn heavy(xe: &Xe, device: &Device<'_>, program: &Compiled, surface: Surface, frames: u32) -> (f64, f64) {
     let mut floats = Vec::new();
     let mut bytes: Vec<Vec<u8>> = Vec::new();
     for k in 0..HEAVY_DRAWS {
@@ -231,7 +231,7 @@ fn heavy(xe: &Xe, device: &Device<'_>, program: &Compiled<'_>, surface: Surface,
 }
 
 /// Draws into dma-buf `fd` imported, `frames` frames, checked through `memory` (the exporter's)
-fn imported(xe: &Xe, device: &Device<'_>, programs: &[Compiled<'_>; 2], what: &str, fd: BorrowedFd<'_>, memory: &mut dyn FnMut() -> Vec<u8>, frames: u32) {
+fn imported(xe: &Xe, device: &Device<'_>, programs: &[Compiled; 2], what: &str, fd: BorrowedFd<'_>, memory: &mut dyn FnMut() -> Vec<u8>, frames: u32) {
     let pitch = SIZE * 4 + PAD;
     let surface = device.import(&target(Tiling::Linear, TargetLoad::Keep(&[])), fd, 0, pitch).unwrap();
     frame(device, programs, surface, Tiling::Linear, false);

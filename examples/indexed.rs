@@ -81,7 +81,7 @@ fn target() -> ColorTarget<'static> {
 
 struct Run<'a, 't> {
     device: &'a Device<'t>,
-    program: &'a Compiled<'a>,
+    program: &'a Compiled,
 }
 
 impl Run<'_, '_> {
