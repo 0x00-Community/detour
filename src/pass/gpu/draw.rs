@@ -156,6 +156,11 @@ impl ColorTarget<'_> {
         (self.row() * self.height) as usize
     }
 
+    /// Whether it has no pixels
+    pub const fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// The bytes it takes in memory
     pub const fn size(&self) -> usize {
         self.tiling.size(self.row(), self.height)

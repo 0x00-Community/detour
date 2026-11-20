@@ -1091,7 +1091,7 @@ impl GpuToXe3 {
     fn bytes(t: &Type<'_>) -> Option<u32> {
         let Type::Shaped(s) = t else { return None };
         let n: i64 = t.dims()?.iter().product();
-        Some(n as u32 * (s.elem.bit_width()? as u32 / 8))
+        Some(n as u32 * (s.elem.bit_width()? / 8))
     }
 
     fn shared(t: &Type<'_>) -> Option<bool> {
