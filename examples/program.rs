@@ -86,6 +86,7 @@ fn draw(compiled: &Compiled<'_>, inputs: &[(u32, Vec<f32>)], device: &Device<'_>
         buffers: bytes.iter().zip(inputs).map(|(b, (n, _))| VertexBuffer { bytes: b, stride: n * 4 }).collect(),
         elements,
         uniforms: Vec::new(),
+        textures: Vec::new(),
         primitive: DrawPrimitive::Triangles,
         first: 0,
         count: VERTICES,

@@ -99,11 +99,14 @@ impl TryFrom<u32> for VertexFormat {
     }
 }
 
-/// A color target's texel format
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A color target's texel format (sampled as it is: no sRGB decoding)
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum ColorFormat {
     Rgba32Float,
+    #[default]
     Rgba8Unorm,
+    /// one channel, red; sampled as (r, 0, 0, 1)
+    R8Unorm,
 }
 
 impl ColorFormat {
@@ -111,6 +114,7 @@ impl ColorFormat {
         match self {
             ColorFormat::Rgba32Float => 16,
             ColorFormat::Rgba8Unorm => 4,
+            ColorFormat::R8Unorm => 1,
         }
     }
 }
@@ -138,6 +142,18 @@ pub struct ColorTarget<'d> {
     pub format: ColorFormat,
     pub tiling: crate::Tiling,
     pub load: TargetLoad<'d>,
+}
+
+impl Default for TargetLoad<'_> {
+    fn default() -> Self {
+        TargetLoad::Keep(&[])
+    }
+}
+
+impl Default for ColorTarget<'_> {
+    fn default() -> Self {
+        ColorTarget { width: 0, height: 0, format: ColorFormat::default(), tiling: crate::Tiling::Linear, load: TargetLoad::default() }
+    }
 }
 
 impl ColorTarget<'_> {
@@ -186,6 +202,11 @@ pub struct TargetClear {
 }
 
 impl TargetClear {
+    /// A channel's bytes: a quarter of the texel's, or all of a one-channel texel's
+    fn channel_bytes(&self) -> usize {
+        (self.texel.len() / self.channels.len()).max(1)
+    }
+
     /// The clear applied to `memory`, a target `width` pixels wide laid out as `tiling`
     pub fn apply_laid_out(&self, memory: &mut [u8], width: u32, tiling: crate::Tiling) {
         self.apply_pitched(memory, tiling.pitch(width * self.texel.len() as u32), tiling);
@@ -195,10 +216,10 @@ impl TargetClear {
     pub fn apply_pitched(&self, memory: &mut [u8], pitch: u32, tiling: crate::Tiling) {
         let [x0, y0, x1, y1] = self.rect;
         let size = self.texel.len();
-        let per = size / self.channels.len();
+        let per = self.channel_bytes();
         for y in y0..y1 {
             for x in x0..x1 {
-                for (c, _) in self.channels.iter().enumerate().filter(|(_, on)| **on) {
+                for (c, _) in self.channels.iter().enumerate().take(size / per).filter(|(_, on)| **on) {
                     let at = tiling.byte(x * size as u32 + (c * per) as u32, y, pitch);
                     memory[at..at + per].copy_from_slice(&self.texel[c * per..(c + 1) * per]);
                 }
@@ -210,11 +231,11 @@ impl TargetClear {
     pub fn apply(&self, pixels: &mut [u8], width: u32) {
         let [x0, y0, x1, y1] = self.rect;
         let size = self.texel.len();
-        let per = size / self.channels.len();
+        let per = self.channel_bytes();
         for y in y0..y1 {
             let row = &mut pixels[(y * width) as usize * size..][(x0 as usize * size)..(x1 as usize * size)];
             for px in row.chunks_exact_mut(size) {
-                for (c, _) in self.channels.iter().enumerate().filter(|(_, on)| **on) {
+                for (c, _) in self.channels.iter().enumerate().take(size / per).filter(|(_, on)| **on) {
                     px[c * per..(c + 1) * per].copy_from_slice(&self.texel[c * per..(c + 1) * per]);
                 }
             }
@@ -234,6 +255,32 @@ impl TargetFill {
     }
 }
 
+/// How a sampled texture filters between texels
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+pub enum Filter {
+    #[default]
+    Nearest,
+    Linear,
+}
+
+/// What a sampled texture gives for coordinates outside [0, 1]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+pub enum Wrap {
+    #[default]
+    ClampToEdge,
+    Repeat,
+    MirroredRepeat,
+}
+
+/// A surface the fragment shader samples, at its sampled image `binding` (one mip level, its own size and format)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Sampled {
+    pub binding: u32,
+    pub surface: crate::Surface,
+    pub filter: Filter,
+    pub wrap: Wrap,
+}
+
 /// One draw, described without the GPU: a target's constructor (detour's `Xe3Draw`, say) lowers it, with the program's kernels,
 /// into the image the GPU runs
 #[derive(Clone, Debug)]
@@ -242,6 +289,8 @@ pub struct Draw<'d> {
     pub elements: Vec<VertexElement>,
     /// uniform blocks, by binding
     pub uniforms: Vec<(u32, &'d [u8])>,
+    /// surfaces the fragment shader samples
+    pub textures: Vec<Sampled>,
     pub primitive: DrawPrimitive,
     pub first: u32,
     pub count: u32,
@@ -258,4 +307,29 @@ pub struct Draw<'d> {
     /// red, green, blue, alpha: written or kept
     pub color_mask: [bool; 4],
     pub target: ColorTarget<'d>,
+}
+
+impl Default for Draw<'_> {
+    /// No vertices, uniforms or textures; one instance of a triangle list, the whole target, depth 0 to 1, no culling,
+    /// no blending, every channel written
+    fn default() -> Self {
+        Draw {
+            buffers: Vec::new(),
+            elements: Vec::new(),
+            uniforms: Vec::new(),
+            textures: Vec::new(),
+            primitive: DrawPrimitive::Triangles,
+            first: 0,
+            count: 0,
+            instances: 1,
+            viewport: [0.0; 4],
+            depth_range: [0.0, 1.0],
+            scissor: None,
+            cull: CullMode::None,
+            front_ccw: true,
+            blend: None,
+            color_mask: [true; 4],
+            target: ColorTarget::default(),
+        }
+    }
 }

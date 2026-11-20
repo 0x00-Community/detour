@@ -81,6 +81,7 @@ pub fn expected(case: &Case, rule: FillRule) -> Vec<u8> {
         _ => match t.format {
         ColorFormat::Rgba8Unorm => vec![core::array::from_fn(|c| f32::from(t.clear[c]) / 255.0); n],
         ColorFormat::Rgba32Float => vec![core::array::from_fn(|c| f32::from_le_bytes(t.clear[4 * c..4 * c + 4].try_into().unwrap())); n],
+        ColorFormat::R8Unorm => unreachable!("raster cases draw into RGBA targets"),
         },
     };
     for (op, shade) in &case.draws {
@@ -118,6 +119,7 @@ pub fn expected(case: &Case, rule: FillRule) -> Vec<u8> {
     match t.format {
         ColorFormat::Rgba8Unorm => px.iter().flat_map(|p| p.map(reference::unorm8)).collect(),
         ColorFormat::Rgba32Float => px.iter().flat_map(|p| p.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<_>>()).collect(),
+        ColorFormat::R8Unorm => unreachable!("raster cases draw into RGBA targets"),
     }
 }
 
@@ -125,7 +127,7 @@ pub fn expected(case: &Case, rule: FillRule) -> Vec<u8> {
 pub fn differences(t: &Target, got: &[u8], want: &[u8], tolerance: u8) -> String {
     let size = t.format.bytes() as usize;
     let close = |a: &[u8], b: &[u8]| match t.format {
-        ColorFormat::Rgba8Unorm => a.iter().zip(b).all(|(x, y)| x.abs_diff(*y) <= tolerance),
+        ColorFormat::Rgba8Unorm | ColorFormat::R8Unorm => a.iter().zip(b).all(|(x, y)| x.abs_diff(*y) <= tolerance),
         ColorFormat::Rgba32Float => a == b,
     };
     let bad: Vec<usize> = (0..(t.width * t.height) as usize).filter(|&i| !close(&got[i * size..(i + 1) * size], &want[i * size..(i + 1) * size])).collect();
@@ -133,7 +135,7 @@ pub fn differences(t: &Target, got: &[u8], want: &[u8], tolerance: u8) -> String
         return String::new();
     }
     let show = |b: &[u8]| match t.format {
-        ColorFormat::Rgba8Unorm => format!("{b:?}"),
+        ColorFormat::Rgba8Unorm | ColorFormat::R8Unorm => format!("{b:?}"),
         ColorFormat::Rgba32Float => format!("{:?}", b.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect::<Vec<_>>()),
     };
     let first: Vec<String> = bad

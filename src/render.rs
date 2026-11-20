@@ -202,7 +202,9 @@ struct Commands {
     scissor_pointer: Command,
     target_surface: Command,
     uniform_surface: Command,
+    texture_surface: Command,
     binding_table: Command,
+    barrier: Command,
     table_vs: Command,
     table_ps: Command,
     viewport_cc: Command,
@@ -212,7 +214,7 @@ struct Commands {
 impl Commands {
     /// The bytes a draw's commands take at most
     fn bytes(&self) -> usize {
-        [&self.vertex_buffers, &self.scissor_pointer, &self.table_vs, &self.table_ps, &self.viewport_cc, &self.viewport_sf_clip, &self.primitive].iter().map(|c| c.bytes()).sum()
+        [&self.vertex_buffers, &self.scissor_pointer, &self.table_vs, &self.table_ps, &self.viewport_cc, &self.viewport_sf_clip, &self.primitive, &self.barrier].iter().map(|c| c.bytes()).sum()
     }
 }
 
@@ -237,6 +239,8 @@ struct Shape<'x> {
     null: u64,
     /// the uniform blocks' bindings, in the draw's order
     bindings: Vec<u32>,
+    /// the sampled textures' bindings, in the draw's order
+    textures: Vec<u32>,
 }
 
 impl<'x> Shape<'x> {
@@ -245,7 +249,13 @@ impl<'x> Shape<'x> {
         let c = &parts.commands;
         let vb: Vec<String> = (0..d.buffers.len()).flat_map(|i| [Xe3Draw::vertex_buffer(i), format!("{}_size", Xe3Draw::vertex_buffer(i))]).collect();
         let bindings: Vec<u32> = d.uniforms.iter().map(|(b, _)| *b).collect();
-        let table: Vec<String> = ["rt", "null"].into_iter().map(String::from).chain(bindings.iter().map(|b| Xe3Draw::uniform_buffer(*b))).collect();
+        let textures: Vec<u32> = d.textures.iter().map(|t| t.binding).collect();
+        let table: Vec<String> = ["rt", "null"]
+            .into_iter()
+            .map(String::from)
+            .chain(bindings.iter().map(|b| Xe3Draw::uniform_buffer(*b)))
+            .chain(textures.iter().map(|b| Xe3Draw::texture_binding(*b)))
+            .collect();
         let commands = Commands {
             primitive: Command::new(&c.primitive, &names(&["count", "first", "instances"]))?,
             vertex_buffers: Command::new(&c.vertex_buffers, &vb)?,
@@ -253,7 +263,9 @@ impl<'x> Shape<'x> {
             scissor_pointer: Command::new(&c.scissor_pointer, &names(&["scissor"]))?,
             target_surface: Command::new(&c.target_surface, &names(&["target", "pitch", "width", "height"]))?,
             uniform_surface: Command::new(&c.uniform_surface, &names(&["ubo", "ubo_w", "ubo_h", "ubo_d"]))?,
+            texture_surface: Command::new(&c.texture_surface, &names(&["tex", "tex_format", "tex_tile", "tex_w", "tex_h", "tex_pitch"]))?,
             binding_table: Command::new(&c.binding_table, &table)?,
+            barrier: Command::new(&c.barrier, &[])?,
             table_vs: Command::new(&c.table_pointers_vs, &names(&["bt"]))?,
             table_ps: Command::new(&c.table_pointers_ps, &names(&["bt"]))?,
             viewport_cc: Command::new(&c.viewport_cc, &names(&["cc"]))?,
@@ -299,12 +311,13 @@ impl<'x> Shape<'x> {
             pool_end,
             null: parts.null,
             bindings,
+            textures,
         })
     }
 
     /// The bytes a draw's binding table and its surface states take in the pool at most
     fn table_bytes(&self) -> usize {
-        STATE_ALIGN * (1 + self.bindings.len()) + self.commands.binding_table.bytes().next_multiple_of(STATE_ALIGN)
+        STATE_ALIGN * (1 + self.bindings.len() + self.textures.len()) + self.commands.binding_table.bytes().next_multiple_of(STATE_ALIGN)
     }
 
     /// Its memories unmapped (nothing of it running)
@@ -328,6 +341,9 @@ fn key(program: u64, d: &Draw<'_>) -> u64 {
     }
     for (binding, _) in &d.uniforms {
         binding.hash(&mut h);
+    }
+    for t in &d.textures {
+        (t.binding, t.filter, t.wrap).hash(&mut h);
     }
     discriminant(&d.primitive).hash(&mut h);
     (discriminant(&d.cull), d.front_ccw, d.color_mask, d.blend.is_some()).hash(&mut h);
@@ -396,6 +412,34 @@ impl<'x> Target<'x> {
         Ok(out)
     }
 
+    /// `pixels` (rows of `rect`'s width) written into rectangle `rect` of it (nothing using it)
+    fn write_rect(&mut self, rect: [u32; 4], pixels: &[u8]) -> Result<(), Error> {
+        let [x, y, w, h] = rect;
+        if x.checked_add(w).is_none_or(|r| r > self.width) || y.checked_add(h).is_none_or(|b| b > self.height) {
+            return Err(Error(format!("a {w}x{h} rectangle at {x}, {y} of a {}x{} surface", self.width, self.height)));
+        }
+        let bpp = self.format.bytes();
+        let row = (w * bpp) as usize;
+        if pixels.len() < row * h as usize {
+            return Err(Error(format!("{} bytes for a {w}x{h} rectangle of {bpp}-byte texels", pixels.len())));
+        }
+        let (pitch, tiling) = (self.pitch, self.tiling);
+        let memory = self.memory()?;
+        for (r, src) in pixels.chunks_exact(row).take(h as usize).enumerate() {
+            let yy = y + r as u32;
+            let mut done = 0;
+            while done < row {
+                let bx = x * bpp + done as u32;
+                let run = (Tiling::RUN - bx % Tiling::RUN) as usize;
+                let n = run.min(row - done);
+                let at = tiling.byte(bx, yy, pitch);
+                memory[at..at + n].copy_from_slice(&src[done..done + n]);
+                done += n;
+            }
+        }
+        Ok(())
+    }
+
     /// `pixels` (rows) written into it (nothing using it)
     fn write(&mut self, pixels: &[u8]) -> Result<(), Error> {
         self.natural()?;
@@ -411,12 +455,12 @@ impl<'x> Target<'x> {
 }
 
 /// What the batch being recorded has set since its last shape's state: its vertex buffers, binding table (the
-/// surface and the uniforms' addresses), viewport and scissor
+/// surface, the uniforms' addresses and the textures), viewport and scissor
 struct Current {
     shape: u64,
     flush: u64,
     vertices: Vec<u64>,
-    table: Option<(usize, Vec<u64>)>,
+    table: Option<(usize, Vec<u64>, Vec<usize>)>,
     viewport: Option<u64>,
     scissor: Option<[u32; 4]>,
 }
@@ -439,10 +483,16 @@ struct State<'x> {
     shapes: Vec<Shape<'x>>,
     clock: u64,
     surfaces: Vec<Option<Target<'x>>>,
-    /// what the next submission waits for, the last submission, the surfaces the batch being recorded draws into
+    /// what the next submission waits for, the last submission, the surfaces the batch being recorded draws into and
+    /// samples
     waits: Vec<Syncobj<'x>>,
     last: Option<Rc<Syncobj<'x>>>,
     written: Vec<usize>,
+    sampled: Vec<usize>,
+    /// the surfaces drawn into and sampled since the batch's last barrier: sampling one of the first, or drawing
+    /// into one of the second, records a barrier first
+    drawn_since: Vec<usize>,
+    sampled_since: Vec<usize>,
     current: Option<Current>,
     /// the viewports written into the dynamic memory since it started over: each one's key, CC and SF_CLIP state
     viewports: Vec<(u64, u64, u64)>,
@@ -476,6 +526,9 @@ impl<'x> State<'x> {
             waits: Vec::new(),
             last: None,
             written: Vec::new(),
+            sampled: Vec::new(),
+            drawn_since: Vec::new(),
+            sampled_since: Vec::new(),
             current: None,
             viewports: Vec::new(),
             words: Vec::new(),
@@ -541,7 +594,10 @@ impl<'x> State<'x> {
         let waits: Vec<&Syncobj<'x>> = self.waits.iter().collect();
         self.queue.submit(&(CALLS_ADDR + start as u64), &waits, &[&done]).map_err(io)?;
         self.waits.clear();
-        for s in self.written.drain(..) {
+        self.drawn_since.clear();
+        self.sampled_since.clear();
+        let used: Vec<usize> = self.written.drain(..).chain(self.sampled.drain(..)).collect();
+        for s in used {
             if let Some(Some(t)) = self.surfaces.get_mut(s) {
                 t.fence = Some(done.clone());
             }
@@ -585,9 +641,9 @@ impl<'x> State<'x> {
         Ok(())
     }
 
-    /// The draws into surface `s` submitted and done
+    /// The draws into surface `s`, and those sampling it, submitted and done
     fn idle(&mut self, s: Surface) -> Result<(), Error> {
-        if self.written.contains(&s.0) {
+        if self.written.contains(&s.0) || self.sampled.contains(&s.0) {
             self.submit()?;
         }
         if let Some(f) = &self.target(s)?.fence {
@@ -743,14 +799,21 @@ impl<'x> State<'x> {
             self.write()?;
             self.current.as_mut().unwrap().viewport = Some(viewport);
         }
+        let textures: Vec<usize> = d.textures.iter().map(|t| t.surface.0).collect();
+        if textures.iter().any(|t| self.drawn_since.contains(t)) || self.sampled_since.contains(&s.0) {
+            self.shapes[i].commands.barrier.emit(&mut self.words, &[]);
+            self.write()?;
+            self.drawn_since.clear();
+            self.sampled_since.clear();
+        }
         let mut uniforms = Vec::with_capacity(d.uniforms.len());
         for (binding, bytes) in &d.uniforms {
             uniforms.push(self.uniform(*binding, bytes)?);
         }
-        if self.current.as_ref().is_some_and(|c| c.table.as_ref().is_none_or(|(t, u)| *t != s.0 || *u != uniforms)) {
+        if self.current.as_ref().is_some_and(|c| c.table.as_ref().is_none_or(|(t, u, x)| *t != s.0 || *u != uniforms || *x != textures)) {
             let lens: Vec<usize> = d.uniforms.iter().map(|(_, b)| b.len()).collect();
-            self.table(i, s, &uniforms, &lens)?;
-            self.current.as_mut().unwrap().table = Some((s.0, uniforms));
+            self.table(i, s, &uniforms, &lens, &textures)?;
+            self.current.as_mut().unwrap().table = Some((s.0, uniforms, textures.clone()));
         }
         let mut values = Vec::with_capacity(2 * d.buffers.len());
         for (r, b) in self.vertices.iter_mut().zip(&d.buffers) {
@@ -775,14 +838,31 @@ impl<'x> State<'x> {
         if !self.written.contains(&s.0) {
             self.written.push(s.0);
         }
+        if !self.drawn_since.contains(&s.0) {
+            self.drawn_since.push(s.0);
+        }
+        for t in textures {
+            if !self.sampled.contains(&t) {
+                self.sampled.push(t);
+            }
+            if !self.sampled_since.contains(&t) {
+                self.sampled_since.push(t);
+            }
+        }
         Ok(())
     }
 
-    /// A binding table of `s` and `uniforms` (the blocks' addresses, `lens` their bytes) written into shape `i`'s
-    /// pool, and the pointers to it recorded
-    fn table(&mut self, i: usize, s: Surface, uniforms: &[u64], lens: &[usize]) -> Result<(), Error> {
+    /// A binding table of `s`, `uniforms` (the blocks' addresses, `lens` their bytes) and `textures` (surfaces)
+    /// written into shape `i`'s pool, and the pointers to it recorded
+    fn table(&mut self, i: usize, s: Surface, uniforms: &[u64], lens: &[usize], textures: &[usize]) -> Result<(), Error> {
         let t = self.target(s)?;
         let rt = [t.addr, u64::from(t.pitch) - 1, u64::from(t.width) - 1, u64::from(t.height) - 1];
+        let mut sampled = Vec::with_capacity(textures.len());
+        for &x in textures {
+            let t = self.target(Surface(x))?;
+            let [format, tile] = Xe3Draw::texture(t.format, t.tiling);
+            sampled.push([t.addr, u64::from(format), u64::from(tile), u64::from(t.width) - 1, u64::from(t.height) - 1, u64::from(t.pitch) - 1]);
+        }
         let sh = &mut self.shapes[i];
         let (pool, pool_addr) = (sh.pool, sh.pool_addr);
         let mut at = sh.pool_at.next_multiple_of(STATE_ALIGN);
@@ -795,6 +875,13 @@ impl<'x> State<'x> {
             words.clear();
             let [w, h, dd] = Xe3Draw::buffer_size(*len as u32);
             sh.commands.uniform_surface.emit(&mut words, &[*addr, u64::from(w), u64::from(h), u64::from(dd)]);
+            put(&mut sh.bos[pool].0, at, &words)?;
+            table.push(pool_addr + at as u64);
+            at += STATE_ALIGN;
+        }
+        for values in &sampled {
+            words.clear();
+            sh.commands.texture_surface.emit(&mut words, values);
             put(&mut sh.bos[pool].0, at, &words)?;
             table.push(pool_addr + at as u64);
             at += STATE_ALIGN;
@@ -835,12 +922,15 @@ impl<'x> Device<'x> {
         Ok(RefMut::map(st, |s| s.as_mut().unwrap()))
     }
 
-    /// A new surface for target `t` (its size, format and layout), zero
+    /// A new surface for target `t` (its size, format and layout): zero, then loaded as `t.load` says (a texture's
+    /// texels: `TargetLoad::Pixels`)
     pub fn surface(&self, t: &ColorTarget<'_>) -> Result<Surface, Error> {
         let mut st = self.state()?;
         let size = (t.size() as u64).next_multiple_of(self.xe.info().min_alignment.max(4096));
         let bo = self.xe.bo((size, Caching::WriteCombined).into()).map_err(io)?;
-        st.adopt(t, bo, 0, t.pitch(), &[MemType::Streaming])
+        let s = st.adopt(t, bo, 0, t.pitch(), &[MemType::Streaming])?;
+        st.load(s, &t.load)?;
+        Ok(s)
     }
 
     /// A surface drawn straight into dma-buf `fd` (a GBM buffer, a udmabuf...): targets like `t` (its size, format:
@@ -859,9 +949,18 @@ impl<'x> Device<'x> {
         st.idle(s)?;
         let t = st.surfaces.get_mut(s.0).and_then(Option::take).ok_or_else(|| Error(format!("no surface {s:?}")))?;
         for c in st.current.iter_mut() {
-            c.table = c.table.take().filter(|(t, _)| *t != s.0);
+            c.table = c.table.take().filter(|(t, _, x)| *t != s.0 && !x.contains(&s.0));
         }
         st.vm.unbind(t.addr, t.range, &[]).map_err(io)
+    }
+
+    /// `pixels` (rows of `rect`'s width, tightly packed) written into rectangle `rect` (x, y, width, height) of
+    /// surface `s`, once the draws into it and those sampling it are done: a texture's part updated (a glyph
+    /// atlas's)
+    pub fn write(&self, s: Surface, rect: [u32; 4], pixels: &[u8]) -> Result<(), Error> {
+        let mut st = self.state()?;
+        st.idle(s)?;
+        st.target(s)?.write_rect(rect, pixels)
     }
 
     /// How many draw shapes were lowered into images so far (each costs a compile; a draw of a resident one does not)
@@ -930,6 +1029,12 @@ impl<'x> Device<'x> {
                 "a draw into a {}x{} {:?} {:?} target, surface {s:?} is {}x{} {:?} {:?}",
                 d.target.width, d.target.height, d.target.format, d.target.tiling, t.width, t.height, t.format, t.tiling
             )));
+        }
+        for x in &d.textures {
+            if x.surface == s {
+                return Err(Error(format!("a draw into surface {s:?} sampling it")));
+            }
+            st.target(x.surface)?;
         }
         let i = st.shape(program, d)?;
         st.load(s, &d.target.load)?;

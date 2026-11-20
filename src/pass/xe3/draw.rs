@@ -97,6 +97,14 @@ const CC_VIEWPORT_ALIGN: u32 = 32;
 const STATE_ALIGN: u32 = 64;
 const FENCE_ALIGN: u64 = 4096;
 const FENCE_SIZE: u64 = 64;
+/// Sampler states: their array on 32 bytes, each 16; the border color on 64; the PS's sampler count in fours
+const SAMPLER_ALIGN: u32 = 32;
+const SAMPLER_ENTRY_ALIGN: u32 = 16;
+const BORDER_ALIGN: u32 = 64;
+const SAMPLERS_PER_COUNT: u32 = 4;
+const SAMPLERS_MAX: u32 = 16;
+/// A sampler's LOD range: the one level a texture has
+const LOD_MAX: f32 = 0.0;
 /// A buffer surface's size, split over its width, height and depth fields
 const BUFFER_WIDTH_BITS: u32 = 7;
 const BUFFER_HEIGHT_BITS: u32 = 14;
@@ -155,6 +163,7 @@ impl SurfaceFormat {
     const R32_FLOAT: u32 = 0x0d8;
     const R32_UINT: u32 = 0x0d7;
     const R8G8B8A8_UNORM: u32 = 0x0c7;
+    const R8_UNORM: u32 = 0x140;
     const RAW: u32 = 0x1ff;
 
     const fn vertex(f: VertexFormat) -> u32 {
@@ -170,6 +179,7 @@ impl SurfaceFormat {
         match f {
             ColorFormat::Rgba32Float => SurfaceFormat::R32G32B32A32_FLOAT,
             ColorFormat::Rgba8Unorm => SurfaceFormat::R8G8B8A8_UNORM,
+            ColorFormat::R8Unorm => SurfaceFormat::R8_UNORM,
         }
     }
 }
@@ -185,6 +195,21 @@ impl Genxml {
             DrawPrimitive::LineStrip => XE3__3DPRIM_LINESTRIP,
             DrawPrimitive::Triangles => XE3__3DPRIM_TRILIST,
             DrawPrimitive::TriangleStrip => XE3__3DPRIM_TRISTRIP,
+        }
+    }
+
+    fn filter(f: Filter) -> u32 {
+        match f {
+            Filter::Nearest => XE3_MAPFILTER_NEAREST,
+            Filter::Linear => XE3_MAPFILTER_LINEAR,
+        }
+    }
+
+    fn wrap(w: Wrap) -> u32 {
+        match w {
+            Wrap::ClampToEdge => XE3_TCM_CLAMP,
+            Wrap::Repeat => XE3_TCM_WRAP,
+            Wrap::MirroredRepeat => XE3_TCM_MIRROR,
         }
     }
 
@@ -216,7 +241,9 @@ pub struct Xe3DrawImage {
 /// reads none), a scissor rectangle (`x0`, `y0`, `x1`, `y1`, inclusive) and the pointer to one (`scissor`, below
 /// 4 GiB, on `Xe3Draw::SCISSOR_ALIGN`), the color target's surface state (`target`: its address, `pitch`: a row's
 /// bytes less one), a uniform block's (`ubo`: its address, `ubo_w`, `ubo_h`, `ubo_d`: its size less one, split as
-/// `Xe3Draw::buffer_size` does), the binding table (`rt`, `null`, `ubo<binding>`: surface states' addresses, on
+/// `Xe3Draw::buffer_size` does), a sampled texture's (`tex`: its address, `tex_format`, `tex_tile`: `Xe3Draw::texture`,
+/// `tex_w`, `tex_h`, `tex_pitch`: less one), the binding table (`rt`, `null`, `ubo<binding>`, `tex<binding>`: surface
+/// states' addresses, on
 /// `SURFACE_ALIGN` in the pool) and the pointers to it (`bt`: its offset in the pool; the vertex shader's: no dwords
 /// when it reads no buffers), and the pointers to the viewport states (`cc`, `sf_clip`: `Xe3Draw::viewports`, below
 /// 4 GiB). The color target's size is in its surface state (`width`, `height`, less one)
@@ -227,11 +254,15 @@ pub struct Xe3DrawCommands {
     pub scissor_pointer: Template,
     pub target_surface: Template,
     pub uniform_surface: Template,
+    pub texture_surface: Template,
     pub binding_table: Template,
     pub table_pointers_vs: Template,
     pub table_pointers_ps: Template,
     pub viewport_cc: Template,
     pub viewport_sf_clip: Template,
+    /// between a draw into a surface and one sampling it, or the other way round: the render target written back and
+    /// the texture cache emptied, once the draws before it are done (no holes)
+    pub barrier: Template,
 }
 
 /// A draw on Xe3: the program's kernels (in the module, as the shader pipeline leaves them), the state, the commands
@@ -268,6 +299,8 @@ impl<'a> Xe3Draw<'_, 'a> {
     const SCISSOR: &'static str = "scissor";
     const COLOR_CALC: &'static str = "color_calc";
     const BLEND: &'static str = "blend";
+    const SAMPLERS: &'static str = "samplers";
+    const BORDER: &'static str = "border_color";
     const SHADER_MODULE: &'static str = "shaders";
 
     /// The module's top-level spirv.module ops moved into a gpu.module (what convert-spirv-entry-points takes),
@@ -387,10 +420,15 @@ impl<'a> Xe3Draw<'_, 'a> {
         Pack(XE3).template(&data.name, &data.all_attrs())
     }
 
-    /// The binding table's entries: the color target, then each uniform block at its binding (`None`: the null
-    /// surface)
+    /// The binding table's entries: the color target, each sampled texture after it at its binding, then each uniform
+    /// block at its binding from `XE3_BUFFER_BTI` (`None`: the null surface)
     fn entries(d: &Draw<'_>) -> Vec<Option<String>> {
         let mut entries = vec![Some("rt".to_owned())];
+        for t in &d.textures {
+            let at = 1 + t.binding as usize;
+            entries.resize(entries.len().max(at + 1), None);
+            entries[at] = Some(Xe3Draw::texture_binding(t.binding));
+        }
         for &(binding, _) in &d.uniforms {
             let at = usize::from(XE3_BUFFER_BTI) + binding as usize;
             entries.resize(entries.len().max(at + 1), None);
@@ -440,6 +478,24 @@ impl<'a> Xe3Draw<'_, 'a> {
             l1_cache_control: XE3_L1CC_WB,
             surface_base_address: A::sym("ubo"),
         }))?;
+        let texture_surface = Xe3Draw::template(&xe3!(StateRenderSurfaceState {
+            surface_type: XE3_SURFTYPE_2D,
+            surface_format: A::sym("tex_format"),
+            surface_horizontal_alignment: HALIGN_128B,
+            surface_vertical_alignment: VALIGN_4,
+            width: A::sym("tex_w"),
+            height: A::sym("tex_h"),
+            surface_pitch: A::sym("tex_pitch"),
+            tile_mode: A::sym("tex_tile"),
+            mip_tail_start_lod: MIP_TAIL_NONE,
+            mocs: MOCS,
+            l1_cache_control: XE3_L1CC_WB,
+            shader_channel_select_red: SCS[0],
+            shader_channel_select_green: SCS[1],
+            shader_channel_select_blue: SCS[2],
+            shader_channel_select_alpha: SCS[3],
+            surface_base_address: A::sym("tex"),
+        }))?;
         let mut binding_table = Template::default();
         for e in Xe3Draw::entries(d) {
             binding_table.extend(&Xe3Draw::template(&xe3!(StateBindingTableState { surface_state_pointer: A::sym(e.as_deref().unwrap_or("null")) }))?);
@@ -486,6 +542,11 @@ impl<'a> Xe3Draw<'_, 'a> {
             scissor_rectangle_y_max: A::sym("y1"),
         }))?;
         let scissor_pointer = Xe3Draw::template(&xe3!(Cmd3dstateScissorStatePointers { scissor_rect_pointer: A::sym("scissor") }))?;
+        let barrier = Xe3Draw::template(&xe3!(CmdPipeControl {
+            render_target_cache_flush_enable: true,
+            texture_cache_invalidation_enable: true,
+            command_streamer_stall_enable: true,
+        }))?;
         Ok(Xe3DrawCommands {
             primitive,
             vertex_buffers,
@@ -493,11 +554,13 @@ impl<'a> Xe3Draw<'_, 'a> {
             scissor_pointer,
             target_surface,
             uniform_surface,
+            texture_surface,
             binding_table,
             table_pointers_vs,
             table_pointers_ps,
             viewport_cc,
             viewport_sf_clip,
+            barrier,
         })
     }
 
@@ -558,6 +621,63 @@ impl<'a> Xe3Draw<'_, 'a> {
     /// Uniform block `binding`'s hole in `Xe3DrawCommands::binding_table`
     pub fn uniform_buffer(binding: u32) -> String {
         format!("ubo{binding}")
+    }
+
+    /// Sampled texture `binding`'s hole in `Xe3DrawCommands::binding_table`
+    pub fn texture_binding(binding: u32) -> String {
+        format!("tex{binding}")
+    }
+
+    /// A texture's `tex_format` and `tex_tile` in `Xe3DrawCommands::texture_surface`
+    pub const fn texture(format: ColorFormat, tiling: Tiling) -> [u32; 2] {
+        [SurfaceFormat::color(format), if matches!(tiling, Tiling::Tile4) { XE3_TILE4 } else { 0 }]
+    }
+
+    /// The fragment shader's sampler states (`SAMPLERS`, one per binding up to its last texture's, with the border
+    /// color they share) and the pointer to them: the count of fours the PS states
+    fn samplers(&mut self, d: &Draw<'_>, bindings: u32) -> Result<u32, Error> {
+        if bindings == 0 {
+            return Ok(0);
+        }
+        if bindings > SAMPLERS_MAX {
+            return Err(Error(format!("a draw on Xe3 samples at most {SAMPLERS_MAX} bindings, the shader {bindings}")));
+        }
+        self.state(false, Xe3Draw::BORDER, BORDER_ALIGN, &StateSamplerBorderColorState::default());
+        for b in 0..bindings {
+            let t = d.textures.iter().find(|t| t.binding == b);
+            let (filter, wrap) = t.map_or((Filter::Nearest, Wrap::ClampToEdge), |t| (t.filter, t.wrap));
+            let (f, w, round) = (Genxml::filter(filter), Genxml::wrap(wrap), filter == Filter::Linear);
+            let state = xe3!(StateSamplerState {
+                min_mode_filter: f,
+                mag_mode_filter: f,
+                mip_mode_filter: XE3_MIPFILTER_NONE,
+                lod_preclamp_mode: XE3_CLAMP_MODE_OGL,
+                max_lod: LOD_MAX,
+                min_lod: LOD_MAX,
+                border_color_pointer: A::sym(Xe3Draw::BORDER),
+                tcx_address_control_mode: w,
+                tcy_address_control_mode: w,
+                tcz_address_control_mode: w,
+                u_address_min_filter_rounding_enable: round,
+                u_address_mag_filter_rounding_enable: round,
+                v_address_min_filter_rounding_enable: round,
+                v_address_mag_filter_rounding_enable: round,
+                r_address_min_filter_rounding_enable: round,
+                r_address_mag_filter_rounding_enable: round,
+                sampler_disable: t.is_none(),
+            });
+            match b {
+                0 => {
+                    self.state(false, Xe3Draw::SAMPLERS, SAMPLER_ALIGN, &state);
+                }
+                _ => {
+                    let o = self.put(self.code, &state);
+                    self.body[o].set(ImagePlaced::ALIGN, A::from(SAMPLER_ENTRY_ALIGN).into());
+                }
+            }
+        }
+        self.cmd(&xe3!(Cmd3dstateSamplerStatePointersPs { pointer_to_ps_sampler_state: A::sym(Xe3Draw::SAMPLERS) }));
+        Ok(bindings.div_ceil(SAMPLERS_PER_COUNT))
     }
 
     fn pc_flush(&mut self) {
@@ -686,8 +806,12 @@ impl<'a> Xe3Draw<'_, 'a> {
         if inputs as usize != d.elements.len() {
             return Err(Error(format!("the vertex shader reads {inputs} inputs, the draw gives {}", d.elements.len())));
         }
-        if fh.targets.unwrap_or(1) != 1 || fh.bindings.unwrap_or(0) != 0 {
-            return Err(Error("a draw on Xe3: one color target and no textures, for now".into()));
+        if fh.targets.unwrap_or(1) != 1 {
+            return Err(Error("a draw on Xe3: one color target".into()));
+        }
+        let bindings = fh.bindings.unwrap_or(0);
+        if bindings > 0 && d.textures.is_empty() {
+            return Err(Error(format!("the fragment shader samples bindings below {bindings}, the draw gives no texture")));
         }
         self.viewport(d);
         let blend = d.blend.unwrap_or_default();
@@ -756,6 +880,7 @@ impl<'a> Xe3Draw<'_, 'a> {
         self.cmd(&xe3!(Cmd3dstateBindingTablePointersDs { pointer_to_ds_binding_table: null() }));
         self.cmd(&xe3!(Cmd3dstateBindingTablePointersGs { pointer_to_gs_binding_table: null() }));
         self.cmd(&xe3!(Cmd3dstateBindingTablePointersPs { pointer_to_ps_binding_table: bt() }));
+        let samplers = self.samplers(d, bindings)?;
         self.cmd(&xe3!(CmdPipeControl { stall_at_pixel_scoreboard: true, render_target_cache_flush_enable: true }));
         self.cmd(&xe3!(Cmd3dstateMultisample { number_of_multisamples: 0u32 }));
         self.cmd(&xe3!(Cmd3dstateSampleMask { sample_mask: 1u32 }));
@@ -782,7 +907,7 @@ impl<'a> Xe3Draw<'_, 'a> {
             kernel_start_pointer_0: A::sym(Xe3Draw::FS),
             registers_per_thread: REGISTERS_PER_THREAD,
             binding_table_entry_count: table,
-            sampler_count: 0u32,
+            sampler_count: samplers,
             maximum_number_of_threads_per_psd: PS_THREADS,
             dispatch_grf_start_register_for_constant_setup_data_0: u32::from(setup),
             kernel_0_poly_packing_policy: XE3_POLY_PACK16_FIXED,
