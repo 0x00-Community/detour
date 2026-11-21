@@ -57,7 +57,8 @@ Mesa, 没有 libdrm, 不提供任何图形 API (那是应用那一层的事). �
 | 🔵 **Intel Xe3** (Panther Lake, PCI 8086:b0a0) | `xe` |
 | 🔴 **AMD RDNA2** (gfx1036, Radeon 610M, PCI 1002:13c0) | `amdgpu` |
 
-只支持 x86_64 Linux. 没有任何回退: 没有 CPU 光栅, 也不转给系统的驱动.
+只支持 Linux. 绘制跑在按 x86-64-v3 (AVX2, BMI2, FMA; `.cargo/config.toml`) 编译的 x86_64 主机上: 更老的 CPU 会遇到非法
+指令而崩溃. 工具链 (编译, 编码, `tests/`) 在 aarch64 上也能编过并通过. 没有任何回退: 没有 CPU 光栅, 也不转给系统的驱动.
 
 ## 🗂️ 目录
 
