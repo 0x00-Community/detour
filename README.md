@@ -58,7 +58,9 @@ Each GPU against a CPU reference, and Xe3's fixed function against Mesa (iris 25
 | 🔵 **Intel Xe3** (Panther Lake, PCI 8086:b0a0) | `xe` |
 | 🔴 **AMD RDNA2** (gfx1036, Radeon 610M, PCI 1002:13c0) | `amdgpu` |
 
-x86_64 Linux only. There is no fallback: no CPU rasterizer, no hand-off to the system's drivers.
+Linux only. Draws run on x86_64 hosts built for x86-64-v3 (AVX2, BMI2, FMA; `.cargo/config.toml`): an older CPU dies on an
+illegal instruction. The toolchain (compiling, encoding, `tests/`) also builds and passes on aarch64. There is no
+fallback: no CPU rasterizer, no hand-off to the system's drivers.
 
 ## 🗂️ Layout
 

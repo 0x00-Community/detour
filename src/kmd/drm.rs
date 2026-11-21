@@ -160,9 +160,13 @@ impl Node {
         Node::all(drivers)?.into_iter().next().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no {} render node in /dev/dri", drivers.join(" or "))))
     }
 
-    /// Every render node in /dev/dri whose driver is one of `drivers`, in order
+    /// Every render node in /dev/dri whose driver is one of `drivers`, in order (none when there is no /dev/dri)
     pub fn all(drivers: &[&str]) -> Result<Vec<Node>> {
-        let mut nodes: Vec<PathBuf> = std::fs::read_dir("/dev/dri")?
+        let dir = match std::fs::read_dir("/dev/dri") {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            dir => dir?,
+        };
+        let mut nodes: Vec<PathBuf> = dir
             .filter_map(|e| e.ok().map(|e| e.path()))
             .filter(|p| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("renderD")))
             .collect();
